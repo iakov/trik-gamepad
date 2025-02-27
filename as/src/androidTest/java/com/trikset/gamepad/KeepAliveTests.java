@@ -51,10 +51,10 @@ public class KeepAliveTests {
 
         // In order to set connection up
         client.send("testtest");
-        Thread.sleep(5000);
+        Thread.sleep(1000);
         client.disconnect("testtest");
 
-        Thread.sleep(1000);
+        Thread.sleep(5000);
         server.stopListening();
 
         Iterator<String> messages = server.getReceivedMessages().iterator();

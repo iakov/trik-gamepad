@@ -125,7 +125,7 @@ public class SettingsTests {
                                         withClassName(is("android.widget.ScrollView")),
                                         0),
                                 1)));
-        appCompatEditText.perform(scrollTo(), longClick());
+        appCompatEditText.perform(scrollTo(), click());
 
         // Added a sleep statement to match the app's execution delay.
         // The recommended way to handle such scenarios is to use Espresso idling resources:
@@ -143,7 +143,7 @@ public class SettingsTests {
                                         withClassName(is("android.widget.ScrollView")),
                                         0),
                                 1)));
-        appCompatEditText2.perform(scrollTo(), replaceText(""));
+        appCompatEditText2.perform(replaceText(""));
 
         ViewInteraction appCompatEditText3 = onView(
                 allOf(withId(android.R.id.edit),
@@ -189,10 +189,10 @@ public class SettingsTests {
                                         withClassName(is("android.widget.ScrollView")),
                                         0),
                                 1)));
-        appCompatEditText5.perform(scrollTo(), replaceText("127.0.0.1"));
+        appCompatEditText5.perform(scrollTo(), replaceText("localhost"));
 
         ViewInteraction appCompatEditText6 = onView(
-                allOf(withId(android.R.id.edit), withText("127.0.0.1"),
+                allOf(withId(android.R.id.edit), withText("localhost"),
                         childAtPosition(
                                 childAtPosition(
                                         withClassName(is("android.widget.ScrollView")),
@@ -245,7 +245,7 @@ public class SettingsTests {
                                         withClassName(is("android.widget.ScrollView")),
                                         0),
                                 1)));
-        appCompatEditText7.perform(scrollTo(), longClick());
+        appCompatEditText7.perform(scrollTo(), click());
 
         // Added a sleep statement to match the app's execution delay.
         // The recommended way to handle such scenarios is to use Espresso idling resources:
@@ -346,7 +346,7 @@ public class SettingsTests {
                                         withClassName(is("android.widget.ScrollView")),
                                         0),
                                 1)));
-        appCompatEditText11.perform(scrollTo(), longClick());
+        appCompatEditText11.perform(scrollTo(), click());
 
         // Added a sleep statement to match the app's execution delay.
         // The recommended way to handle such scenarios is to use Espresso idling resources:
@@ -779,7 +779,7 @@ public class SettingsTests {
                 PreferenceManager.getDefaultSharedPreferences(mActivityTestRule.getActivity());
 
         assertEquals(
-                "127.0.0.1",
+                "localhost",
                 preferences.getString(SettingsFragment.SK_HOST_ADDRESS, ""));
         assertEquals(
                 "12345",
@@ -793,9 +793,9 @@ public class SettingsTests {
         assertEquals(
                 "3000",
                 preferences.getString(SettingsFragment.SK_KEEPALIVE, ""));
-     /*   assertEquals(
+        assertEquals(
                 "http://localhost:8080/?action=stream",
-                preferences.getString(SettingsFragment.SK_VIDEO_URI, ""));*/
+                preferences.getString(SettingsFragment.SK_VIDEO_URI, ""));
     }
 
     @Test
@@ -859,7 +859,7 @@ public class SettingsTests {
                                         0)),
                         4),
                         isDisplayed()));
-        linearLayout.perform(click());
+        linearLayout.perform(longClick());
 
         // Added a sleep statement to match the app's execution delay.
         // The recommended way to handle such scenarios is to use Espresso idling resources:
