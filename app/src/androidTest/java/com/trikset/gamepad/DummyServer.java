@@ -9,29 +9,37 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DummyServer {
-    static final String IP = "localhost";
-    static final int DEFAULT_PORT = 12345;
+  static final String IP = "localhost";
+  static final int DEFAULT_PORT = 12345;
 
-    private boolean canStopListening = false;
-    public void stopListening() { canStopListening = true; }
+  private boolean canStopListening = false;
 
-    private final ArrayList<String> receivedMessages = new ArrayList<>();
-    public List<String> getReceivedMessages() { return receivedMessages; }
+  public void stopListening() {
+    canStopListening = true;
+  }
 
-    DummyServer() {
-        Thread serverThread = new Thread(() -> {
-            try (ServerSocket server = new ServerSocket(DEFAULT_PORT)) {
+  private final ArrayList<String> receivedMessages = new ArrayList<>();
+
+  public List<String> getReceivedMessages() {
+    return receivedMessages;
+  }
+
+  DummyServer() {
+    Thread serverThread =
+        new Thread(
+            () -> {
+              try (ServerSocket server = new ServerSocket(DEFAULT_PORT)) {
                 Socket client = server.accept();
 
                 BufferedReader clientInput =
-                        new BufferedReader(new InputStreamReader(client.getInputStream()));
+                    new BufferedReader(new InputStreamReader(client.getInputStream()));
                 do {
-                    receivedMessages.add(clientInput.readLine());
+                  receivedMessages.add(clientInput.readLine());
                 } while (!canStopListening);
-            } catch (IOException e) {
+              } catch (IOException e) {
                 e.printStackTrace();
-            }
-        });
-        serverThread.start();
-    }
+              }
+            });
+    serverThread.start();
+  }
 }
