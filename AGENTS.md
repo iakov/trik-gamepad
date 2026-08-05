@@ -12,24 +12,28 @@ Removing a documented rule changes agent behavior — only delete if provably in
 
 ## Project
 
-Android app (mixed Kotlin/Java, effectively Java-only — 0 `.kt` files) that
+Android app (mixed Kotlin/Java, currently Java sources — 0 `.kt` files) that
 mimics a gamepad to control TRIK robots. It sends plain-text commands over a
-TCP socket and streams MJPEG video over HTTP. Only the app in `as/` is
-maintained.
+TCP socket and streams MJPEG video over HTTP. Pure-Kotlin migration is planned
+after the 85% coverage gate passes (see `.PLAN.md`).
 
 ## Layout
 
-- `as/` — the only active project (Android Studio / Gradle). All gradle commands run from `as/`.
-- `xamarin/` — legacy, unfinished F# Xamarin port. Not built by CI, do not edit.
+- Canonical Android layout at repo root: `settings.gradle` + `app/` module.
+  All gradle commands run from the repo root (`./gradlew ...`).
 - `_apk/` — committed release APKs (historical).
-- `.circleci/config.yml` — CI: builds `as/`, unit tests on JVM, instrumented tests via Firebase Test Lab.
+- `.github/workflows/` — CI: build, Robolectric unit tests, lint/checkstyle/
+  spotbugs/jacoco gates, instrumented tests on emulator.
+- `.opencode/skills/` — opencode skills (e.g. release-notes).
+- `docs/img/` — screenshots/logos.
+- `.venv/` — repo-local uv virtualenv (pre-commit, mdformat); gitignored.
 
-## Build (from `as/`)
+## Build (from repo root)
 
-- Gradle wrapper 8.11.1, AGP 8.9.0, Kotlin 1.9.23, Java 11. `compileSdk 35`, `targetSdk 34`, `minSdk 21`.
-- No `settings.gradle`; `build.gradle` at the `as/` root is the whole build.
-- Signing: `defaultConfig` applies a release signing config referencing `../../android-keystorage.jks`. Debug builds use it too, so **any build fails without that keystore file present**. See MEMORY.md "Build & layout" for gitignore status and how the path resolves.
-- Version is hand-set at the top of `as/build.gradle` (`appMajorVersion`/`appMinorVersion`, currently 1.40). `versionCode` is computed (`minSdk*10000 + major*100 + minor`), `versionNameSuffix` is `-API<minSdk>`. Bump `appMinorVersion` for a release; never set versionCode by hand.
+- Planned toolchain (locked in `.PLAN.md`): Gradle 8.14.5, AGP 8.13.2, Kotlin 2.x, Java 11. `compileSdk 36`, `targetSdk 36`, `minSdk 21`, `maxSdk 36` — single main flavor (D14/D15). Do not migrate to AGP 9 / Gradle 9 without a settings.gradle restructure.
+- `settings.gradle` at repo root: `rootProject.name = 'trik-gamepad'`, `include ':app'`.
+- Signing: `app/build.gradle` applies a release signing config conditionally — only when `file('../android-keystorage.jks')` exists. Debug builds fall back to the auto-generated debug keystore in CI. See MEMORY.md "Build & layout" for gitignore status and how the path resolves.
+- Version is hand-set at the top of `app/build.gradle` (`appMajorVersion`/`appMinorVersion`, currently 1.40; next release 1.41). `versionCode` is computed (`minSdk*10000 + major*100 + minor`), `versionNameSuffix` is `-API<minSdk>`. Bump `appMinorVersion` for a release; never set versionCode by hand.
 
 ## Hooks
 
@@ -38,12 +42,12 @@ configurations, update this section and the referenced config files.
 
 ### On session init
 
-- Read this file, `MEMORY.md` header + section list, `TESTING.md`, `as/build.gradle`, and `.circleci/config.yml`; pull MEMORY sections on demand.
+- Read this file, `MEMORY.md` header + section list, `TESTING.md`, `app/build.gradle`, and `.github/workflows/ci.yml`; pull MEMORY sections on demand.
 - Don't talk to the user before session warm-up is complete.
 
 ### Before commit
 
-- When pre-commit is installed, run `pre-commit run --all-files`; otherwise at least `uvx mdformat` on changed `.md` files.
+- When pre-commit is installed, run `.venv/Scripts/pre-commit run --all-files`; otherwise at least `uvx mdformat` on changed `.md` files.
 - New tool/config → update this section and `MEMORY.md`.
 
 ### Before push / PR
@@ -51,13 +55,22 @@ configurations, update this section and the referenced config files.
 - Fork-only workflow: work lives in the personal fork (origin remote; run `git remote -v` for the URL). Never create PRs against upstream `trikset/trik-gamepad`.
 - Branch from fork `master` (== `origin/master`); name `feat/`, `fix/`, `docs/`, `style/`, `refactor/`, or `chore/`.
 - Never push to `master` directly — always a within-fork PR (`gh pr create --base master`), squash-merged after green CI (see Guardrails).
-- Re-validate from `as/`: `./gradlew test` and `./gradlew lint`.
+- Re-validate from repo root: `./gradlew test` and `./gradlew lint`.
 - If `AGENTS.md` changed: `git diff HEAD -- AGENTS.md`, check every added/removed line against the boundary test (see Guardrails — Documenting decisions).
 
 ### Before test / command
 
-- From `as/`: `./gradlew test` (Robolectric, no device needed); a single test via `./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.<method>"`.
+- From repo root: `./gradlew test` (Robolectric, no device needed); a single test via `./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.<method>"`.
 - Instrumented tests need a running emulator/device (AEHD hypervisor required — verify with `emulator -accel-check`).
+
+### Operational rules (command hygiene)
+
+- **Every command runs with a reasonable timeout**, scaled to the task (gradle build ~10 min, downloads ~10 min, emulator boot ~5 min).
+- **Every command is logged**: tee output to `app/build/<task>.log` (gitignored) or `.tmp/`; never run blind. On timeout, read the log and find root cause before re-running.
+- **If a command takes ≥1.5× the expected time, analyze the wrong guess.** Record expected vs actual for each command.
+- **A wrong guess often means an option was not set properly** — re-audit the invocation (e.g. the AVD's `hw.gpu.mode=host` config was the truth that CLI flags must not override).
+- **Slow commands → research (incl. web), apply best practices, tune repeatable tooling** — fix the tooling, not the symptom; document quirks and findings in `MEMORY.md`.
+- **Async tools**: capture a process handle (`Start-Process -PassThru`), verify liveness immediately, wait for the readiness signal with a timeout, then continue independent work — never stall on a poll.
 
 ### On tool error
 
@@ -68,7 +81,7 @@ configurations, update this section and the referenced config files.
 ### Before release
 
 - Gates: green CI, 0 open PRs, 0 security alerts.
-- Bump `appMinorVersion` in `as/build.gradle`; signing is local-only (the keystore never enters CI).
+- Bump `appMinorVersion` in `app/build.gradle`; signing is local-only (the keystore never enters CI).
 - Commit the release APK to `_apk/`; generate notes via the release-notes skill; review the draft, never auto-publish.
 
 ## Guardrails
@@ -84,7 +97,6 @@ configurations, update this section and the referenced config files.
 ## Commands
 
 ```sh
-cd as
 ./gradlew assembleDebug                      # CI adds: -PpreDexEnable=false
 ./gradlew assembleDebugAndroidTest
 ./gradlew test                               # Robolectric unit tests, no device needed
@@ -93,8 +105,9 @@ cd as
 ```
 
 ```sh
-uv tool install pre-commit && pre-commit install   # once; needs %USERPROFILE%\.local\bin on PATH
-pre-commit run --all-files
+uv venv                                      # create repo-local .venv (gitignored)
+uv pip install --python .venv pre-commit mdformat
+.venv/Scripts/pre-commit run --all-files     # or uvx pre-commit run --all-files
 uvx mdformat <file>.md
 ```
 
@@ -115,16 +128,16 @@ Details live in `MEMORY.md` — pull a section on demand:
 | Layout, keystore path, versioning | Build & layout |
 | Test suite structure, DummyServer ports | Testing |
 | SenderService protocol, keepalive, MJPEG | App protocol |
-| CI (CircleCI, Firebase), emulator prerequisites | CI quirks |
+| CI (GitHub Actions, Firebase), emulator prerequisites | CI quirks |
 | Branch/PR and release workflows | Workflows |
 | Rationale for tool choices and past fixes | Design decisions |
 
 ## Current work
 
-- In-flight plan for the "global refresh" (docs culture + quality gates + format
-  sweep, four commits on `feat/global-refresh`) lives in `.PLAN.md`. Code/tool
-  changes are intentionally postponed — do not add quality gates without an
-  explicit request.
+- Execution plan for the revival (canonical layout + quality gates + format
+  sweep + toolchain upgrade to compileSdk/targetSdk 36, minSdk 21, coverage to
+  85%, pure-Kotlin migration, commits on `feat/global-refresh`) lives in
+  `.PLAN.md`. `.PLAN.md` is gitignored — never commit it.
 
 ## Conventions
 

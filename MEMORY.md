@@ -12,27 +12,32 @@ Design decisions (dated entries).
 
 ### Which code is alive
 
-- `as/` is the only maintained project. `xamarin/` is an unfinished F# port
-  (git history: "Draft of F# version. Raw translation. Not finished yet."),
-  not built by CI — never edit.
+- The repo has the **canonical Android layout** at the root: `settings.gradle`
+  (`rootProject.name = 'trik-gamepad'`, `include ':app'`) + the `app/` module.
+  All gradle commands run from the repo root.
 - `_apk/` holds committed release APKs with versioned names
   (`TRIKGamepad-1.40-21.apk`).
-- The `as/` source tree is **Java-only** (0 `.kt`/`.kts` files) even though the
+- The `app/` source tree is **Java-only** (0 `.kt`/`.kts` files) even though the
   Kotlin Android plugin is applied; `compileDebugKotlin` reports NO-SOURCE.
+  Pure-Kotlin migration is planned (gated on green CI + 85% coverage, `.PLAN.md`).
+- `xamarin/` was an unfinished F# port — **deleted** during the revival
+  restructure (git history preserves it). `imgs/` moved to `docs/img/`.
 
 ### Keystore path (subtle)
 
-`as/build.gradle` sets `storeFile file('../../android-keystorage.jks')`
-relative to the project dir `as/`. Two levels up from `as/` is the **parent of
-the repo root**, not the repo root — earlier AGENTS.md wording ("repo root")
-was wrong. The keystore is gitignored via `**/*.jks` (never committed).
-Because `defaultConfig` applies the signing config, **even debug builds
-require the file**; builds fail without it. Key alias is `gamepad`.
+`app/build.gradle` sets `storeFile file('../android-keystorage.jks')` relative
+to the project dir `app/`. One level up from `app/` is the **parent of the repo
+root** — the keystore deliberately lives *outside* the workdir (guarded-push
+rule: no secrets in the repo). The keystore is gitignored via `**/*.jks`
+(never committed). Signing is applied **conditionally** — `if (file('../android-keystorage.jks').exists())` — so debug builds in CI fall back
+to the auto-generated debug keystore and never need the file. Locally the
+keystore is present, so release builds sign normally. Key alias is `gamepad`.
 
 ### Versioning
 
-`appMajorVersion`/`appMinorVersion` are hand-set at the top of `as/build.gradle`
-(currently 1.40). `versionCode = minSdk*10000 + abiCode*1000 + major*100 + minor`
+`appMajorVersion`/`appMinorVersion` are hand-set at the top of `app/build.gradle`
+(currently 1.40; next release 1.41 per `.PLAN.md` D19).
+`versionCode = minSdk*10000 + abiCode*1000 + major*100 + minor`
 (never set by hand), `versionName = "1.40"`, `versionNameSuffix = "-API21"`.
 Bump `appMinorVersion` per release; semantic 1.x is kept intentionally
 (Play Store requires a strictly increasing versionCode per app — date-based
@@ -40,14 +45,26 @@ versions risk collisions with the `minSdk*10000 + ...` formula).
 
 ### SDK/local setup
 
-- `as/local.properties` (gitignored) points at the user-local Android SDK via
-  `sdk.dir=<path>`; the drive-letter colon MUST be escaped (e.g.
-  `C\:/Users/<user>/Android/Sdk` style) or lint's `PropertyEscape` check fails
-  the build.
-- JDK 21 (Microsoft OpenJDK) works with Gradle 8.11.1 + AGP 8.9.0.
+- `local.properties` (gitignored, at repo root) points at the user-local
+  Android SDK via `sdk.dir=<path>`; the drive-letter colon MUST be escaped
+  (e.g. `C\:/Users/<user>/Android/Sdk` style) or lint's `PropertyEscape` check
+  fails the build.
+- JDK 21 (Microsoft OpenJDK) works with Gradle 8.14.5 + AGP 8.13.2 (planned
+  toolchain per `.PLAN.md`).
 - AEHD (Android Emulator Hypervisor Driver 2.2) is installed for local
   emulator acceleration; verify with `emulator -accel-check`. Installer lives
   in the SDK: `extras\google\Android_Emulator_Hypervisor_Driver\silent_install.bat`.
+- SDK platforms installed: 23, 30, 35, 36, 36.1. `compileSdk/targetSdk 36`
+  needs `platforms;android-36` — installed via
+  `sdkmanager "platforms;android-36"`.
+
+### Python tooling (uv + repo-local venv)
+
+All Python tools run through uv with a **repo-local `.venv`** (gitignored):
+`uv venv` then `uv pip install --python .venv pre-commit mdformat`. Run them as
+`.venv/Scripts/pre-commit.exe` / `.venv/Scripts/mdformat.exe` or `uvx`. Do NOT
+use `uv tool install` (global, machine-level) or system pip. The git pre-commit
+hook (`.git/hooks/pre-commit`) points at the venv Python via `INSTALL_PYTHON`.
 
 ## Testing
 
@@ -233,11 +250,47 @@ suppression policy, error-leaves-a-trace.
 skill. Python tooling is uv-managed (`uv tool install pre-commit`, `uvx mdformat`); `%USERPROFILE%\.local\bin` must be on PATH for the git hook.
 
 **Consequences:** this file was created; TESTING.md created; AGENTS.md
-restructured. Code changes and quality gates (google-java-format, Checkstyle,
-SpotBugs+find-sec-bugs, Error Prone, JaCoCo, Mockito, pre-commit config,
-Dependabot, CI hardening) were **postponed** by the maintainer — do not add
-them without explicit request. The full execution plan and rationale live in
-`.PLAN.md`.
+restructured. Quality gates and the toolchain upgrade were initially postponed
+by the maintainer (recorded in the next entry, "Toolchain + quality gates");
+the maintainer later approved them. The full execution plan and locked
+decisions D1–D19 live in `.PLAN.md`.
+
+### [2026-08-05] Toolchain + quality gates approved (single main flavor)
+
+**Context:** the maintainer reviewed the lobe-style plan again and granted
+freedom to upgrade tooling/deps. Constraints: backward-compatible with 99% of
+Androids; tests-first (TDD) so features keep working; keep Java sources this
+release (pure-Kotlin later); single main flavor — a legacy flavor is postponed.
+
+**Decision (D14–D19, full rationale in `.PLAN.md`):** minSdk 21 stays
+(AndroidX floor for libs released before June 2025; 99.8% coverage vs 98.0% at
+minSdk 23). Toolchain goes to Gradle 8.14.5 + AGP 8.13.2 + Kotlin 2.x (NOT AGP
+9 — needs settings.gradle/plugins-DSL migration on this legacy single-module
+`apply plugin:` layout). `compileSdk/targetSdk/maxSdk 36` (Play requires
+targetSdk 36 from 2026-08-31). Deps pinned to minSdk-21-compatible freshest:
+core 1.16.0 / appcompat 1.7.1 (core 1.17+ raises minSdk to 23). Version 1.41.
+
+**Consequences:** `.PLAN.md` rewritten with a six-commit sequence (docs →
+gates → format sweep → test fix → toolchain/deps/version → docs
+retrospective). Biggest risk: targetSdk 34→36 edge-to-edge enforcement on the
+fullscreen gamepad UI — needs an API 36 emulator smoke test.
+
+### [2026-08-05] Version/SDK data snapshot (for future sessions)
+
+**Context:** researched current Android distribution and freshest versions
+(Apr 2026 Statcounter via apilevels.com; Google Maven / Maven Central).
+
+**Data (cumulative coverage):** minSdk 16=99.9%, 19=99.9%, 21=99.8%,
+23=98.0%, 26=96.1%, 28=93.5%, 30=86.9%, 34=54.5%, 36=22.3%. Play requires
+targetSdk 36+ after 2026-08-31. AndroidX libs released after June 2025 require
+minSdk 23.
+
+**Freshest stable (2026-08-05):** Gradle 8.14.5 (9.6.1 pairs with AGP 9); AGP
+8.13.2 (9.3.1 is freshest stable but breaking); Kotlin 2.4.10; appcompat 1.7.1,
+core 1.19.0 (but 1.17+ needs minSdk 23), annotation 1.10.0, preference 1.2.1,
+tracing 1.3.0; androidx.test runner 1.7.0, espresso-core 3.7.0, rules 1.7.0,
+orchestrator 1.6.1; Robolectric 4.15.1, Mockito 5.18.0, junit 4.13.2,
+commons-io 2.22.0. Local SDK has platforms 30/35; android-36 installable.
 
 ### [2026-08-05] Fork-only workflow (no upstream PRs)
 
@@ -263,3 +316,56 @@ languages is expected, not an error.
 
 **Decision:** keep the downgrade; it is the intended convention, recorded here
 per the suppression policy.
+
+### [2026-08-06] Emulator: AVD config is the source of truth (slow-boot lesson)
+
+**Context:** an ad-hoc emulator launch used `-gpu swiftshader_indirect -no-snapshot`, overriding the AVD's declared `hw.gpu.mode=host` + quickboot.
+The AVD cold-booted under software rendering at 1080×2340@440dpi and stayed
+`offline` for ~2.7 h. The maintainer then fixed `config.ini`
+(`hw.gpu.mode=host`, `fastboot.forceFastBoot=yes`,
+`firstboot.bootFromDownloadableSnapshot=yes`, 6 cores, 4 GB) and created two
+`emu-launch*.bat` launchers to teach the correct invocation.
+
+**Decision:** the AVD's `config.ini` is the source of truth; CLI flags must
+not fight it. Correct local launch: `emulator -avd Simple_Phone_API36 -no-window -no-audio -no-boot-anim -gpu host` (snapshots stay enabled). The
+launcher `.bat` files were training material and were deleted.
+
+**Consequences:** relaunch booted in **~39 s** (`Boot completed in 38877 ms`,
+NVIDIA GPU translator) vs ~2.7 h. Quirk recorded: emulator 37.1.11 logs
+"configured it not to save on exit" and `default_boot` snapshot failed to load
+even though `config.ini` declares `firstboot.saveToLocalSnapshot=yes` — a
+snapshot-policy discrepancy to revisit. Never pass `-no-snapshot` for local
+iteration; only for pristine CI-style cold boots.
+
+### [2026-08-06] Operational rules for command hygiene
+
+**Context:** the agent stalled "staring at the emulator" — launched an async
+process, then polled it instead of advancing the work queue. Root cause:
+serialized the pipeline on an async resource (needed only later), and treated
+polling as progress.
+
+**Decision:** every command gets a reasonable timeout + a log tee
+(`app/build/<task>.log` or `.tmp/`); expected-vs-actual time is compared;
+≥1.5× → analyze the wrong guess; slow commands → research + tune repeatable
+tooling + document quirks. Async tools: capture `Start-Process -PassThru`,
+verify liveness immediately, wait for the readiness signal with timeout, then
+continue independent work — never stall on a poll. (Rules in AGENTS.md, this
+rationale here.)
+
+### [2026-08-06] Revival restructure (canonical layout, delete garbage)
+
+**Context:** the maintainer approved a full revival: canonical Android layout,
+quality gates, coverage to 85%, then pure-Kotlin migration; no release, no PR.
+`as/` (legacy single-module) was replaced by `settings.gradle` + `app/`.
+
+**Decision (R1–R15, full detail in `.PLAN.md`):** `settings.gradle` +
+`app/` module at repo root; delete `xamarin/`, `as/import-summary.txt`,
+Eclipse junk, `.local_development.db`; `imgs/` → `docs/img/`; retire CircleCI
+→ GitHub Actions; conditional signing (keystore stays outside the workdir);
+toolchain Gradle 8.14.5 / AGP 8.13.2 / Kotlin 2.x / SDK 36 / minSdk 21;
+coverage gate starts 60% and ratchets to 85% before Kotlin migration;
+MJPEG reconnect-on-error replaces the 30 s forced restart.
+
+**Consequences:** all gradle commands run from the repo root; keystore path
+changed `../../` → `../` (same file, `trik\android-keystorage.jks`). The
+restructure was a pure `git mv` so history is preserved.

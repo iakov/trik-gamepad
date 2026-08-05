@@ -31,7 +31,12 @@ cd as
 Local instrumented run:
 
 1. Verify acceleration: `emulator -accel-check` (needs AEHD → returns `0`).
-1. Boot an AVD: `emulator -avd Simple_Phone_API35 -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect`.
+1. Boot an AVD **with its declared config** — the AVD `config.ini` is the source
+   of truth (`hw.gpu.mode=host`, quickboot snapshots). Never override with
+   `-gpu swiftshader_indirect` or `-no-snapshot` for local work — a software-GPU
+   cold boot can take hours. Correct launch (boot ~40 s):
+   `emulator -avd Simple_Phone_API36 -no-window -no-audio -no-boot-anim -gpu host`
+   (drop `-no-window` to see the UI; keep snapshots enabled for fast reboots).
 1. Wait for `adb shell getprop sys.boot_completed` → `1`.
 1. `./gradlew connectedDebugAndroidTest`.
 
@@ -86,7 +91,8 @@ Every batch of changes touching `SenderService` or the tests should consider:
 
 ## Known gaps
 
-- No coverage gate yet (JaCoCo planned but postponed).
+- No coverage gate yet (JaCoCo `jacocoTestReport` is being added as a report
+  only — not a 100% gate, per `.PLAN.md` D17/Tool mapping).
 - Instrumented tests exercise only what runs on the emulator; real TRIK robot
   interaction is never in CI.
 - Espresso tests note "idling resources would be the recommended way" — the
