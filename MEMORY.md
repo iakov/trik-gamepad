@@ -317,6 +317,32 @@ languages is expected, not an error.
 **Decision:** keep the downgrade; it is the intended convention, recorded here
 per the suppression policy.
 
+### [2026-08-06] Gradle pipeline hang: daemon inherits pipe handles
+
+**Context:** a gradle run "finished in 12 s" but the agent command blocked
+until the 10-min timeout. Root cause: the invocation was a PowerShell pipeline
+`gradlew ... 2>&1 | Tee-Object ... | Select-Object -Last 20`. Gradle spawns a
+**daemon** (`GradleDaemon`, a long-lived JVM) that **inherits the parent
+shell's stdout/stderr pipe handles**. PowerShell pipelines wait for the whole
+pipeline to complete (EOF), and because the daemon keeps those handles open the
+pipeline never saw EOF — even though `gradlew.bat` had long since returned.
+The build result was sitting in the log the whole time.
+
+**Decision:** never pipe a long-lived child (Gradle, emulator, servers) through
+`Select-Object`/`Tee-Object`. Redirect to a file instead:
+`& gradlew <args> *> <log>` (or `Start-Process -Wait -RedirectStandardOutput <log>`),
+read the file afterward, use short timeouts for probes, and stop the daemon
+(`gradlew --stop`) or use `--no-daemon` for one-shot probe runs. Rule recorded
+in AGENTS.md "Operational rules".
+
+**Also:** the first gate attempt mis-guessed the google-java-format Gradle
+plugin coordinates (`com.github.sherter.google-java-format:0.9` does not
+resolve from `google()`/`mavenCentral()`). Verified candidates: the
+`com.github.sherter.google-java-format` plugin id exists but needs correct
+version/coordinates; fallback is Spotless with `googleJavaFormat()` — the
+lobe-style equivalent. Always probe plugin coordinates read-only before
+committing to them (Tooling assumptions guardrail).
+
 ### [2026-08-06] Emulator: AVD config is the source of truth (slow-boot lesson)
 
 **Context:** an ad-hoc emulator launch used `-gpu swiftshader_indirect -no-snapshot`, overriding the AVD's declared `hw.gpu.mode=host` + quickboot.

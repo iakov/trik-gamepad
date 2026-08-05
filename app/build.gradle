@@ -2,19 +2,31 @@ apply plugin: 'idea'
 apply plugin: 'checkstyle'
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
+apply plugin: 'jacoco'
+apply plugin: 'com.github.spotbugs'
+apply plugin: 'com.diffplug.spotless'
 
 def abiCode = 0 // just for fun
 def appMajorVersion = 1 // single digit for each SDK/ABI
 def appMinorVersion = 40 // two digits for each major version
 
+// The signing keystore deliberately lives OUTSIDE the repo workdir (one level
+// above the repo root, next to the checkout). It is gitignored via **/*.jks and
+// never enters CI. Debug builds in CI fall back to the auto-generated debug
+// keystore; release signing stays local-only and keystore-gated.
+def keystoreFile = file('../android-keystorage.jks')
+
 buildscript {
     repositories {
         google()
         mavenCentral()
+        gradlePluginPortal()
     }
     dependencies {
         classpath 'com.android.tools.build:gradle:8.9.0'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.23"
+        classpath 'com.github.spotbugs:com.github.spotbugs.gradle.plugin:6.5.10'
+        classpath 'com.diffplug.spotless:com.diffplug.spotless.gradle.plugin:8.9.0'
     }
 }
 
@@ -29,7 +41,7 @@ android {
     signingConfigs {
         config {
             keyAlias 'gamepad'
-            storeFile file('../android-keystorage.jks')
+            storeFile keystoreFile
         }
     }
     compileSdk 35
@@ -42,36 +54,17 @@ android {
         versionName ('' + appMajorVersion + '.' + appMinorVersion)
         versionNameSuffix ('-API' + minSdk)
         resourceConfigurations += ['en']
-        signingConfig signingConfigs.config
+        // Only sign with the local keystore when it actually exists (CI has no
+        // keystore and must fall back to the debug keystore). See MEMORY.md.
+        if (keystoreFile.exists()) {
+            signingConfig signingConfigs.config
+        }
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments clearPackageData: 'true'
     }
     buildFeatures {
         buildConfig = true // to use BuildConfig.VERSION_NAME in About
     }
-/*
-    flavorDimensions "api"
-    productFlavors {
-        latest {
-            dimension "api"
-            targetSdk (compileSdk - 1)
-            minSdk 21 // (compileSdk - 3)
-        }
-        legacy {
-            dimension "api"
-            maxSdk (compileSdk - 4)
-            minSdk 21
-            targetSdk compileSdk
-            versionNameSuffix ('-compat' + minSdk)
-
-        }
-    }
-    productFlavors.configureEach {
-        flavor ->
-            defaultConfig.versionCode (flavor.minSdk * 10000 + abiCode * 1000 +  appMajorVersion * 100  + appMinorVersion)
-            defaultConfig.versionName ('' + appMajorVersion + '.' + appMinorVersion)
-    }
-*/
     buildTypes {
         release {
             minifyEnabled true
@@ -85,12 +78,28 @@ android {
             debuggable true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
         }
-
     }
     testOptions {
         animationsDisabled true
         unitTests {
             includeAndroidResources = true
+            all {
+                jacoco {
+                    // Robolectric loads classes without a file location via its
+                    // own classloader; without this the exec file records nothing
+                    // and coverage is always 0%.
+                    includeNoLocationClasses = true
+                    excludes = [
+                            'jdk.internal.*',
+                            '**/R.class',
+                            '**/R$*.class',
+                            '**/BuildConfig.*',
+                            '**/Manifest*.*',
+                            '**/*Test*.*',
+                            'android/**/*.*',
+                    ]
+                }
+            }
         }
         execution 'ANDROIDX_TEST_ORCHESTRATOR'
     }
@@ -103,6 +112,135 @@ android {
     kotlinOptions {
         jvmTarget = '11'
     }
+    lint {
+        // MissingTranslation is downgraded in lint.xml by convention (English-only
+        // resources); everything else fails the build.
+        abortOnError true
+    }
+}
+
+// javac -Xlint:all as the baseline static-analysis safety net (D8; Error Prone
+// deferred). Warnings do not fail the build yet.
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ['-Xlint:all']
+}
+
+checkstyle {
+    toolVersion '10.20.1'
+    // Google's ruleset, vendored verbatim from the checkstyle 10.20.1
+    // distribution (google_checks.xml) so the config never drifts from
+    // upstream and does not depend on archive-resolution quirks.
+    configFile = file('config/checkstyle/google_checks.xml')
+    maxWarnings = 0
+    ignoreFailures = false
+}
+
+// The Android plugin does not apply the `java` plugin, so checkstyle registers
+// no tasks of its own; create one bound to the app's Java sources.
+tasks.register('checkstyle', Checkstyle) {
+    description = 'Run Checkstyle over the app sources.'
+    source 'src/main/java'
+    include '**/*.java'
+    // The com.demo.mjpeg package is vendored third-party code (MJPEG player);
+    // it is excluded from the style gate and will be rewritten during the
+    // pure-Kotlin migration.
+    exclude '**/com/demo/mjpeg/**'
+    classpath = files()
+    config = checkstyle.config
+    reports {
+        xml.required = false
+        html.required = true
+        html.outputLocation = file("$buildDir/reports/checkstyle/checkstyle.html")
+    }
+}
+
+spotbugs {
+    toolVersion = '4.10.3'
+    effort = com.github.spotbugs.snom.Effort.MAX
+    reportLevel = com.github.spotbugs.snom.Confidence.valueOf('MEDIUM')
+    excludeFilter = file('findbugs-android-exclude.xml')
+    // Restrict analysis to the app's own packages: SpotBugs on JDK 17+ cannot
+    // resolve java.rmi.Remote and other JDK-platform types that android.jar
+    // references, which aborts analysis with a missing-class error. Only our
+    // own code is of interest anyway.
+    onlyAnalyze = ['com.trikset.*', 'com.demo.*']
+}
+
+// find-sec-bugs as the security SAST detector on the SpotBugs classpath. The
+// SpotBugs engine itself is pulled in via toolVersion above.
+dependencies {
+    spotbugsPlugins 'com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0'
+}
+
+tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
+    reports {
+        html {
+            required = true
+            outputLocation = file("$buildDir/reports/spotbugs/${name}.html")
+            stylesheet = 'fancy-hist.xsl'
+        }
+    }
+}
+
+spotless {
+    java {
+        target 'src/**/*.java'
+        googleJavaFormat('1.22.0')
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+}
+
+jacoco {
+    toolVersion = '0.8.12'
+}
+
+// Coverage is measured on the debug unit tests; the report is always produced
+// and a verification gate enforces a minimum. The gate is a ratchet: it starts
+// at the current measured baseline (~11% line) and is raised step by step in
+// the coverage drive (Phase 12 of .PLAN.md) toward 85% before the pure-Kotlin
+// migration.
+def coverageExcludes = [
+        '**/R.class',
+        '**/R$*.class',
+        '**/BuildConfig.*',
+        '**/Manifest*.*',
+        '**/*Test*.*',
+        'android/**/*.*',
+]
+
+def debugClasses = fileTree(dir: "${buildDir}/intermediates/javac/debug/compileDebugJavaWithJavac/classes", excludes: coverageExcludes)
+def debugKotlinClasses = fileTree(dir: "${buildDir}/tmp/kotlin-classes/debug", excludes: coverageExcludes)
+
+tasks.register('jacocoTestReport', JacocoReport) {
+    dependsOn 'testDebugUnitTest'
+    reports {
+        xml.required = true
+        html.required = true
+    }
+    classDirectories.setFrom(files([debugClasses, debugKotlinClasses]))
+    sourceDirectories.setFrom(files(["${projectDir}/src/main/java", "${projectDir}/src/main/kotlin"]))
+    // Only the debug unit-test exec file: the report declares testDebugUnitTest
+    // as its dependency, so mixing in other variants' exec files would be an
+    // implicit-dependency violation (and would double-count coverage).
+    executionData.setFrom(file("${buildDir}/jacoco/testDebugUnitTest.exec"))
+}
+
+tasks.register('jacocoTestCoverageVerification', JacocoCoverageVerification) {
+    dependsOn 'testDebugUnitTest'
+    classDirectories.setFrom(files([debugClasses, debugKotlinClasses]))
+    sourceDirectories.setFrom(files(["${projectDir}/src/main/java", "${projectDir}/src/main/kotlin"]))
+    executionData.setFrom(file("${buildDir}/jacoco/testDebugUnitTest.exec"))
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.10
+            }
+        }
+    }
 }
 
 dependencies {
@@ -114,6 +252,8 @@ dependencies {
     implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.robolectric:robolectric:4.14'
+    testImplementation 'org.mockito:mockito-core:5.18.0'
+    testImplementation 'org.mockito:mockito-inline:5.2.0'
     androidTestImplementation 'androidx.test:runner:1.6.2'
     androidTestUtil 'androidx.test:orchestrator:1.5.1'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'

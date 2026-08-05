@@ -71,6 +71,7 @@ configurations, update this section and the referenced config files.
 - **A wrong guess often means an option was not set properly** — re-audit the invocation (e.g. the AVD's `hw.gpu.mode=host` config was the truth that CLI flags must not override).
 - **Slow commands → research (incl. web), apply best practices, tune repeatable tooling** — fix the tooling, not the symptom; document quirks and findings in `MEMORY.md`.
 - **Async tools**: capture a process handle (`Start-Process -PassThru`), verify liveness immediately, wait for the readiness signal with a timeout, then continue independent work — never stall on a poll.
+- **Never pipe a long-lived child through `Select-Object`/`Tee-Object`**: Gradle spawns a daemon that inherits the parent's stdout/stderr pipe handles, so a pipeline never sees EOF and the command blocks until timeout even though Gradle finished in seconds. Redirect to a file instead (`& gradlew ... *> log` or `Start-Process -Wait -RedirectStandardOutput log`), read the file after, and use short timeouts for probes. Use `gradlew --stop` / `--no-daemon` for one-shot probe runs so no daemon lingers.
 
 ### On tool error
 
