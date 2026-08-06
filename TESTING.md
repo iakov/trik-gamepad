@@ -51,13 +51,16 @@ Local instrumented run:
 > 8/8 with `RootViewWithoutFocusException` — the exact failure CI saw. Local
 > runs must use `-gpu host`.
 
-> **CI focus flake is intermittent.** On the GitHub Actions emulator
-> (`default` image + swiftshader + KVM) the focus loss occasionally still
-> happens even with the immersive pre-empt — identical config has been green
-> 9/9 and failed 7/9 on different runs. The ci.yml script therefore waits for
+> **CI focus flake is frequent, and retry-once is a band-aid.** On the GitHub
+> Actions emulator (`default` image + swiftshader + KVM) the focus loss
+> occasionally still happens even with the immersive pre-empt — identical
+> config has been green 9/9 and failed 7/9 on different runs, including a
+> 7/9 failure on a run that already had the retry. The ci.yml script waits for
 > the device, verifies the `immersive_mode_confirmations` value, dismisses any
-> keyguard, and **retries the suite once** on failure. A `RootViewWithoutFocusException`
-> on CI is a transient boot flake unless it repeats on the retry.
+> keyguard, and retries the suite once, but that does **not** reliably hold.
+> The real fix (macOS/GPU runner or a focus-wait before Espresso) is untried.
+> Treat a `RootViewWithoutFocusException` on CI as a known instability, not a
+> code regression.
 
 ## Diagnostic discipline
 

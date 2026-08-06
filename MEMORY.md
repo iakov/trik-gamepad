@@ -692,6 +692,49 @@ loss is **not** deterministic.
   emulator-boot flake. Neither is a code/test defect. Before debugging, confirm
   which job/step failed and whether the failure is at boot vs tests.
 
-**Consequences:** the job tolerates the transient focus/boot flakes. "CI green"
-must be judged on a run that actually executed both jobs to completion; keep a
-note of the last known-good run id (`31103997686`).
+**Consequences:** the retry once does **not** reliably hold — the final
+validation run of the session (`31116833261`, identical config) failed 7/9 on
+the focus flake even with the retry. So the retry is a band-aid: it absorbs the
+rater boot flake but the focus loss recurs often enough to matter. The real fix
+is a GPU-capable/macOS runner (host GPU) or a focus-wait before Espresso starts
+— both untried. "CI green" must be judged on a run that actually executed both
+jobs to completion; keep a note of the last known-good run id
+(`31103997686`).
+
+### [2026-08-06] Session retrospective: CI failure-rate baseline + process lessons
+
+**Context:** the Phase 11/12 session (commits `577db50`..`59857e2`, 17 commits,
+7 new test files, ~1048 test lines) ran 15 CI builds and got only **2 fully
+green** (`31100146629`, `31103997686`). The failure rate — and which failures
+were self-inflicted — is a baseline the next session should beat.
+
+**Failure breakdown (13 red runs):**
+
+| Cause | Runs | Self-inflicted? |
+|---|---|---|
+| `OldTargetApi` lint (strict-lint baseline scoped to `lintDebug`, env-dependent check) | 2 | Yes |
+| KeepAlive `NoSuchElementException` (fixed sleep, missed async-bind) | 1 | Yes |
+| Pad-test static-state leak (`[23]` variant only) | 1 | Yes |
+| Pad-test network dependency (2nd variant) | 1 | Yes |
+| Keepalive timing flake (fixed sleep vs real timer) | 1 | Yes |
+| Swiftshader focus flake (intermittent; retry not yet added) | 1 | Partly |
+| Shell syntax in my CI retry script (YAML `\` continuation) | 1 | Yes |
+| adb boot flake during emulator boot poll | 2 | No |
+| GHA "action download" infra failure | 1 | No |
+
+**Root causes (preventable):** the two most expensive were *re-discovering*
+already-documented hazards — `SenderService` static state and `DummyServer`
+sync-bind were both in MEMORY.md before this session, yet cost CI runs anyway
+(hit twice each). A `lintDebug`-generated baseline doesn't match the aggregate
+`lint` task CI runs. And I pushed a CI script without `sh -n`.
+
+**Decision:** added four AGENTS.md operational rules: (1) read a class's
+MEMORY.md/TESTING.md entry and apply every documented trap *before* writing
+tests against it; (2) run the full 3-variant `test` suite twice before pushing
+test changes; (3) generate lint baselines with the aggregate `lint` task (and
+suppress env-dependent checks in lint.xml); (4) validate CI scripts with
+`sh -n`. All rationale lives here; the rules live in AGENTS.md.
+
+**Consequences:** CI is not green at session end (`31116833261` failed 7/9 on
+the focus flake despite the retry). Next session: fix the focus flake for real
+(macOS runner / focus-wait), then Phase 13 Kotlin migration.

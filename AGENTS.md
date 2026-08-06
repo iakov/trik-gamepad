@@ -76,6 +76,9 @@ configurations, update this section and the referenced config files.
 - **Static state leaks across Robolectric test classes**: `SenderService` keeps `keepaliveTimeout`/`mConnectTask` static; tests that touch it must reset both via reflection in `@Before`/`@After`, or the 3-variant suite flakes only on CI (SDK-23). Test UI logic without a live TCP dependency when possible (assert `PausedExecutorService.runAll()` count, not server arrival).
 - **CI `script:` blocks must be plain POSIX `sh`** — no `\` line continuations or `{ ...; }` brace groups (they collapse into "Syntax error: end of file unexpected"). Validate the extracted script with `sh -n` before pushing.
 - **Distinguish infra from code failures**: `Failed to resolve action download info` (GitHub Actions) and `adb ... exit code 1` during the runner's boot poll are transient infra/emulator flakes, not code defects. Check which job/step failed and whether it is boot vs tests before changing code. Keep a note of the last known-good CI run id.
+- **Apply documented class traps before writing tests against a class**: MEMORY.md records hard-won hazards per class (e.g. `SenderService` static state, `DummyServer` sync-bind). When adding tests to a known-tricky class, read that class's MEMORY.md/TESTING.md entry FIRST and apply every documented trap in the first draft — re-discovering them costs CI runs (the session hit the static-state and async-bind flakes twice each).
+- **Run the full 3-variant suite twice before pushing test changes**: `./gradlew test` runs debug/release/releaseDebug in parallel JVMs; static-state and timing flakes surface only under full-suite or second-run conditions, not single-test runs. New/edited tests get `test` twice locally before push.
+- **Generate lint baselines with the aggregate `lint` task, not `lintDebug`**: a baseline from `lintDebug` misses issues the aggregate task reports, so CI fails on a "new" issue that is actually in-scope. Env-dependent checks (e.g. `OldTargetApi`) cannot be baselined — suppress them in `lint.xml`.
 
 ### On tool error
 
@@ -147,15 +150,18 @@ Details live in `MEMORY.md` — pull a section on demand:
 - Phases 1–12 are committed and pushed to the fork (layout, cleanup, CI retire,
   gates, format sweep, deterministic tests, toolchain 36, edge-to-edge + MJPEG
   reconnect, docs refresh, GitHub Actions CI, static analysis, coverage drive).
-  CI build gate is green; the last fully-green run (both jobs) was
-  `31103997686`. After the Phase 12 coverage + flake fixes + CI hardening,
-  HEAD was not re-validated before the session reset — the final run
-  (`31115958336`) failed on a GitHub Actions infra issue, not code. Key state:
-  coverage gate at **85% line / 60% branch**; PMD 7.26 + strict-lint baseline +
-  SpotBugs (0 bugs); `aosp_atd` local test AVD `Atd_API36` (`-gpu host` only);
-  CI uses `default` image + KVM step + `pixel_5`; instrumented job retries once
-  on the intermittent swiftshader focus flake. Next: re-validate CI on HEAD,
-  then Kotlin migration (Phase 13), retrospective (14).
+  CI build gate is green; **CI is NOT green overall at session end** — the last
+  fully-green run (both jobs) was `31103997686`. After Phase 12, several runs
+  failed on code (lint baseline scope, static-state/test flakes — all fixed),
+  one on a GitHub Actions infra issue (`31115958336`), and the final
+  validation run `31116833261` failed **7/9 on the swiftshader focus flake —
+  the retry-once did not absorb it**. Key state: coverage gate at
+  **85% line / 60% branch**; PMD 7.26 + strict-lint baseline + SpotBugs
+  (0 bugs); `aosp_atd` local test AVD `Atd_API36` (`-gpu host` only); CI uses
+  `default` image + KVM step + `pixel_5`. Next: **fix the instrumented focus
+  flake for real** (macOS/GPU runner or a focus-wait before Espresso — the
+  retry-once is a band-aid that does not hold), then Kotlin migration
+  (Phase 13), retrospective (14).
 
 ## Conventions
 
