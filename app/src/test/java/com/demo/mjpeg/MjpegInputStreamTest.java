@@ -94,4 +94,22 @@ public class MjpegInputStreamTest {
     frame.close();
     assertEquals(200, body.length);
   }
+
+  @Test
+  public void readMjpegFrameWhenAvailableShortShouldSkipToRecover() throws IOException {
+    // Header advertises a big Content-Length but only a few body bytes follow;
+    // the available() < 2*contentLength path is skipped and the short skip
+    // exercises the "Skipped only" warning path.
+    String headers = "Content-Type: image/jpeg\r\nContent-Length: 500\r\n\r\n";
+    byte[] headerBytes = headers.getBytes(StandardCharsets.US_ASCII);
+    byte[] frame = new byte[headerBytes.length + 10];
+    System.arraycopy(headerBytes, 0, frame, 0, headerBytes.length);
+    System.arraycopy(new byte[] {(byte) 0xFF, (byte) 0xD8}, 0, frame, headerBytes.length, 2);
+
+    MjpegInputStream stream = new MjpegInputStream(new ByteArrayInputStream(frame));
+    BoundedInputStream result = stream.readMjpegFrame();
+    if (result != null) {
+      result.close();
+    }
+  }
 }

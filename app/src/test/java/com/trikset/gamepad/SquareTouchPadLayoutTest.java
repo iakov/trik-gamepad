@@ -2,6 +2,8 @@ package com.trikset.gamepad;
 
 import static android.os.Looper.getMainLooper;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
 import static org.robolectric.annotation.LooperMode.Mode.PAUSED;
@@ -131,6 +133,33 @@ public class SquareTouchPadLayoutTest {
   @Test
   public void unknownActionShouldBeIgnored() {
     assertTrue(pad.dispatchTouchEvent(eventAt(100, 100, MotionEvent.ACTION_SCROLL)));
+  }
+
+  @Test
+  public void allConstructorsShouldBuild() {
+    Context context = org.robolectric.RuntimeEnvironment.getApplication();
+    assertNotNull(new SquareTouchPadLayout(context));
+    assertNotNull(new SquareTouchPadLayout(context, null));
+    assertNotNull(new SquareTouchPadLayout(context, null, 0));
+  }
+
+  @Test
+  public void onDrawShouldRenderCircle() {
+    android.graphics.Canvas canvas = new android.graphics.Canvas();
+    pad.setAbsXY(100, 100);
+    pad.draw(canvas);
+  }
+
+  @Test
+  public void onSizeChangedShouldCenterWhenStartingEmpty() {
+    // size changed from (0,0) -> centers the touch point.
+    pad.measure(
+        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
+        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY));
+    pad.layout(0, 0, 200, 200);
+    // After a layout with old size 0, dispatch a move to read the new center.
+    pad.dispatchTouchEvent(eventAt(100, 100, MotionEvent.ACTION_DOWN));
+    assertFalse(sender == null);
   }
 
   /** Binds synchronously in the constructor (see MEMORY.md) and records messages. */

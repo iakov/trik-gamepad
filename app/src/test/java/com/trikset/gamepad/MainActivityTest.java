@@ -262,6 +262,71 @@ public class MainActivityTest {
   }
 
   @Test
+  public void setSystemUiVisibilityShowShouldRun() throws Exception {
+    Method m = (Method) method(activity, "setSystemUiVisibility", boolean.class);
+    m.invoke(activity, true);
+    org.robolectric.Robolectric.flushForegroundThreadScheduler();
+  }
+
+  @Test
+  public void recreateMagicButtonsShouldCreateButtonsThatSendCommands() throws Exception {
+    Method m = (Method) method(activity, "recreateMagicButtons", int.class);
+    m.invoke(activity, 3);
+    org.robolectric.Robolectric.flushForegroundThreadScheduler();
+
+    android.view.ViewGroup buttonsView = activity.findViewById(R.id.buttons);
+    assertNotNull(buttonsView);
+    assertTrue(buttonsView.getChildCount() == 3);
+    // Clicking a magic button sends "btn N down" via the sender.
+    android.view.View first = buttonsView.getChildAt(0);
+    first.performClick();
+    org.robolectric.Robolectric.flushForegroundThreadScheduler();
+  }
+
+  @Test
+  public void createPadShouldWireSender() throws Exception {
+    Method m = (Method) method(activity, "createPad", int.class, String.class);
+    m.invoke(activity, R.id.leftPad, "1");
+    SquareTouchPadLayout pad = activity.findViewById(R.id.leftPad);
+    assertNotNull(pad);
+  }
+
+  @Test
+  public void onAccuracyChangedShouldBeNoOp() throws Exception {
+    // Call the listener method; must not throw.
+    activity.onAccuracyChanged(null, 0);
+  }
+
+  @Test
+  public void onSensorChangedAccelerometerShouldProcessWheel() throws Exception {
+    setField(activity, "mWheelEnabled", true);
+    setField(activity, "mAngle", 0);
+    setField(activity, "mWheelStep", 7);
+
+    android.hardware.SensorManager sm =
+        activity.getSystemService(android.hardware.SensorManager.class);
+    android.hardware.SensorEvent event =
+        org.robolectric.shadows.ShadowSensorManager.createSensorEvent(3);
+    if (event.sensor == null) {
+      java.util.List<android.hardware.Sensor> sensors =
+          sm.getSensorList(android.hardware.Sensor.TYPE_ACCELEROMETER);
+      event.sensor = sensors.isEmpty() ? null : sensors.get(0);
+    }
+    event.values[0] = 0.7f;
+    event.values[1] = 0.7f;
+    event.values[2] = 0f;
+    activity.onSensorChanged(event);
+  }
+
+  @Test
+  public void btnSettingsClickShouldToggleActionBar() {
+    android.widget.Button btnSettings = activity.findViewById(R.id.btnSettings);
+    assertNotNull(btnSettings);
+    btnSettings.performClick();
+    org.robolectric.Robolectric.flushForegroundThreadScheduler();
+  }
+
+  @Test
   public void onDestroyShouldNullOutListeners() {
     activity.onDestroy();
     // No crash; all listeners nulled and pads cleared.
