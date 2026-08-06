@@ -109,6 +109,9 @@ configurations, update this section and the referenced config files.
 - **Gaps escalate**: 1st occurrence — document (canonical doc); 2nd — automate (CI check or pre-commit hook); 3rd+ — tool config (linter rule, structural guard).
 - **Verify "runs automatically" claims against the environment**: a config file existing ≠ the tool being active — confirm with a command.
 - **Measure, don't estimate**: when claiming a refactor reduces SLOC/complexity/test-count, measure before and after; revert a consolidation that backfires; report measured deltas, not estimates.
+- **3 identical failures → stop and read, don't tweak-and-rerun**: if the same Robolectric test fails identically N≥3 consecutive runs (same exception/line, near-identical log size), stop and read the shadow/API source from the jar. The sensor saga burned ~15 runs because each "fix" only shifted the failing line. Applies beyond shadows: identical repeated failures mean a wrong model, not bad luck.
+- **Pre-format `.md` with `uvx mdformat` before pre-commit**: the mdformat hook modifies files on its first run and fails, so a second pass is always needed. Format changed `.md` files first and the hook passes once.
+- **`gh run watch` takes the run **id**, not the object**: passing a PowerShell run object (e.g. from a `ConvertFrom-Json` pipeline) makes `gh` build a bogus URL and 404. Extract `.id` explicitly. Same for any `gh <cmd>` that takes an id.
 
 ### On tool error
 
@@ -197,14 +200,17 @@ Details live in `MEMORY.md` — pull a section on demand:
   baseline + SpotBugs (0 bugs); `aosp_atd` local test AVD `Atd_API36`
   (`-gpu host` only); CI uses `default` image + KVM step + `pixel_5`.
 - **CI is NOT green overall**: the last fully-green run (both jobs) was
-  `31103997686`; later runs failed on code (fixed) or GitHub Actions infra
-  (`31115958336`), and the final validation run `31116833261` failed **7/9 on
-  the swiftshader focus flake — the retry-once did not absorb it** (details:
-  MEMORY.md "CI flake saga"). Treat `RootViewWithoutFocusException` on CI as a
-  known instability, not a code regression.
-- Next: **fix the instrumented focus flake for real** (macOS/GPU runner or a
-  focus-wait before Espresso — the retry-once is a band-aid that does not
-  hold), then Kotlin migration (Phase 13), retrospective (14).
+  `31103997686`. Full ledger (18 runs): **15 red, 2 green, 1 running** — the
+  running one (`31119028275`) is the retrospective-docs commit's CI; verify it
+  before Phase 13. Most red runs are **adb/emulator boot flakes** (infra, not
+  code); the swiftshader **focus flake** (`RootViewWithoutFocusException`) hit
+  7/9 on `31116833261` *with* the retry-once in place — the retry is proven
+  insufficient, do NOT spend more CI runs re-testing it (details: MEMORY.md
+  "CI flake saga" + "Full-session audit").
+- Next: **verify the docs-commit CI run**, then **fix the instrumented focus
+  flake for real** (macOS/GPU runner or a focus-wait before Espresso — the
+  retry-once is a band-aid that does not hold), then Kotlin migration
+  (Phase 13), retrospective (14).
 
 ## Conventions
 

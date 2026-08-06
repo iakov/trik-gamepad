@@ -99,6 +99,21 @@ asserting connected/command state.
 run `onPostExecute`. Do not rely on real threads for the `SenderService`
 executor.
 
+### Robolectric shadow traps
+
+- **Sensor tests need a `SensorEvent`, not a `Sensor`.** To feed the
+  accelerometer path, build the event via
+  `ShadowSensorManager.createSensorEvent(3)` (the sensor-agnostic 3-float
+  constructor), set `event.values`, and stub the sensor lookup. Trying
+  `shadowOf(Class<Sensor>)` or the wrong constructor is a compile error
+  (`no suitable method found for shadowOf`) that the sensor-test saga hit
+  twice (see MEMORY.md "Coverage drive to 85%": MainActivityTest).
+- **3 identical failures → stop and read the shadow source.** If the *same*
+  test fails identically N≥3 consecutive runs (same exception, same line, log
+  sizes near-identical), stop retrying and read the shadow's real API from the
+  Robolectric jar/source instead of tweaking-and-rerunning. The sensor saga
+  burned ~15 local runs this way before the `createSensorEvent(3)` fix.
+
 ## Edge-case audit
 
 Every batch of changes touching `SenderService` or the tests should consider:

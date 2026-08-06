@@ -101,6 +101,17 @@ guaranteed listening before the client connects.
 `PausedExecutorService` for the `SenderService` executor — `mExecutor.runAll()`
 drives background tasks deterministically, then `shadowOf(getMainLooper()).idle()`.
 
+**Sensor shadow trap (MainActivityTest):** to feed the accelerometer wheel
+path, build the event with `ShadowSensorManager.createSensorEvent(3)` (the
+sensor-agnostic 3-float constructor), fill `event.values`, and stub the sensor
+lookup so `onSensorChanged` receives it. `shadowOf(Class<Sensor>)` or the wrong
+constructor is a compile error (`no suitable method found for shadowOf`).
+Discovered the hard way: the sensor test failed identically 4 consecutive runs
+(assertion line shifting 214→219→222 as the test was patched), plus two
+compile failures — ~15 local runs before reading the shadow's real API.
+Rule (in TESTING.md): **3 identical failures → stop and read the shadow source,
+not tweak-and-rerun.**
+
 ### Emulator prerequisites
 
 Instrumented tests (`KeepAliveTests`, `MainWindowTests`, `SettingsTests`) are
@@ -166,6 +177,24 @@ About/system-info field.
   signs release (the keystore never enters CI; release signing stays local-only).
 - DummyServer tests bind `localhost:12345` inside the app process, so they run
   on-device via Firebase without firewall changes.
+
+**CI failure taxonomy (from the session retrospective, Aug 6):** three
+*distinct* failure classes — do not conflate them:
+
+- **adb/emulator boot flake** (top-frequency, ~6 runs): `The process .../adb failed with exit code 1` during the emulator boot poll and
+  `WARNING | Failed to process .ini file emu-update-last-check.ini` are the
+  runner fighting a slow headless boot. They appear *before* any test runs and
+  are pure CI infra noise — never a code defect.
+- **Focus flake** (rare, hard): `RootViewWithoutFocusException` on Espresso
+  interactions after the suite started; the retry-once script does **not**
+  reliably absorb it (a 7/9 failure happened *with* the retry in place).
+  Genuinely unsolved — needs a GPU-capable/macOS runner or a focus-wait.
+- **Self-inflicted code/test/gate failures**: everything else (lint baseline
+  scope, static-state, network-dependent pads, fixed-sleep keepalive). These
+  are the ones to fix in code.
+
+Triage rule: check which job/step failed and whether the failure is at boot
+vs tests before touching code.
 
 ## Workflows
 
@@ -786,3 +815,55 @@ config files changed.
 **Consequences:** the docs tree now encodes the full cross-repo docs culture
 (AGENTS = rules/pointers, MEMORY = rationale, TESTING = test strategy).
 Retrospective commit `docs:` pending at session end; no state regression.
+
+### [2026-08-06] Full-session audit: error & time-waste root causes (correction)
+
+**Context:** a deep pass over the entire campaign's git history, all ~204
+command logs in `.tmp/`, and every CI run. It *corrects* the earlier baseline
+and names the root causes behind the time spent.
+
+**CI ledger (corrected).** The earlier retrospective said 15 runs / 13 red /
+2 green; the complete ledger is **18 runs: 15 red, 2 green, 1 still running**
+(`31119028275`, the docs-commit CI) — 17 completed, 12% green. Breakdown:
+
+| Failure class | Runs | Self-inflicted? |
+|---|---|---|
+| adb/emulator boot flake (`adb exit 1` in boot poll, `.ini` warnings) | ~6 | No (CI infra) |
+| Focus flake `RootViewWithoutFocusException` (7/9, retry in place) | 1+ | No (unsolved) |
+| `OldTargetApi` lint (env-dependent; baseline scope) | 2 | Yes |
+| Pad static-state `[23]` / network-dependency | 2 | Yes (documented traps) |
+| Keepalive fixed-sleep timing | 1 | Yes |
+| GHA action-download infra | 1 | No |
+| Cancelled (superseded by next push) | 1 | — |
+
+**Time-waste root causes (ranked):**
+
+1. **Re-discovered documented traps (~7 CI runs).** Static-state, network-
+   dependent pads, fixed-sleep keepalive, `lintDebug` baseline — all four were
+   in MEMORY/TESTING *before* they cost a CI run each. Fix: the AGENTS.md rule
+   "apply documented class traps before writing tests" (added at the time) and
+   "run the full 3-variant suite twice before pushing".
+1. **Robolectric `ShadowSensorManager` sensor trap (~15 local runs, ~1h).**
+   The sensor test failed identically 4 consecutive runs (line 214→219→222 as
+   it was patched) plus 2 compile errors, before the right API
+   (`createSensorEvent(3)`) was read from the shadow. Rule added (TESTING.md):
+   **3 identical failures → stop and read the shadow source.**
+1. **Tooling misconfigs before configs were right.** checkstyle scanned the
+   vendored `com.demo.mjpeg` (1084 errors, 231 on `MjpegView.java`, one 475 KB
+   log) until the `exclude` was added; PMD took 7 runs to settle the ruleset
+   (invalid rule names, `ruleSets = []`). Both are now documented and
+   configured — one-time cost.
+1. **Over-verification.** `phase12-iter1/2/3` are three byte-identical log
+   files (53910 B each) of the same full-suite run; `full` and `main-test`
+   sagas ran 13 and 11 times respectively. Rule already in place: run the full
+   suite twice — a third identical re-run adds nothing.
+1. **`gh run watch` object-vs-id bug** (`watch4.log`): a PowerShell run object
+   `{conclusion:null,id:31112929469}` was passed where the numeric id was
+   expected → HTTP 404. One wasted command; rule added in AGENTS.md.
+
+**Correction note:** the earlier "13 red / 2 green of 15" baseline was
+under-counted (3 early runs omitted) and *mis-labeled* two boot-flake runs as
+focus flakes. This ledger supersedes it. CI remains **not green**: the retry
+band-aid is proven insufficient (`31116833261` 7/9 with retry) — do not spend
+further CI runs re-testing it; the next fix is a GPU-capable/macOS runner or a
+focus-wait before Espresso, then verify on a fresh run.
