@@ -102,9 +102,24 @@ jobs:
           script: |
             # The gamepad runs immersive (system bars hidden); the first entry
             # pops an ImmersiveModeConfirmation overlay that steals window focus
-            # and makes every Espresso interaction time out. Pre-empt it.
-            adb shell settings put secure immersive_mode_confirmations confirmed
-            ./gradlew connectedDebugAndroidTest -PpreDexEnable=false
+            # and makes every Espresso interaction time out. Pre-empt it, then
+            # confirm the value stuck (the write can race the settings provider
+            # on a fresh headless emulator).
+            adb wait-for-device
+            for i in 1 2 3 4 5; do
+              adb shell settings put secure immersive_mode_confirmations confirmed
+              VALUE=$(adb shell settings get secure immersive_mode_confirmations | tr -d '\r')
+              echo "immersive_mode_confirmations=$VALUE"
+              [ "$VALUE" = "confirmed" ] && break
+              sleep 2
+            done
+            adb shell input keyevent 82 # dismiss any keyguard
+            # Swiftshader under KVM occasionally boots with a focus-less window;
+            # retry the suite once to ride out the transient flake.
+            ./gradlew connectedDebugAndroidTest -PpreDexEnable=false \
+              || { echo "instrumented run failed; retrying once"; \
+                   adb shell am force-stop com.trikset.gamepad; \
+                   ./gradlew connectedDebugAndroidTest -PpreDexEnable=false; }
 
       - name: Upload instrumented test results
         if: always()
