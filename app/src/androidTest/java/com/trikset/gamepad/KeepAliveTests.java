@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import androidx.test.rule.ActivityTestRule;
 import java.util.Iterator;
 import java.util.ListIterator;
 import org.junit.Rule;
@@ -15,8 +14,8 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class KeepAliveTests {
   @Rule
-  public final ActivityTestRule<MainActivity> mActivityTestRule =
-      new ActivityTestRule<>(MainActivity.class);
+  public final FocusAwareActivityTestRule<MainActivity> mActivityTestRule =
+      new FocusAwareActivityTestRule<>(MainActivity.class);
 
   @Test
   public void keepAliveShouldBeReceivedAfterGivenTimePeriod() throws InterruptedException {

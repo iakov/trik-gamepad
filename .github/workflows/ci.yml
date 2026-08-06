@@ -104,7 +104,14 @@ jobs:
             # pops an ImmersiveModeConfirmation overlay that steals window focus
             # and makes every Espresso interaction time out. Pre-empt it.
             adb wait-for-device
+            # Wait for a real boot before touching the settings provider; writing
+            # settings while the system is still booting races the provider and
+            # the value is silently lost (a fresh headless emulator is slow).
+            adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 1; done'
             adb shell settings put secure immersive_mode_confirmations confirmed
+            # settings put is async through the provider; verify the value is
+            # actually applied before running the suite.
+            adb shell 'i=0; while [ $i -lt 20 ]; do [ "$(settings get secure immersive_mode_confirmations)" = "confirmed" ] && break; i=$((i+1)); sleep 1; done'
             adb shell input keyevent 82
             # Swiftshader under KVM occasionally boots with a focus-less app
             # window; retry the suite once to ride out the transient flake.

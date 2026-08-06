@@ -17,7 +17,6 @@ import androidx.test.espresso.UiController;
 import androidx.test.espresso.ViewAction;
 import androidx.test.espresso.action.MotionEvents;
 import androidx.test.filters.LargeTest;
-import androidx.test.rule.ActivityTestRule;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
@@ -38,8 +37,8 @@ public class MainWindowTests {
   @RunWith(Parameterized.class)
   public static class SquareButtonTest {
     @Rule
-    public final ActivityTestRule<MainActivity> mActivityTestRule =
-        new ActivityTestRule<>(MainActivity.class);
+    public final FocusAwareActivityTestRule<MainActivity> mActivityTestRule =
+        new FocusAwareActivityTestRule<>(MainActivity.class);
 
     @Parameters
     public static Collection<Object[]> data() {
@@ -223,8 +222,8 @@ public class MainWindowTests {
   @RunWith(JUnit4.class)
   public static class MagicButtonsTests {
     @Rule
-    public final ActivityTestRule<MainActivity> mActivityTestRule =
-        new ActivityTestRule<>(MainActivity.class);
+    public final FocusAwareActivityTestRule<MainActivity> mActivityTestRule =
+        new FocusAwareActivityTestRule<>(MainActivity.class);
 
     @Before
     public void initNetworkSettings() {

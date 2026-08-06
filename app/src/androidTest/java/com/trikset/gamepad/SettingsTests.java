@@ -22,7 +22,6 @@ import android.view.ViewParent;
 import androidx.test.espresso.Espresso;
 import androidx.test.espresso.ViewInteraction;
 import androidx.test.filters.LargeTest;
-import androidx.test.rule.ActivityTestRule;
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;
 import org.hamcrest.TypeSafeMatcher;
@@ -36,8 +35,8 @@ import org.junit.runners.JUnit4;
 public class SettingsTests {
 
   @Rule
-  public final ActivityTestRule<MainActivity> mActivityTestRule =
-      new ActivityTestRule<MainActivity>(MainActivity.class) {
+  public final FocusAwareActivityTestRule<MainActivity> mActivityTestRule =
+      new FocusAwareActivityTestRule<MainActivity>(MainActivity.class) {
         @Override
         protected void beforeActivityLaunched() {
           SharedPreferences preferences =
