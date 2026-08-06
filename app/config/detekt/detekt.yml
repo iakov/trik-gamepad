@@ -1,0 +1,13 @@
+# detekt configuration for trik-gamepad.
+#
+# build.gradle sets buildUponDefaultConfig = true, so this file only
+# *deviates* from detekt's bundled default ruleset. Keep it minimal; any
+# relaxation carries a rationale comment or a recorded entry in MEMORY.md
+# (AGENTS.md suppression policy).
+
+config:
+  validation: true
+
+build:
+  # Fail the gate on any issue (strict, like checkstyle/pmd).
+  maxIssues: 0

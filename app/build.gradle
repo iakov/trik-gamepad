@@ -2,6 +2,7 @@ apply plugin: 'idea'
 apply plugin: 'checkstyle'
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
+apply plugin: 'io.gitlab.arturbosch.detekt'
 apply plugin: 'jacoco'
 apply plugin: 'com.github.spotbugs'
 apply plugin: 'com.diffplug.spotless'
@@ -26,6 +27,7 @@ buildscript {
     dependencies {
         classpath 'com.android.tools.build:gradle:8.13.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21"
+        classpath 'io.gitlab.arturbosch.detekt:detekt-gradle-plugin:1.23.8'
         classpath 'com.github.spotbugs:com.github.spotbugs.gradle.plugin:6.5.10'
         classpath 'com.diffplug.spotless:com.diffplug.spotless.gradle.plugin:8.9.0'
     }
@@ -180,6 +182,15 @@ pmd {
     ignoreFailures = false
 }
 
+detekt {
+    toolVersion = '1.23.8'
+    config = files('config/detekt/detekt.yml')
+    // Start from detekt's bundled default ruleset and layer only the curated
+    // deviations in config/detekt/detekt.yml on top (the analogue of PMD's
+    // ruleSets = [] + curated ruleset for Kotlin).
+    buildUponDefaultConfig = true
+}
+
 // The Android plugin does not apply the `java` plugin, so PMD registers no
 // tasks of its own; create one bound to the app's Java sources.
 tasks.register('pmd', Pmd) {
@@ -222,6 +233,14 @@ spotless {
         target 'src/**/*.java'
         googleJavaFormat('1.22.0')
         removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
+    kotlin {
+        target 'src/**/*.kt'
+        // 0.51.0-FINAL is the last com.pinterest:ktlint artifact Spotless's
+        // ktlint step resolves directly; bumped if a newer 1.x is needed.
+        ktlint('0.51.0-FINAL')
         trimTrailingWhitespace()
         endWithNewline()
     }
