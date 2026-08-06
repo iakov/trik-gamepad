@@ -77,7 +77,11 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
           api-level: 36
-          target: google_apis
+          # aosp_atd = Android Test Device: the lightweight headless image made
+          # for CI. google_apis boots slowly under swiftshader and the APK
+          # install-commit keeps dying with a broken-pipe under resource
+          # pressure on 2-core runners.
+          target: aosp_atd
           arch: x86_64
           cores: 4
           ram-size: 4096M
