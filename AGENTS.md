@@ -30,11 +30,12 @@ passed; pure-Kotlin migration is next (see `.PLAN.md`).
 
 ## Build (from repo root)
 
-- Planned toolchain (locked in `.PLAN.md`): Gradle 8.14.5, AGP 8.13.2, Kotlin 2.x, Java 11. `compileSdk 36`, `targetSdk 36`, `minSdk 21`, `maxSdk 36` — single main flavor, no product flavors. Do not migrate to AGP 9 / Gradle 9 without a settings.gradle restructure.
+- Planned toolchain (locked in `.PLAN.md`): Gradle 8.14.5, AGP 8.13.2, Kotlin 2.x, Java 11 source/target — but Gradle runs under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`, `targetSdk 36`, `minSdk 21`, `maxSdk 36` — single main flavor, no product flavors. Do not migrate to AGP 9 / Gradle 9 without a settings.gradle restructure.
 - Three build types (`debug`/`release`/`releaseDebug`); `./gradlew test` runs
   Robolectric under all three in parallel JVMs — unit tests must use ephemeral
   ports and reset static state (TESTING.md).
 - `settings.gradle` at repo root: `rootProject.name = 'trik-gamepad'`, `include ':app'`.
+- `local.properties` (gitignored): `sdk.dir` must escape the drive-colon (`C\:/...`) or lint's `PropertyEscape` check fails the build.
 - Signing: `app/build.gradle` applies a release signing config conditionally — only when `file('../android-keystorage.jks')` exists. Debug builds fall back to the auto-generated debug keystore in CI. See MEMORY.md "Build & layout" for gitignore status and how the path resolves.
 - Version is hand-set at the top of `app/build.gradle` (`appMajorVersion`/`appMinorVersion`, currently 1.41). `versionCode` is computed (`minSdk*10000 + major*100 + minor`), `versionNameSuffix` is `-API<minSdk>`. Bump `appMinorVersion` for a release; never set versionCode by hand.
 
@@ -88,7 +89,7 @@ configurations, update this section and the referenced config files.
 ### Before test / command
 
 - From repo root: `./gradlew test` (Robolectric, no device needed); a single test via `./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.<method>"`.
-- Instrumented tests need a running emulator/device (AEHD hypervisor required — verify with `emulator -accel-check`).
+- Instrumented tests need a running emulator/device (AEHD hypervisor required — verify with `emulator -accel-check`); boot with `-gpu host` (never `swiftshader_indirect`) and pre-empt the immersive-mode confirmation (`adb shell settings put secure immersive_mode_confirmations confirmed`). Full recipe: TESTING.md.
 
 ### Operational rules (command hygiene)
 
@@ -101,8 +102,10 @@ configurations, update this section and the referenced config files.
 - **Never pipe a long-lived child through `Select-Object`/`Tee-Object`**: Gradle spawns a daemon that inherits the parent's stdout/stderr pipe handles, so a pipeline never sees EOF and the command blocks until timeout even though Gradle finished in seconds. Redirect to a file instead (`& gradlew ... *> log` or `Start-Process -Wait -RedirectStandardOutput log`), read the file after, and use short timeouts for probes. Use `gradlew --stop` / `--no-daemon` for one-shot probe runs so no daemon lingers.
 - **"Exit 0" ≠ the tool ran**: static analyzers (PMD 7 drops invalid rule names; checkstyle/spotbugs can silently no-op) may exit clean with zero files analyzed. Re-run with `--info`/`--rerun-tasks` and grep for the analysis actually loading config + analyzing sources before trusting a green result.
 - **Static state leaks across Robolectric test classes**: `SenderService` keeps `keepaliveTimeout`/`mConnectTask` static; tests that touch it must reset both via reflection in `@Before`/`@After`, or the 3-variant suite flakes only on CI (SDK-23). Test UI logic without a live TCP dependency when possible (assert `PausedExecutorService.runAll()` count, not server arrival).
+- **Robolectric real-socket HTTP is unreliable**: a fake local HTTP server success-path test flaked; cover the null/error branches of `StartReadMjpegAsync` instead.
 - **CI `script:` blocks must be plain POSIX `sh`** — no `\` line continuations or `{ ...; }` brace groups (they collapse into "Syntax error: end of file unexpected"). Validate the extracted script with `sh -n` before pushing.
 - **Distinguish infra from code failures**: `Failed to resolve action download info` (GitHub Actions) and `adb ... exit code 1` during the runner's boot poll are transient infra/emulator flakes, not code defects. Check which job/step failed and whether it is boot vs tests before changing code. Keep a note of the last known-good CI run id.
+- **A focus failure after a targetSdk bump is usually an OS overlay, not app code**: first immersive-mode entry on API 35+ pops an `ImmersiveModeConfirmation` window that steals focus (every Espresso interaction then times out with `RootViewWithoutFocusException`). Check `dumpsys window` `mCurrentFocus` for system windows before editing the app.
 - **Apply documented class traps before writing tests against a class**: MEMORY.md records hard-won hazards per class (e.g. `SenderService` static state, `DummyServer` sync-bind). When adding tests to a known-tricky class, read that class's MEMORY.md/TESTING.md entry FIRST and apply every documented trap in the first draft — re-discovering them costs CI runs (the session hit the static-state and async-bind flakes twice each).
 - **Run the full 3-variant suite twice before pushing test changes**: `./gradlew test` runs debug/release/releaseDebug in parallel JVMs; static-state and timing flakes surface only under full-suite or second-run conditions, not single-test runs. New/edited tests get `test` twice locally before push.
 - **Generate lint baselines with the aggregate `lint` task, not `lintDebug`**: a baseline from `lintDebug` misses issues the aggregate task reports, so CI fails on a "new" issue that is actually in-scope. Env-dependent checks (e.g. `OldTargetApi`) cannot be baselined — suppress them in `lint.xml`.
@@ -112,6 +115,7 @@ configurations, update this section and the referenced config files.
 - **3 identical failures → stop and read, don't tweak-and-rerun**: if the same Robolectric test fails identically N≥3 consecutive runs (same exception/line, near-identical log size), stop and read the shadow/API source from the jar. The sensor saga burned ~15 runs because each "fix" only shifted the failing line. Applies beyond shadows: identical repeated failures mean a wrong model, not bad luck.
 - **Pre-format `.md` with `uvx mdformat` before pre-commit**: the mdformat hook modifies files on its first run and fails, so a second pass is always needed. Format changed `.md` files first and the hook passes once.
 - **`gh run watch` takes the run **id**, not the object**: passing a PowerShell run object (e.g. from a `ConvertFrom-Json` pipeline) makes `gh` build a bogus URL and 404. Extract `.id` explicitly. Same for any `gh <cmd>` that takes an id.
+- **Every `gh` run command needs `--repo iakov/trik-gamepad`**: without it `gh` resolves to the default repo (upstream `trikset/trik-gamepad`), so `gh run view`/`watch` report a bogus/404 run.
 
 ### On tool error
 
