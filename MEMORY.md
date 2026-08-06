@@ -513,8 +513,16 @@ rendering and the install-commit pipe dies under resource pressure on
 `gradle/actions/setup-gradle@v5.0.2` (v6 ships a proprietary caching component;
 v5 is MIT). `gradle/actions/wrapper-validation@v5.0.2` validates the wrapper.
 
-**Consequences:** the `build` job is green (2m51s); the instrumented job on
-`aosp_atd` was still iterating at session end. `gh run view --repo iakov/trik-gamepad <run>` is the way to watch it (default repo is upstream).
+**Consequences:** the `build` job is green (2m51s). Instrumented CI status at
+session end: `google_apis` → APK `install-commit` broken-pipe (under-resourced);
+`aosp_atd` → APK installs and tests run, but **8/8 fail with
+`RootViewWithoutFocusException`** even though `immersive_mode_confirmations confirmed` was set. Root-cause hypothesis: locally the AVD boots with
+`-gpu host` (real GPU) and the app window gets focus; CI's
+`-gpu swiftshader_indirect` headless software rendering never grants the window
+focus, so Espresso's root picker times out regardless of the immersive setting.
+`gh run view --repo iakov/trik-gamepad <run>` is how to watch a run (default repo
+is upstream). Next-session candidates: verify focus under swiftshader, or run
+the instrumented job on a GPU-capable/macOS runner, or relax the root picker.
 
 ### [2026-08-06] Edge-to-edge and Robolectric 4.16.1 (SDK 36 migration)
 

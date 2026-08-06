@@ -144,8 +144,10 @@ Details live in `MEMORY.md` — pull a section on demand:
   gates, format sweep, deterministic tests, toolchain 36, edge-to-edge + MJPEG
   reconnect, docs refresh, GitHub Actions CI). CI `build` job is green; the
   instrumented job was iterating on the emulator image (`google_apis`
-  install-commit broken-pipe → `aosp_atd`). Next: verify CI fully green, static
-  analysis, coverage drive, Kotlin migration.
+  install-commit broken-pipe → `aosp_atd`, which runs but all tests fail with
+  `RootViewWithoutFocusException` under headless `-gpu swiftshader_indirect`).
+  Next: fix CI instrumented focus, static analysis, coverage drive, Kotlin
+  migration.
 
 ## Conventions
 
