@@ -132,10 +132,14 @@ the timer.
 
 `com.demo.mjpeg` package (`MjpegView`, `StartReadMjpegAsync`). Default URI
 `http://<host>:8080/?action=stream`, rebuilt from `SK_VIDEO_URI`; changing the
-host address rewrites the video URI to match. The stream is force-restarted
-every 30 s by re-posting a `mRestartCallback` runnable in
-`MainActivity.onResume` (drop the HTTP connection and re-open). Cleartext HTTP
-is enabled via `android:usesCleartextTraffic="true"`.
+host address rewrites the video URI to match. The stream **reconnects on error**,
+not on a timer: `MjpegView.MjpegRenderThread` stops on `IOException` and invokes
+`OnStreamErrorListener`, which `MainActivity` registers in `onResume` and routes
+to `restartVideoStream()` (main thread, drops the HTTP connection, re-opens via
+`StartReadMjpegAsync`). There is **no forced periodic restart** — the old 30 s
+`mRestartCallback` timer was removed (see the "MJPEG: reconnect-on-error"
+design decision). Cleartext HTTP is enabled via
+`android:usesCleartextTraffic="true"`.
 
 ### Settings
 
@@ -289,8 +293,13 @@ minSdk 23.
 8.13.2 (9.3.1 is freshest stable but breaking); Kotlin 2.4.10; appcompat 1.7.1,
 core 1.19.0 (but 1.17+ needs minSdk 23), annotation 1.10.0, preference 1.2.1,
 tracing 1.3.0; androidx.test runner 1.7.0, espresso-core 3.7.0, rules 1.7.0,
-orchestrator 1.6.1; Robolectric 4.15.1, Mockito 5.18.0, junit 4.13.2,
-commons-io 2.22.0. Local SDK has platforms 30/35; android-36 installable.
+orchestrator 1.6.1; Mockito 5.18.0, junit 4.13.2, commons-io 2.22.0.
+Local SDK has platforms 23/30/35/36/36.1.
+
+> **Post-execution correction (2026-08-06):** Robolectric is **4.16.1**, not the
+> 4.15.1 pinned in R8 — 4.15.1 does **not** support SDK 36 (`UnknownSdk`); 4.16
+> added Baklava support and **requires JDK 21** for SDK 36 tests. Toolchain used:
+> Gradle 8.14.5 + AGP 8.13.2 + Kotlin 2.0.21 + JDK 21 (Microsoft/CI Temurin).
 
 ### [2026-08-05] Fork-only workflow (no upstream PRs)
 
@@ -435,3 +444,91 @@ MJPEG reconnect-on-error replaces the 30 s forced restart.
 **Consequences:** all gradle commands run from the repo root; keystore path
 changed `../../` → `../` (same file, `trik\android-keystorage.jks`). The
 restructure was a pure `git mv` so history is preserved.
+
+### [2026-08-06] Quality-gate implementation quirks (checkstyle/SpotBugs/JaCoCo)
+
+**Context:** wiring the R5 gates onto an Android module surfaced several
+non-obvious plugin behaviors; each cost a failed build before it was pinned
+down. Recorded so future sessions do not re-discover them.
+
+**Decisions & quirks:**
+
+- **Checkstyle on Android registers no tasks.** The Android plugin does not
+  apply the `java` plugin, so `checkstyle` creates nothing. Must register the
+  task explicitly: `tasks.register('checkstyle', Checkstyle)` with `source 'src/main/java'`, `include '**/*.java'`, `classpath = files()`,
+  `config = checkstyle.config`, `maxWarnings = 0`. The vendored Google config
+  lives at `app/config/checkstyle/google_checks.xml` and is applied via
+  `checkstyle.configFile`. `com.demo.mjpeg` (vendored third-party) is excluded
+  from the gate; it will be rewritten during the Kotlin migration.
+- **SpotBugs `effort`/`reportLevel` are Kotlin enums.** The plugin's
+  `SpotBugsExtension` types them as `com.github.spotbugs.snom.Effort` /
+  `Confidence`. Groovy resolves enum constants with bodies (e.g.
+  `Confidence.MEDIUM` has an `internal` member) to a `java.lang.Class`, so
+  `effort = 'max'` and `reportLevel = Confidence.MEDIUM` both fail. Use
+  `effort = Effort.MAX` and `reportLevel = Confidence.valueOf('MEDIUM')`
+  (the `valueOf` route is the safe one).
+- **SpotBugs tasks are lazy.** `spotbugsMain` is not registered eagerly — use
+  `tasks.withType(SpotBugsTask).configureEach { reports { html { ... } } }`.
+  On Android the task is **`spotbugsDebug`** (per variant), not `spotbugsMain`.
+- **`onlyAnalyze` is required on JDK 17+.** Without it, analysis of
+  `android.jar` references aborts: "The following classes needed for analysis
+  were missing: java.rmi.Remote" (exit code 3). Restrict to app packages:
+  `onlyAnalyze = ['com.trikset.*', 'com.demo.*']`.
+- **SpotBugs engine version** comes from `toolVersion` (4.10.3); find-sec-bugs
+  1.14.0 is added via `spotbugsPlugins`. The engine is NOT a separate `spotbugs`
+  dependency line.
+- **JaCoCo class dir under AGP 8** is
+  `build/intermediates/javac/debug/compileDebugJavaWithJavac/classes` (the old
+  `.../debug/classes` resolves nothing → "No class files specified", 0% report).
+- **JaCoCo `executionData` must be scoped to one variant.** Reading
+  `fileTree(buildDir).include("jacoco/*.exec")` triggers an implicit-dependency
+  error under the configuration cache; the report declares only
+  `testDebugUnitTest`, so point at
+  `build/jacoco/testDebugUnitTest.exec`.
+- **Robolectric coverage is 0% without `includeNoLocationClasses = true`** in
+  `testOptions.unitTests.all { jacoco { ... } }` — Robolectric's classloader
+  loads classes without a file location, so AGP's default instrumentation
+  records nothing.
+
+**Consequences:** all six gates green locally; coverage baseline measured at
+**10% line / 6% branch** (80/714 line, 13/214 branch) — the mjpeg package sits
+at 0%. The R10 gate of 60% was unreachable, so the ratchet starts at **10%**
+and is raised stepwise to 85% in the coverage drive (Phase 12).
+
+### [2026-08-06] CI emulator image: google_apis broken-pipe → aosp_atd
+
+**Context:** the instrumented job failed twice with `Failed to commit install session ... package install-commit ... Broken pipe (32)` while installing the
+debug APK on an API 36 `google_apis` image under swiftshader. The emulator also
+spent minutes `offline` during boot, and the `google_apis` image is heavy
+(Google services the tests don't need).
+
+**Decision:** switch the emulator runner to **`target: aosp_atd`** (Android Test
+Device — the lightweight, headless, CI-oriented system image), with
+`cores: 4` and `ram-size: 4096M`. `google_apis` boots slowly under software
+rendering and the install-commit pipe dies under resource pressure on
+2-core runners.
+
+**Also:** bumped actions to Node-24 majors — `actions/checkout@v7`,
+`actions/setup-java@v5`, `actions/upload-artifact@v7` — and pinned
+`gradle/actions/setup-gradle@v5.0.2` (v6 ships a proprietary caching component;
+v5 is MIT). `gradle/actions/wrapper-validation@v5.0.2` validates the wrapper.
+
+**Consequences:** the `build` job is green (2m51s); the instrumented job on
+`aosp_atd` was still iterating at session end. `gh run view --repo iakov/trik-gamepad <run>` is the way to watch it (default repo is upstream).
+
+### [2026-08-06] Edge-to-edge and Robolectric 4.16.1 (SDK 36 migration)
+
+**Context:** targetSdk 36 enforces edge-to-edge. `MainActivity` used the removed
+`FLAG_FULLSCREEN` + deprecated `View.SYSTEM_UI_FLAG_*` set, which is a no-op on
+API 36 and leaves the window focus-less — Espresso then fails every interaction
+with `RootViewWithoutFocusException`. Separately, Robolectric 4.15.1 (plan R8)
+does not know SDK 36 and throws `UnknownSdk` on `Config.TARGET_SDK`.
+
+**Decision:** fullscreen → `WindowCompat.setDecorFitsSystemWindows(getWindow(), false)` + `WindowInsetsControllerCompat` (`show`/`hide(WindowInsetsCompat.Type. systemBars())`, `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`). Robolectric → 4.16.1
+(needs JDK 21, which both local and CI provide). Also: the first immersive-mode
+entry on API 35+ pops an `ImmersiveModeConfirmation` overlay that steals focus —
+must pre-empt with `adb shell settings put secure immersive_mode_confirmations confirmed` before `connectedDebugAndroidTest` (see TESTING.md).
+
+**Consequences:** all 9 instrumented tests pass on the local API 36 emulator
+(2 of 3 runs; one flake was an activity-launch timeout under load, not a code
+issue).

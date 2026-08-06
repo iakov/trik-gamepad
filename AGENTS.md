@@ -103,6 +103,7 @@ configurations, update this section and the referenced config files.
 ./gradlew test                               # Robolectric unit tests, no device needed
 ./gradlew lint                               # lint.xml downgrades MissingTranslation to warning
 ./gradlew connectedDebugAndroidTest          # needs running emulator/device (AEHD)
+./gradlew checkstyle spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck   # quality gates (also run in CI)
 ```
 
 ```sh
@@ -116,7 +117,7 @@ uvx mdformat <file>.md
 
 - `SenderService` keeps one TCP connection to the robot (default `192.168.77.1:4444`) and sends newline-terminated plain-text commands: `pad1 x y`, `pad2 x y`, `btn N down`, `wheel <angle>`, `keepalive <ms>`.
 - Keepalive: default 5000 ms, minimum 1000 ms. The real timer period is `keepaliveTimeout - 300` ms. Disconnect on `mOut.checkError()` or target change.
-- MJPEG video: `com.demo.mjpeg` package, default URI `http://<host>:8080/?action=stream`; the stream is force-restarted every 30 s. Cleartext HTTP is enabled in the manifest.
+- MJPEG video: `com.demo.mjpeg` package, default URI `http://<host>:8080/?action=stream`; the stream reconnects **on error** (`MjpegView.OnStreamErrorListener` → `MainActivity.restartVideoStream()`) — there is no forced periodic restart. Cleartext HTTP is enabled in the manifest.
 - Settings keys live in `SettingsFragment` as `SK_*` constants, stored via legacy `PreferenceManager`/`android.preference` APIs.
 - Deeper details and rationale: MEMORY.md "App protocol".
 
@@ -139,10 +140,12 @@ Details live in `MEMORY.md` — pull a section on demand:
   sweep + toolchain upgrade to compileSdk/targetSdk 36, minSdk 21, coverage to
   85%, pure-Kotlin migration, commits on `feat/global-refresh`) lives in
   `.PLAN.md`. `.PLAN.md` is gitignored — never commit it.
-- Phases 1–8 are committed and verified (layout, cleanup, CI retire, gates,
-  format sweep, deterministic tests, toolchain 36, edge-to-edge + MJPEG
-  reconnect). Next: CI workflow, static analysis, coverage drive, Kotlin
-  migration.
+- Phases 1–10 are committed and pushed to the fork (layout, cleanup, CI retire,
+  gates, format sweep, deterministic tests, toolchain 36, edge-to-edge + MJPEG
+  reconnect, docs refresh, GitHub Actions CI). CI `build` job is green; the
+  instrumented job was iterating on the emulator image (`google_apis`
+  install-commit broken-pipe → `aosp_atd`). Next: verify CI fully green, static
+  analysis, coverage drive, Kotlin migration.
 
 ## Conventions
 

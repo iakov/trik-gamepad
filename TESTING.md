@@ -17,7 +17,8 @@ Two layers:
   three SDK configs per build type and covers the TCP `SenderService`.
 - **Espresso instrumented tests** (`androidTest`): `KeepAliveTests`,
   `MainWindowTests`, `SettingsTests`, run with AndroidX Test Orchestrator.
-  CI runs them on Firebase Test Lab; locally they need a running emulator.
+  CI runs them on an API 36 emulator via GitHub Actions; locally they need a
+  running emulator.
 
 ## Running tests
 
