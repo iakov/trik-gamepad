@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [master, 'feat/**', 'fix/**', 'refactor/**']
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build and gate suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v5.0.2
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5.0.2
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
+
+      - name: Build debug + androidTest APKs
+        run: ./gradlew assembleDebug assembleDebugAndroidTest -PpreDexEnable=false
+
+      - name: Unit tests + quality gates
+        run: >-
+          ./gradlew
+          test
+          lint
+          checkstyle
+          spotbugsDebug
+          jacocoTestReport
+          jacocoTestCoverageVerification
+          spotlessCheck
+          -PpreDexEnable=false
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: ignore
+
+  instrumented:
+    name: Instrumented tests (API 36)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5.0.2
+        with:
+          cache-read-only: true
+
+      - name: Instrumented tests on emulator
+        uses: reactivecircus/android-emulator-runner@v2.38.0
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect
+          disable-animations: true
+          script: |
+            # The gamepad runs immersive (system bars hidden); the first entry
+            # pops an ImmersiveModeConfirmation overlay that steals window focus
+            # and makes every Espresso interaction time out. Pre-empt it.
+            adb shell settings put secure immersive_mode_confirmations confirmed
+            ./gradlew connectedDebugAndroidTest -PpreDexEnable=false
+
+      - name: Upload instrumented test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-results
+          path: |
+            app/build/outputs/androidTest-results/
+            app/build/reports/androidTests/
+          if-no-files-found: ignore
