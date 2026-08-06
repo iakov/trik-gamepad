@@ -72,6 +72,10 @@ configurations, update this section and the referenced config files.
 - **Slow commands → research (incl. web), apply best practices, tune repeatable tooling** — fix the tooling, not the symptom; document quirks and findings in `MEMORY.md`.
 - **Async tools**: capture a process handle (`Start-Process -PassThru`), verify liveness immediately, wait for the readiness signal with a timeout, then continue independent work — never stall on a poll.
 - **Never pipe a long-lived child through `Select-Object`/`Tee-Object`**: Gradle spawns a daemon that inherits the parent's stdout/stderr pipe handles, so a pipeline never sees EOF and the command blocks until timeout even though Gradle finished in seconds. Redirect to a file instead (`& gradlew ... *> log` or `Start-Process -Wait -RedirectStandardOutput log`), read the file after, and use short timeouts for probes. Use `gradlew --stop` / `--no-daemon` for one-shot probe runs so no daemon lingers.
+- **"Exit 0" ≠ the tool ran**: static analyzers (PMD 7 drops invalid rule names; checkstyle/spotbugs can silently no-op) may exit clean with zero files analyzed. Re-run with `--info`/`--rerun-tasks` and grep for the analysis actually loading config + analyzing sources before trusting a green result.
+- **Static state leaks across Robolectric test classes**: `SenderService` keeps `keepaliveTimeout`/`mConnectTask` static; tests that touch it must reset both via reflection in `@Before`/`@After`, or the 3-variant suite flakes only on CI (SDK-23). Test UI logic without a live TCP dependency when possible (assert `PausedExecutorService.runAll()` count, not server arrival).
+- **CI `script:` blocks must be plain POSIX `sh`** — no `\` line continuations or `{ ...; }` brace groups (they collapse into "Syntax error: end of file unexpected"). Validate the extracted script with `sh -n` before pushing.
+- **Distinguish infra from code failures**: `Failed to resolve action download info` (GitHub Actions) and `adb ... exit code 1` during the runner's boot poll are transient infra/emulator flakes, not code defects. Check which job/step failed and whether it is boot vs tests before changing code. Keep a note of the last known-good CI run id.
 
 ### On tool error
 
@@ -103,7 +107,7 @@ configurations, update this section and the referenced config files.
 ./gradlew test                               # Robolectric unit tests, no device needed
 ./gradlew lint                               # lint.xml downgrades MissingTranslation to warning
 ./gradlew connectedDebugAndroidTest          # needs running emulator/device (AEHD)
-./gradlew checkstyle spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck   # quality gates (also run in CI)
+./gradlew checkstyle pmd spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck   # quality gates (also run in CI)
 ```
 
 ```sh
@@ -140,16 +144,18 @@ Details live in `MEMORY.md` — pull a section on demand:
   sweep + toolchain upgrade to compileSdk/targetSdk 36, minSdk 21, coverage to
   85%, pure-Kotlin migration, commits on `feat/global-refresh`) lives in
   `.PLAN.md`. `.PLAN.md` is gitignored — never commit it.
-- Phases 1–10 are committed and pushed to the fork (layout, cleanup, CI retire,
+- Phases 1–12 are committed and pushed to the fork (layout, cleanup, CI retire,
   gates, format sweep, deterministic tests, toolchain 36, edge-to-edge + MJPEG
-  reconnect, docs refresh, GitHub Actions CI). CI is **fully green** (build +
-  instrumented). The instrumented focus failure was isolated: `aosp_atd` works
-  locally with `-gpu host` (adopted as the local test AVD `Atd_API36`), but the
-  CI failure was the swiftshader headless GPU combo, so CI uses the `default`
-  image + a KVM-enable step + `pixel_5` profile. `KeepAliveTests` made
-  deterministic (`DummyServer.awaitMessage`). Dead deps removed; gradle build
-  cache enabled. Next: static analysis (Phase 11), coverage drive (12), Kotlin
-  migration (13), retrospective (14).
+  reconnect, docs refresh, GitHub Actions CI, static analysis, coverage drive).
+  CI build gate is green; the last fully-green run (both jobs) was
+  `31103997686`. After the Phase 12 coverage + flake fixes + CI hardening,
+  HEAD was not re-validated before the session reset — the final run
+  (`31115958336`) failed on a GitHub Actions infra issue, not code. Key state:
+  coverage gate at **85% line / 60% branch**; PMD 7.26 + strict-lint baseline +
+  SpotBugs (0 bugs); `aosp_atd` local test AVD `Atd_API36` (`-gpu host` only);
+  CI uses `default` image + KVM step + `pixel_5`; instrumented job retries once
+  on the intermittent swiftshader focus flake. Next: re-validate CI on HEAD,
+  then Kotlin migration (Phase 13), retrospective (14).
 
 ## Conventions
 
