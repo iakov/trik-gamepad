@@ -738,3 +738,51 @@ suppress env-dependent checks in lint.xml); (4) validate CI scripts with
 **Consequences:** CI is not green at session end (`31116833261` failed 7/9 on
 the focus flake despite the retry). Next session: fix the focus flake for real
 (macOS runner / focus-wait), then Phase 13 Kotlin migration.
+
+### [2026-08-06] Docs consolidation: lobe-server culture import + AGENTS.md refresh
+
+**Context:** a docs-only session — no code, no CI runs, one file changed.
+Follows the retrospective discipline: every session ends with AGENTS.md/MEMORY.md
+updated or an explicit decision not to.
+
+**What happened:**
+
+- Reconciliated `AGENTS.md` against executable sources before writing:
+  `gradle-wrapper.properties` → Gradle 8.14.5, `app/build.gradle` → AGP 8.13.2 /
+  Kotlin 2.0.21 / three build types (`debug`/`release`/`releaseDebug`, no product
+  flavors). Fixed stale prose (85% gate already passed, not "planned"; dropped
+  the historical `(D14/D15)` flavor tag).
+- Imported all general practices from trik-lobe-server's `AGENTS.md` into
+  trik-gamepad's, dropping Python-specific items (ruff/pytest/basedpyright/
+  bandit/vulture/pyproject/onnx). Brought over: documentation-culture rules
+  (safe-updates mirror, merge-don't-delete, generalize-then-extract,
+  progressive-disclosure contract, session-context-is-ephemeral, docs/code
+  sync, README end-user-only, verify names against executable sources, mdformat
+  reflow trap), error-handling rules (triage question, root-cause taxonomy,
+  grep-before-fix, gaps-escalate, verify "runs automatically", measure-don't-
+  estimate), and new hooks (after-push retrospective, after-merge CI check,
+  "run auto", squash-fix before push, PR-body freshness).
+
+**Measured delta:** AGENTS.md 169 → 210 lines (+41; 58 insertions / 17
+deletions). 12 new guardrail/hook rules + 2 new hook sections. No code or
+config files changed.
+
+**Deviations / observations:**
+
+- **Dormant PR hooks imported verbatim.** The lobe-server PR-workflow rules
+  (PR-body freshness, after-merge fork-master CI check, squash-fix) assume a
+  PR workflow that gamepad's single-branch no-PR execution plan (`.PLAN.md`)
+  doesn't use yet. Kept per explicit "take all" instruction, then marked
+  dormant in AGENTS.md so they can't misdirect future agents.
+- **Blanket import, not mapped.** Lesson (now an AGENTS.md rule — "mark dormant
+  hooks"): when importing practices from a sibling repo, map each to the
+  target's actual workflow and flag inapplicable items rather than importing
+  verbatim.
+- **Current work run-IDs** (last-known-good `31103997686`, failing
+  `31116833261`) still live in AGENTS.md "Current work"; per progressive
+  disclosure they belong here. Kept because CI status is the single most
+  expensive-to-rediscover fact for the next session; revisit at Phase 14.
+
+**Consequences:** the docs tree now encodes the full cross-repo docs culture
+(AGENTS = rules/pointers, MEMORY = rationale, TESTING = test strategy).
+Retrospective commit `docs:` pending at session end; no state regression.
