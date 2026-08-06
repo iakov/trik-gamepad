@@ -5,6 +5,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'jacoco'
 apply plugin: 'com.github.spotbugs'
 apply plugin: 'com.diffplug.spotless'
+apply plugin: 'pmd'
 
 def abiCode = 0 // just for fun
 def appMajorVersion = 1 // single digit for each SDK/ABI
@@ -116,6 +117,13 @@ android {
         // MissingTranslation is downgraded in lint.xml by convention (English-only
         // resources); everything else fails the build.
         abortOnError true
+        // Report warnings too (checkAllWarnings) and ratchet via a baseline:
+        // the current warnings (pinned dep versions, AsyncTask leak patterns to
+        // be rewritten in the Kotlin migration, densityless icons) are recorded
+        // in lint-baseline.xml; any NEW warning fails the build.
+        checkAllWarnings true
+        baseline = file('lint-baseline.xml')
+        warningsAsErrors true
     }
 }
 
@@ -164,6 +172,33 @@ spotbugs {
     // references, which aborts analysis with a missing-class error. Only our
     // own code is of interest anyway.
     onlyAnalyze = ['com.trikset.*', 'com.demo.*']
+}
+
+pmd {
+    toolVersion = '7.26.0'
+    consoleOutput = true
+    ignoreFailures = false
+}
+
+// The Android plugin does not apply the `java` plugin, so PMD registers no
+// tasks of its own; create one bound to the app's Java sources.
+tasks.register('pmd', Pmd) {
+    description = 'Run PMD over the app sources.'
+    source 'src/main/java'
+    include '**/*.java'
+    // The com.demo.mjpeg package is vendored third-party code (MJPEG player);
+    // it is excluded from the static-analysis gates and will be rewritten
+    // during the pure-Kotlin migration.
+    exclude '**/com/demo/mjpeg/**'
+    classpath = files()
+    ruleSetFiles = files('config/pmd/ruleset.xml')
+    // Gradle's PMD plugin defaults to the full errorprone category on top of
+    // any ruleSetFiles; clear it so ONLY the curated ruleset above runs.
+    ruleSets = []
+    reports {
+        html.required = true
+        html.outputLocation = file("$buildDir/reports/pmd/pmd.html")
+    }
 }
 
 // find-sec-bugs as the security SAST detector on the SpotBugs classpath. The

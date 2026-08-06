@@ -33,7 +33,7 @@ class StartReadMjpegAsync extends AsyncTask<URL, Void, MjpegInputStream> {
         return s;
 
       } catch (IOException e) {
-        e.printStackTrace();
+        Log.e("JPGReader", "Failed to open MJPEG stream.", e);
       }
     }
     return null;

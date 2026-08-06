@@ -16,7 +16,7 @@ import java.util.Locale;
 
 public class SquareTouchPadLayout extends RelativeLayout {
 
-  private static final int sDefaultSize = 100;
+  private static final int DEFAULT_SIZE = 100;
   private final Paint paint = new Paint();
   private float mAbsY;
   private float mAbsX;
@@ -91,7 +91,7 @@ public class SquareTouchPadLayout extends RelativeLayout {
     final int size =
         ((width * height) != 0)
             ? Math.min(width, height)
-            : ((halfPerimeter != 0) ? halfPerimeter : SquareTouchPadLayout.sDefaultSize);
+            : ((halfPerimeter != 0) ? halfPerimeter : SquareTouchPadLayout.DEFAULT_SIZE);
     setMeasuredDimension(size, size);
   }
 

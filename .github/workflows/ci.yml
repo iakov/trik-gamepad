@@ -39,6 +39,7 @@ jobs:
           test
           lint
           checkstyle
+          pmd
           spotbugsDebug
           jacocoTestReport
           jacocoTestCoverageVerification
