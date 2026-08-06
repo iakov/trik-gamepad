@@ -143,12 +143,16 @@ public class SenderServiceAdvancedTest {
       shadowOf(getMainLooper()).idle();
       assertTrue(server.awaitConnection());
 
-      // The keepalive Timer runs on a real thread; wait for at least one tick.
-      Thread.sleep(2500);
-      mExecutor.runAll();
-      shadowOf(getMainLooper()).idle();
-
-      assertTrue("expected a keepalive message", server.receivedContains("keepalive " + timeout));
+      // The keepalive Timer runs on a real thread; poll for the message instead
+      // of a single fixed sleep so a busy CI JVM cannot starve the timer.
+      boolean seen = false;
+      for (int i = 0; i < 20 && !seen; i++) {
+        Thread.sleep(500);
+        mExecutor.runAll();
+        shadowOf(getMainLooper()).idle();
+        seen = server.receivedContains("keepalive " + timeout);
+      }
+      assertTrue("expected a keepalive message", seen);
       client.disconnect("done");
     }
   }
