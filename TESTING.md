@@ -31,11 +31,11 @@ Two layers:
 Local instrumented run:
 
 1. Verify acceleration: `emulator -accel-check` (needs AEHD → returns `0`).
-1. Boot an AVD **with its declared config** — the AVD `config.ini` is the source
-   of truth (`hw.gpu.mode=host`, quickboot snapshots). Never override with
-   `-gpu swiftshader_indirect` or `-no-snapshot` for local work — a software-GPU
-   cold boot can take hours. Correct launch (boot ~40 s):
-   `emulator -avd Simple_Phone_API36 -no-window -no-audio -no-boot-anim -gpu host`
+1. Boot the **`aosp_atd` image** AVD `Atd_API36` — the lightweight, headless,
+   CI-oriented image (adopted after it passed 9/9 locally with `-gpu host`;
+   lighter/faster boot than the `default` image). Correct launch (~instant via
+   snapshot, suite ~5 min):
+   `emulator -avd Atd_API36 -no-window -no-audio -no-boot-anim -gpu host`
    (drop `-no-window` to see the UI; keep snapshots enabled for fast reboots).
 1. Wait for `adb shell getprop sys.boot_completed` → `1`.
 1. **Disable the immersive-mode confirmation overlay** (required on API 35+):
@@ -45,6 +45,11 @@ Local instrumented run:
    `RootViewWithoutFocusException`. Pre-empt it once per AVD:
    `adb shell settings put secure immersive_mode_confirmations confirmed`.
 1. `./gradlew connectedDebugAndroidTest`.
+
+> **Do NOT use `-gpu swiftshader_indirect` locally.** Verified: with the
+> software GPU the app window never receives focus and the same suite fails
+> 8/8 with `RootViewWithoutFocusException` — the exact failure CI saw. Local
+> runs must use `-gpu host`.
 
 ## Diagnostic discipline
 

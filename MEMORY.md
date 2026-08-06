@@ -56,7 +56,9 @@ versions risk collisions with the `minSdk*10000 + ...` formula).
   in the SDK: `extras\google\Android_Emulator_Hypervisor_Driver\silent_install.bat`.
 - SDK platforms installed: 23, 30, 35, 36, 36.1. `compileSdk/targetSdk 36`
   needs `platforms;android-36` — installed via
-  `sdkmanager "platforms;android-36"`.
+  `sdkmanager "platforms;android-36"` (or the newer `android sdk install ...`
+  CLI). System images installed include `android-36;default;x86_64` and
+  `android-36;aosp_atd;x86_64` (the local instrumented-test AVD `Atd_API36`).
 
 ### Python tooling (uv + repo-local venv)
 
@@ -103,9 +105,11 @@ drives background tasks deterministically, then `shadowOf(getMainLooper()).idle(
 
 Instrumented tests (`KeepAliveTests`, `MainWindowTests`, `SettingsTests`) are
 Espresso + AndroidX Test Orchestrator (`testOptions.execution ANDROIDX_TEST_ORCHESTRATOR`, `animationsDisabled`). They need a running
-emulator/device; without AEHD the x86_64 images are unusable. Local run:
-boot an AVD (`Simple_Phone_API35`) with `-no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect`, wait for `sys.boot_completed=1`, then
-`./gradlew connectedDebugAndroidTest`.
+emulator/device; without AEHD the x86_64 images are unusable. Local run: boot
+the **aosp_atd** AVD `Atd_API36` with `-no-window -no-audio -no-boot-anim -gpu host` (never `swiftshader_indirect` — window focus is never granted under the
+software GPU), wait for `sys.boot_completed=1`, pre-empt the immersive
+confirmation (`adb shell settings put secure immersive_mode_confirmations confirmed`), then `./gradlew connectedDebugAndroidTest`. See TESTING.md for the
+full recipe.
 
 ## App protocol
 
@@ -523,6 +527,36 @@ focus, so Espresso's root picker times out regardless of the immersive setting.
 `gh run view --repo iakov/trik-gamepad <run>` is how to watch a run (default repo
 is upstream). Next-session candidates: verify focus under swiftshader, or run
 the instrumented job on a GPU-capable/macOS runner, or relax the root picker.
+
+### [2026-08-06] Local instrumented: adopt aosp_atd, root cause isolated
+
+**Context:** CI instrumented failed 8/8 (`RootViewWithoutFocusException`) on
+`aosp_atd` + `-gpu swiftshader_indirect`, while the local `default`-image AVD
+passed 9/9 with `-gpu host` — two variables (image and GPU) changed at once.
+
+**Experiment:** installed `system-images;android-36;aosp_atd;x86_64`, created
+AVD `Atd_API36` (`avdmanager create avd -n Atd_API36 -k ... -d pixel_5`; the
+`Could not load devices from ... devices.xml` warnings are benign — newer
+images ship no `devices.xml`, avdmanager falls back to its built-in catalog),
+booted with `-gpu host` + immersive pre-empt, ran `connectedDebugAndroidTest`.
+
+**Result:** **9/9 green** (boot ~0 s via snapshot, suite 4m50s). This isolates
+the root cause: the `aosp_atd` image is fine; the CI failure is the
+**`-gpu swiftshader_indirect` headless combo** — under the software GPU the app
+window never receives focus (DecorView `has-window-focus=false`, `has-focus=true`).
+
+**Decision:** keep `Atd_API36` (aosp_atd) as the local instrumented-test AVD —
+lighter/faster than `default`. Local runs must use `-gpu host`, never
+`swiftshader_indirect` (same 8/8 focus failure would occur). CI cannot use a
+host GPU on `ubuntu-latest`, so CI switches to the `default` image (mainstream
+`default`+swiftshader combo, proven by coil/retrofit/sqldelight) **plus** the
+missing KVM-enable step the runner README mandates (missing VM accel explains
+both the glacial pace and the original google_apis install broken-pipe).
+Fallback if `default`+swiftshader still red: macOS runner with `-gpu host`.
+
+**Consequences:** TESTING.md local recipe now names `Atd_API36`/aosp_atd.
+CI `target: aosp_atd` → `default`, `profile: pixel_5` (fixes 640×320 screen),
+KVM step added.
 
 ### [2026-08-06] Edge-to-edge and Robolectric 4.16.1 (SDK 36 migration)
 
