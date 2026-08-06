@@ -39,6 +39,21 @@ public class SquareTouchPadLayoutTest {
   private SenderService sender;
   private SquareTouchPadLayout pad;
 
+  // SenderService keeps keepaliveTimeout and mConnectTask STATIC; tests that
+  // run before this class may have left them dirty, which would make
+  // connectAsync() a no-op and every awaitConnection() time out. Reset before
+  // each test (same discipline as SenderServiceAdvancedTest).
+  @Before
+  public void resetSenderServiceStaticState() throws Exception {
+    java.lang.reflect.Field f = SenderService.class.getDeclaredField("mConnectTask");
+    f.setAccessible(true);
+    f.set(null, null);
+    SenderService reset = new SenderService();
+    reset.setExecutor(mExecutor);
+    reset.setKeepaliveTimeout(SenderService.DEFAULT_KEEPALIVE);
+    reset.disconnect("reset");
+  }
+
   private MotionEvent eventAt(float x, float y, int action) {
     return MotionEvent.obtain(0, 0, action, x, y, 0);
   }
