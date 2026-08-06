@@ -496,8 +496,16 @@ down. Recorded so future sessions do not re-discover them.
 
 **Consequences:** all six gates green locally; coverage baseline measured at
 **10% line / 6% branch** (80/714 line, 13/214 branch) — the mjpeg package sits
-at 0%. The R10 gate of 60% was unreachable, so the ratchet starts at **10%**
-and is raised stepwise to 85% in the coverage drive (Phase 12).
+at 0%. The R10 gate of 60% was unreachable, so the ratchet started at **10%**.
+The Phase 12 coverage drive (SenderServiceAdvancedTest, SquareTouchPadLayoutTest,
+MainActivityTest, SettingsActivityTest, MjpegInputStreamTest, MjpegViewTest,
+StartReadMjpegAsyncTest) raised it to **85.3% line / 60.6% branch** (604/708);
+the gate is now **0.85 LINE / 0.60 BRANCH**. The `MjpegView` render/view threads
+stay ~0% (SurfaceView `lockCanvas` + hardware surface untestable in Robolectric)
+and are rewritten during the Kotlin migration. SenderService keeps
+`keepaliveTimeout`/`mConnectTask` **static** — new tests reset them via
+reflection in `@Before`/`@After` or the 3-variant suite flakes on the SDK-23
+config.
 
 ### [2026-08-06] CI emulator image: google_apis broken-pipe → aosp_atd
 

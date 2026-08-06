@@ -102,9 +102,14 @@ Every batch of changes touching `SenderService` or the tests should consider:
 
 ## Known gaps
 
-- Coverage gate exists as a ratchet (JaCoCo `jacocoTestCoverageVerification`,
-  currently 10% line, raised toward 85% in the coverage drive — see
-  `.PLAN.md`); `jacocoTestReport` always produces the full report.
+- Coverage gate is a JaCoCo ratchet now at **85% line / 60% branch**
+  (`jacocoTestCoverageVerification`, raised from 10% through the Phase 12
+  coverage drive); `jacocoTestReport` always produces the full report.
+  Measured 85.3% line (604/708). SenderService, pads, MainActivity,
+  SettingsFragment, and MjpegInputStream are well covered; the `com.demo.mjpeg`
+  `MjpegView` render/view threads (SurfaceView `lockCanvas`, hardware surface)
+  stay near 0% — they are untestable in Robolectric and will be rewritten
+  during the pure-Kotlin migration.
 - Instrumented tests exercise only what runs on the emulator; real TRIK robot
   interaction is never in CI.
 - Espresso tests note "idling resources would be the recommended way" — the
