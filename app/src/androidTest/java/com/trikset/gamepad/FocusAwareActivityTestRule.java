@@ -49,7 +49,6 @@ public class FocusAwareActivityTestRule<T extends Activity> extends ActivityTest
         return;
       }
     }
-    throw new AssertionError(
-        "App window never gained focus within " + FOCUS_TIMEOUT_MS + " ms");
+    throw new AssertionError("App window never gained focus within " + FOCUS_TIMEOUT_MS + " ms");
   }
 }
