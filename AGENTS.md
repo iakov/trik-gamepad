@@ -33,7 +33,7 @@ after the 85% coverage gate passes (see `.PLAN.md`).
 - Planned toolchain (locked in `.PLAN.md`): Gradle 8.14.5, AGP 8.13.2, Kotlin 2.x, Java 11. `compileSdk 36`, `targetSdk 36`, `minSdk 21`, `maxSdk 36` — single main flavor (D14/D15). Do not migrate to AGP 9 / Gradle 9 without a settings.gradle restructure.
 - `settings.gradle` at repo root: `rootProject.name = 'trik-gamepad'`, `include ':app'`.
 - Signing: `app/build.gradle` applies a release signing config conditionally — only when `file('../android-keystorage.jks')` exists. Debug builds fall back to the auto-generated debug keystore in CI. See MEMORY.md "Build & layout" for gitignore status and how the path resolves.
-- Version is hand-set at the top of `app/build.gradle` (`appMajorVersion`/`appMinorVersion`, currently 1.40; next release 1.41). `versionCode` is computed (`minSdk*10000 + major*100 + minor`), `versionNameSuffix` is `-API<minSdk>`. Bump `appMinorVersion` for a release; never set versionCode by hand.
+- Version is hand-set at the top of `app/build.gradle` (`appMajorVersion`/`appMinorVersion`, currently 1.41). `versionCode` is computed (`minSdk*10000 + major*100 + minor`), `versionNameSuffix` is `-API<minSdk>`. Bump `appMinorVersion` for a release; never set versionCode by hand.
 
 ## Hooks
 
@@ -127,9 +127,9 @@ Details live in `MEMORY.md` — pull a section on demand:
 | Topic | Section in MEMORY.md |
 |-------|----------------------|
 | Layout, keystore path, versioning | Build & layout |
-| Test suite structure, DummyServer ports | Testing |
+| Test suite structure, DummyServer ports, emulator prerequisites | Testing |
 | SenderService protocol, keepalive, MJPEG | App protocol |
-| CI (GitHub Actions, Firebase), emulator prerequisites | CI quirks |
+| CI (GitHub Actions), emulator prerequisites | CI quirks |
 | Branch/PR and release workflows | Workflows |
 | Rationale for tool choices and past fixes | Design decisions |
 
@@ -139,6 +139,10 @@ Details live in `MEMORY.md` — pull a section on demand:
   sweep + toolchain upgrade to compileSdk/targetSdk 36, minSdk 21, coverage to
   85%, pure-Kotlin migration, commits on `feat/global-refresh`) lives in
   `.PLAN.md`. `.PLAN.md` is gitignored — never commit it.
+- Phases 1–8 are committed and verified (layout, cleanup, CI retire, gates,
+  format sweep, deterministic tests, toolchain 36, edge-to-edge + MJPEG
+  reconnect). Next: CI workflow, static analysis, coverage drive, Kotlin
+  migration.
 
 ## Conventions
 

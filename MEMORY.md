@@ -36,9 +36,9 @@ keystore is present, so release builds sign normally. Key alias is `gamepad`.
 ### Versioning
 
 `appMajorVersion`/`appMinorVersion` are hand-set at the top of `app/build.gradle`
-(currently 1.40; next release 1.41 per `.PLAN.md` D19).
+(currently 1.41; the 1.41 bump landed with the SDK 36 toolchain upgrade).
 `versionCode = minSdk*10000 + abiCode*1000 + major*100 + minor`
-(never set by hand), `versionName = "1.40"`, `versionNameSuffix = "-API21"`.
+(never set by hand), `versionName = "1.41"`, `versionNameSuffix = "-API21"`.
 Bump `appMinorVersion` per release; semantic 1.x is kept intentionally
 (Play Store requires a strictly increasing versionCode per app — date-based
 versions risk collisions with the `minSdk*10000 + ...` formula).
@@ -147,15 +147,15 @@ About/system-info field.
 
 ## CI quirks
 
-### CircleCI
+### GitHub Actions (replaces CircleCI)
 
-- `.circleci/config.yml` is v2.1. Jobs: `build` (`assembleDebug` +
-  `assembleDebugAndroidTest`, both with `-PpreDexEnable=false`), `test_local`
-  (`./gradlew test`), `test_instrumented` (Firebase Test Lab, needs
-  `GCLOUD_SERVICE_KEY` + `GOOGLE_PROJECT_ID`). Image `circleci/android:api-30`.
-- The `build` job signs with the release config — a CI build would also fail
-  without the keystore present at the resolved path. (Release signing is
-  local-only by policy; CI never holds the keystore.)
+- CI lives in `.github/workflows/ci.yml` (CircleCI was retired — see the
+  "Revival restructure" entry). The workflow runs the gate suite: unit tests,
+  lint, checkstyle, SpotBugs, JaCoCo report + verification, and the format
+  check. Instrumented tests run on an emulator (API 36 AVD) — see TESTING.md
+  for the `immersive_mode_confirmations` prerequisite.
+- CI builds with `-PpreDexEnable=false` (debug APK + androidTest APK) and never
+  signs release (the keystore never enters CI; release signing stays local-only).
 - DummyServer tests bind `localhost:12345` inside the app process, so they run
   on-device via Firebase without firewall changes.
 
@@ -175,7 +175,7 @@ About/system-info field.
 ### Release
 
 1. Gates: green CI, 0 open PRs, 0 security alerts.
-1. Bump `appMinorVersion` in `as/build.gradle`; commit + PR.
+1. Bump `appMinorVersion` in `app/build.gradle`; commit + PR.
 1. Build `assembleRelease` locally (keystore present), smoke-test the APK.
 1. Commit the APK to `_apk/` with a versioned name.
 1. Generate notes via the `release-notes` opencode skill; review the draft
@@ -231,7 +231,7 @@ conflict with AEHD.
 ### [2026-08-05] Keystore path correction
 
 **Context:** AGENTS.md claimed the keystore lives at "repo root". The relative
-path `../../android-keystorage.jks` from `as/` resolves one level **above** the
+path `../android-keystorage.jks` from `app/` resolves one level **above** the
 repo root.
 
 **Decision:** document that the keystore resolves to the parent of the repo
