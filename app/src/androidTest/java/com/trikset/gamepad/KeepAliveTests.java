@@ -30,7 +30,10 @@ public class KeepAliveTests {
     // In order to set connection up
     client.send("test");
 
-    Thread.sleep(timeout + 5000);
+    // Wait for the keepalive to arrive instead of guessing at a sleep budget;
+    // the connect + first keepalive cycle can outlive a fixed Thread.sleep on a
+    // slow emulator (see TESTING.md "Why awaits are required").
+    assertTrue(server.awaitMessage(String.format("keepalive %d", timeout), 30000));
     server.stopListening();
 
     ListIterator<String> messages = server.getReceivedMessages().listIterator();
@@ -49,9 +52,10 @@ public class KeepAliveTests {
 
     // In order to set connection up
     client.send("testtest");
-    Thread.sleep(1000);
+    assertTrue(server.awaitMessage("testtest", 30000));
     client.disconnect("testtest");
 
+    // Give any (incorrectly scheduled) keepalive a chance to appear.
     Thread.sleep(2000);
     server.stopListening();
 
