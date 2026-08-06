@@ -31,7 +31,7 @@ jobs:
           cache-read-only: ${{ github.ref != 'refs/heads/master' }}
 
       - name: Build debug + androidTest APKs
-        run: ./gradlew assembleDebug assembleDebugAndroidTest -PpreDexEnable=false
+        run: ./gradlew assembleDebug assembleDebugAndroidTest -PpreDexEnable=false --build-cache
 
       - name: Unit tests + quality gates
         run: >-
@@ -44,6 +44,7 @@ jobs:
           jacocoTestCoverageVerification
           spotlessCheck
           -PpreDexEnable=false
+          --build-cache
 
       - name: Upload test reports
         if: always()
@@ -62,6 +63,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Required for hardware-accelerated (KVM) emulation on ubuntu-latest;
+      # without it the emulator falls back to software emulation (glacial
+      # boot, install-commit broken-pipe, and slow flaky tests).
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
       - name: Set up JDK 21
         uses: actions/setup-java@v5
         with:
@@ -77,12 +87,13 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
           api-level: 36
-          # aosp_atd = Android Test Device: the lightweight headless image made
-          # for CI. google_apis boots slowly under swiftshader and the APK
-          # install-commit keeps dying with a broken-pipe under resource
-          # pressure on 2-core runners.
-          target: aosp_atd
+          # default image + swiftshader is the mainstream CI combo (used by
+          # coil/retrofit/sqldelight). aosp_atd + swiftshader was verified to
+          # NEVER grant the app window focus (8/8 RootViewWithoutFocusException);
+          # aosp_atd only works with a host GPU, which ubuntu-latest lacks.
+          target: default
           arch: x86_64
+          profile: pixel_5
           cores: 4
           ram-size: 4096M
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect
