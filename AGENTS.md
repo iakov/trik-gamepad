@@ -142,12 +142,14 @@ Details live in `MEMORY.md` — pull a section on demand:
   `.PLAN.md`. `.PLAN.md` is gitignored — never commit it.
 - Phases 1–10 are committed and pushed to the fork (layout, cleanup, CI retire,
   gates, format sweep, deterministic tests, toolchain 36, edge-to-edge + MJPEG
-  reconnect, docs refresh, GitHub Actions CI). CI `build` job is green; the
-  instrumented job was iterating on the emulator image (`google_apis`
-  install-commit broken-pipe → `aosp_atd`, which runs but all tests fail with
-  `RootViewWithoutFocusException` under headless `-gpu swiftshader_indirect`).
-  Next: fix CI instrumented focus, static analysis, coverage drive, Kotlin
-  migration.
+  reconnect, docs refresh, GitHub Actions CI). CI is **fully green** (build +
+  instrumented). The instrumented focus failure was isolated: `aosp_atd` works
+  locally with `-gpu host` (adopted as the local test AVD `Atd_API36`), but the
+  CI failure was the swiftshader headless GPU combo, so CI uses the `default`
+  image + a KVM-enable step + `pixel_5` profile. `KeepAliveTests` made
+  deterministic (`DummyServer.awaitMessage`). Dead deps removed; gradle build
+  cache enabled. Next: static analysis (Phase 11), coverage drive (12), Kotlin
+  migration (13), retrospective (14).
 
 ## Conventions
 
