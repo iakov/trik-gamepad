@@ -1,6 +1,5 @@
 package com.trikset.gamepad;
 
-import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
@@ -8,7 +7,6 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.util.Log;
@@ -20,7 +18,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewGroup.LayoutParams;
-import android.view.WindowManager;
 import android.view.animation.AlphaAnimation;
 import android.widget.Button;
 import android.widget.CheckBox;
@@ -30,6 +27,9 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.view.MenuItemCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.demo.mjpeg.MjpegView;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -39,10 +39,8 @@ import java.util.Locale;
 import java.util.Objects;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
-
   static final String TAG = "MainActivity";
   private HideRunnable mHideRunnable;
-  @Nullable private Runnable mRestartCallback;
   private SensorManager mSensorManager;
   private int mAngle; // -100%
   // ...
@@ -78,10 +76,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
   @Override
   protected void onCreate(final Bundle savedInstanceState) {
     setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
-    // supportRequestWindowFeature(Window.FEATURE_NO_TITLE);
-    getWindow()
-        .setFlags(
-            WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+    // Edge-to-edge (required on API 35+; enforced for targetSdk 36): draw
+    // behind the system bars instead of using the removed FLAG_FULLSCREEN.
+    // The gamepad UI hides the bars via setSystemUiVisibility(false).
+    WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
     setHideRunnable(new HideRunnable());
@@ -315,10 +313,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     getSenderService().disconnect("Inactive gamepad");
     if (mVideo != null) {
       mVideo.stopPlayback();
-      if (mRestartCallback != null) {
-        mVideo.removeCallbacks(mRestartCallback);
-        mRestartCallback = null;
-      }
+      mVideo.setOnStreamErrorListener(null);
     }
     super.onPause();
   }
@@ -328,24 +323,27 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     super.onResume();
 
     if (mVideo != null) {
-      if (mRestartCallback != null) {
-        mVideo.removeCallbacks(mRestartCallback);
-      }
-
-      mRestartCallback =
-          () -> {
-            new StartReadMjpegAsync(mVideo).execute(mVideoURL);
-            if (mRestartCallback != null && mVideo != null) {
-              // drop HTTP connection and restart
-              mVideo.postDelayed(mRestartCallback, 30000);
-            }
-          };
-
-      mVideo.post(mRestartCallback);
+      // Reconnect-on-error: the render thread reports a dead stream and we
+      // drop the HTTP connection and restart it. No forced periodic restart —
+      // the stream only restarts when it actually breaks (see .PLAN.md R12).
+      mVideo.setOnStreamErrorListener(this::restartVideoStream);
+      restartVideoStream();
     }
 
     mSensorManager.registerListener(
         this, mSensorManager.getDefaultSensor(Sensor.TYPE_ALL), SensorManager.SENSOR_DELAY_NORMAL);
+  }
+
+  private void restartVideoStream() {
+    // The error listener may fire from the render thread; always hop to the
+    // main thread before touching the view hierarchy / launching an AsyncTask.
+    runOnUiThread(
+        () -> {
+          if (mVideo == null) {
+            return;
+          }
+          new StartReadMjpegAsync(mVideo).execute(mVideoURL);
+        });
   }
 
   @Override
@@ -417,49 +415,33 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     }
   }
 
-  // Suppression rationale: SYSTEM_UI_FLAG_* constants are read under explicit
-  // Build.VERSION.SDK_INT guards below (the app is minSdk 21, but the flag
-  // values are version-gated for clarity); lint's NewApi cannot prove the
-  // guards, so the warning is deliberately suppressed.
-  @SuppressLint("NewApi")
+  // Hides/shows the system bars. Uses the modern WindowInsetsControllerCompat
+  // (available back to API 21 via core-ktx) instead of the deprecated
+  // View.SYSTEM_UI_FLAG_* set, which leaves the window without focus on API 36
+  // where edge-to-edge is enforced.
   private void setSystemUiVisibility(boolean show) {
-    int flags = 0;
     final View mainView = findViewById(R.id.main);
     if (mainView == null) {
       return;
     }
 
-    final int sdk = Build.VERSION.SDK_INT;
-
-    if (sdk >= Build.VERSION_CODES.KITKAT) {
-      flags |= show ? 0 : View.SYSTEM_UI_FLAG_IMMERSIVE;
-      // Not using View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY; we use handcrafted autohide
+    WindowInsetsControllerCompat controller =
+        WindowCompat.getInsetsController(getWindow(), mainView);
+    if (controller == null) {
+      return;
     }
 
-    if (sdk >= Build.VERSION_CODES.JELLY_BEAN) {
-      flags |=
-          View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-              | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-              | View.SYSTEM_UI_FLAG_LAYOUT_STABLE;
-
-      flags |= show ? 0 : View.SYSTEM_UI_FLAG_FULLSCREEN;
-    }
-
-    if (sdk >= Build.VERSION_CODES.ICE_CREAM_SANDWICH) {
-      flags |=
-          show
-              ? View.SYSTEM_UI_FLAG_VISIBLE
-              : View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LOW_PROFILE;
-      mainView.setSystemUiVisibility(flags);
-    } else {
+    if (show) {
+      controller.show(WindowInsetsCompat.Type.systemBars());
+      // The action bar is only shown while the settings overlay is toggling.
       ActionBar a = getSupportActionBar();
       if (a != null) {
-        if (show) {
-          a.show();
-        } else {
-          a.hide();
-        }
+        a.show();
       }
+    } else {
+      controller.hide(WindowInsetsCompat.Type.systemBars());
+      controller.setSystemBarsBehavior(
+          WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
     }
 
     HideRunnable r = getHideRunnable();
@@ -502,12 +484,8 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     mSensorManager.unregisterListener(this);
 
     if (mVideo != null) {
-      if (mRestartCallback != null) {
-        mVideo.removeCallbacks(mRestartCallback);
-      }
-      mRestartCallback = null;
-
       mVideo.stopPlayback();
+      mVideo.setOnStreamErrorListener(null);
       mVideo = null;
     }
     final View mainView = findViewById(R.id.main);

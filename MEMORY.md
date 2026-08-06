@@ -363,6 +363,46 @@ even though `config.ini` declares `firstboot.saveToLocalSnapshot=yes` — a
 snapshot-policy discrepancy to revisit. Never pass `-no-snapshot` for local
 iteration; only for pristine CI-style cold boots.
 
+### [2026-08-06] Immersive mode confirmation steals focus on API 35+ (instrumented tests)
+
+**Context:** after the SDK 36 / targetSdk 36 upgrade, every Espresso
+interaction on the API 36 emulator failed with
+`RootViewWithoutFocusException` (`has-window-focus=false` even though the
+DecorView reports `has-focus=true`). Root cause: the gamepad runs immersive
+(system bars hidden), and the first time an app enters immersive mode on
+API 35+ the system pops an `ImmersiveModeConfirmation` overlay ("swipe to exit
+fullscreen") that keeps window focus. Espresso's root picker never finds a
+focused root, so every `onView().perform()` times out after 10 s.
+
+**Decision:** disable the confirmation once per AVD before running
+instrumented tests: `adb shell settings put secure immersive_mode_confirmations confirmed`. This is a CI/emulator prerequisite, not app code. Also migrated
+`MainActivity`'s fullscreen handling from the removed `FLAG_FULLSCREEN` +
+deprecated `View.SYSTEM_UI_FLAG_*` set to `WindowCompat.setDecorFitsSystemWindows(false)`
+
+- `WindowInsetsControllerCompat` (hide/show `systemBars()`) — the legacy set is
+  a no-op under API 36's enforced edge-to-edge and left the window focus-less.
+  Prerequisite documented in TESTING.md.
+
+**Lesson:** a "focus" symptom after a targetSdk bump is often the OS adding a
+new overlay, not the app losing code — check `dumpsys window` `mCurrentFocus`
+for system windows (`ImmersiveModeConfirmation`) before touching the app.
+
+### [2026-08-06] MJPEG: reconnect-on-error replaces the 30 s forced restart
+
+**Context:** the video loop force-restarted the HTTP stream every 30 s via a
+`postDelayed` runnable (`mRestartCallback`) regardless of whether the stream was
+healthy — a magic number that wasted bandwidth and reconnected a perfectly fine
+connection. The render thread already stopped itself on `IOException`, but the
+app never acted on that.
+
+**Decision:** `MjpegView` now exposes an `OnStreamErrorListener` invoked from
+the render thread when `readMjpegFrame()` throws; `MainActivity` registers it in
+`onResume` and calls `restartVideoStream()` (marshalled to the main thread via
+`runOnUiThread`, since the callback fires off-thread). The forced 30 s timer and
+`mRestartCallback` field are gone — the stream restarts only when it breaks.
+`StartReadMjpegAsync` sets 5 s connect/read timeouts so a dead robot surfaces as
+an error quickly.
+
 ### [2026-08-06] Operational rules for command hygiene
 
 **Context:** the agent stalled "staring at the emulator" — launched an async

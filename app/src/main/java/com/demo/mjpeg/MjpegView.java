@@ -23,6 +23,12 @@ import org.apache.commons.io.input.BoundedInputStream;
 
 public class MjpegView extends SurfaceView implements SurfaceHolder.Callback {
   private static final String TAG = "MjpegView";
+
+  /** Invoked from the render thread when the MJPEG stream fails (e.g. socket closed). */
+  public interface OnStreamErrorListener {
+    void onStreamError();
+  }
+
   private MjpegViewThread thread;
   private MjpegInputStream mIn;
   private boolean mRun;
@@ -30,6 +36,7 @@ public class MjpegView extends SurfaceView implements SurfaceHolder.Callback {
   private final Paint fpsTextPaint = new Paint();
   private int dispWidth;
   private int dispHeight;
+  @Nullable private OnStreamErrorListener mOnStreamErrorListener;
 
   public MjpegView(Context context) {
     super(context);
@@ -39,6 +46,10 @@ public class MjpegView extends SurfaceView implements SurfaceHolder.Callback {
   public MjpegView(Context context, AttributeSet attrs) {
     super(context, attrs);
     init(context);
+  }
+
+  public void setOnStreamErrorListener(@Nullable OnStreamErrorListener listener) {
+    mOnStreamErrorListener = listener;
   }
 
   private void init(Context context) {
@@ -174,6 +185,10 @@ public class MjpegView extends SurfaceView implements SurfaceHolder.Callback {
 
         } catch (IOException e) {
           mRun = false;
+          OnStreamErrorListener listener = mOnStreamErrorListener;
+          if (listener != null) {
+            listener.onStreamError();
+          }
         } finally {
 
           if (canvas != null) {

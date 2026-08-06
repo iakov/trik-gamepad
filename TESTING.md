@@ -3,7 +3,7 @@
 <!-- encoding: utf-8 -->
 
 Scope: Test strategy, how to run tests, mocking/synchronization patterns, and
-known gaps for `as/`.
+known gaps for the canonical `app/` layout.
 Aim: Document how tests work, what is covered, and hard-won lessons about
 Robolectric timing, emulator prerequisites, and the two `DummyServer` classes.
 Structure: Overview → Running tests → Diagnostic discipline → Patterns →
@@ -22,7 +22,6 @@ Two layers:
 ## Running tests
 
 ```sh
-cd as
 ./gradlew test                      # all unit-test variants (debug/release/releaseDebug)
 ./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.senderServiceShouldSendSingleCommandCorrectly"   # single test
 ./gradlew connectedDebugAndroidTest # instrumented; needs emulator/device
@@ -38,6 +37,12 @@ Local instrumented run:
    `emulator -avd Simple_Phone_API36 -no-window -no-audio -no-boot-anim -gpu host`
    (drop `-no-window` to see the UI; keep snapshots enabled for fast reboots).
 1. Wait for `adb shell getprop sys.boot_completed` → `1`.
+1. **Disable the immersive-mode confirmation overlay** (required on API 35+):
+   the gamepad runs immersive (system bars hidden), and the first time it enters
+   immersive mode the system pops an `ImmersiveModeConfirmation` window that
+   keeps focus away from the app. Espresso then fails every interaction with
+   `RootViewWithoutFocusException`. Pre-empt it once per AVD:
+   `adb shell settings put secure immersive_mode_confirmations confirmed`.
 1. `./gradlew connectedDebugAndroidTest`.
 
 ## Diagnostic discipline
@@ -52,11 +57,11 @@ Local instrumented run:
 
 ### Two DummyServers — do not confuse them
 
-- `as/src/test/.../SenderServiceTest` defines its **own inner `DummyServer`**.
+- `app/src/test/.../SenderServiceTest` defines its **own inner `DummyServer`**.
   It binds an **ephemeral port** (`ServerSocket(0)`), exposes `getPort()`,
   `awaitConnection()`, `awaitCommands()` (5 s timeouts), and closes the
   listening socket in `close()`.
-- `as/src/androidTest/.../DummyServer.java` is a separate class binding
+- `app/src/androidTest/.../DummyServer.java` is a separate class binding
   `localhost:12345`, used by the instrumented tests.
 - **Never reintroduce fixed ports in the unit test**: `./gradlew test` runs
   three variants in parallel JVMs; fixed ports caused `BindException` cascades
@@ -91,12 +96,13 @@ Every batch of changes touching `SenderService` or the tests should consider:
 
 ## Known gaps
 
-- No coverage gate yet (JaCoCo `jacocoTestReport` is being added as a report
-  only — not a 100% gate, per `.PLAN.md` D17/Tool mapping).
+- Coverage gate exists as a ratchet (JaCoCo `jacocoTestCoverageVerification`,
+  currently 10% line, raised toward 85% in the coverage drive — see
+  `.PLAN.md`); `jacocoTestReport` always produces the full report.
 - Instrumented tests exercise only what runs on the emulator; real TRIK robot
   interaction is never in CI.
 - Espresso tests note "idling resources would be the recommended way" — the
   tests currently rely on `ActivityTestRule` + sleeps; be aware of flakiness
   potential on slow emulators.
-- `MainActivity` forces landscape + fullscreen; instrumented tests run against
+- `MainActivity` forces landscape + immersive; instrumented tests run against
   that configuration only.
