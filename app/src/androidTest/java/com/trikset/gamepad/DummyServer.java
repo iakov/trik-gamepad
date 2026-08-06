@@ -42,25 +42,35 @@ public class DummyServer {
   private final Object lock = new Object();
 
   DummyServer() {
-    Thread serverThread =
-        new Thread(
-            () -> {
-              try (ServerSocket server = new ServerSocket(DEFAULT_PORT)) {
-                Socket client = server.accept();
+    try {
+      // Bind synchronously in the constructor so the port is guaranteed
+      // listening before the client connects. A background bind raced the
+      // client's connect on slow emulators (ECONNREFUSED), failing the
+      // keepalive tests — the same lesson as the unit-test DummyServer
+      // (MEMORY.md "Ephemeral ports (hard-won)").
+      final ServerSocket server = new ServerSocket(DEFAULT_PORT);
+      Thread serverThread =
+          new Thread(
+              () -> {
+                try (ServerSocket s = server) {
+                  Socket client = s.accept();
 
-                BufferedReader clientInput =
-                    new BufferedReader(new InputStreamReader(client.getInputStream()));
-                String message;
-                while ((message = clientInput.readLine()) != null && !canStopListening) {
-                  synchronized (lock) {
-                    receivedMessages.add(message);
-                    lock.notifyAll();
+                  BufferedReader clientInput =
+                      new BufferedReader(new InputStreamReader(client.getInputStream()));
+                  String message;
+                  while ((message = clientInput.readLine()) != null && !canStopListening) {
+                    synchronized (lock) {
+                      receivedMessages.add(message);
+                      lock.notifyAll();
+                    }
                   }
+                } catch (IOException e) {
+                  e.printStackTrace();
                 }
-              } catch (IOException e) {
-                e.printStackTrace();
-              }
-            });
-    serverThread.start();
+              });
+      serverThread.start();
+    } catch (IOException e) {
+      throw new IllegalStateException("Failed to bind DummyServer", e);
+    }
   }
 }
