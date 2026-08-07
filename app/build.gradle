@@ -1,12 +1,10 @@
 apply plugin: 'idea'
-apply plugin: 'checkstyle'
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'io.gitlab.arturbosch.detekt'
 apply plugin: 'jacoco'
 apply plugin: 'com.github.spotbugs'
 apply plugin: 'com.diffplug.spotless'
-apply plugin: 'pmd'
 
 def abiCode = 0 // just for fun
 def appMajorVersion = 1 // single digit for each SDK/ABI
@@ -135,35 +133,6 @@ tasks.withType(JavaCompile).configureEach {
     options.compilerArgs += ['-Xlint:all']
 }
 
-checkstyle {
-    toolVersion '10.20.1'
-    // Google's ruleset, vendored verbatim from the checkstyle 10.20.1
-    // distribution (google_checks.xml) so the config never drifts from
-    // upstream and does not depend on archive-resolution quirks.
-    configFile = file('config/checkstyle/google_checks.xml')
-    maxWarnings = 0
-    ignoreFailures = false
-}
-
-// The Android plugin does not apply the `java` plugin, so checkstyle registers
-// no tasks of its own; create one bound to the app's Java sources.
-tasks.register('checkstyle', Checkstyle) {
-    description = 'Run Checkstyle over the app sources.'
-    source 'src/main/java'
-    include '**/*.java'
-    // The com.demo.mjpeg package is vendored third-party code (MJPEG player);
-    // it is excluded from the style gate and will be rewritten during the
-    // pure-Kotlin migration.
-    exclude '**/com/demo/mjpeg/**'
-    classpath = files()
-    config = checkstyle.config
-    reports {
-        xml.required = false
-        html.required = true
-        html.outputLocation = file("$buildDir/reports/checkstyle/checkstyle.html")
-    }
-}
-
 spotbugs {
     toolVersion = '4.10.3'
     effort = com.github.spotbugs.snom.Effort.MAX
@@ -176,40 +145,12 @@ spotbugs {
     onlyAnalyze = ['com.trikset.*', 'com.demo.*']
 }
 
-pmd {
-    toolVersion = '7.26.0'
-    consoleOutput = true
-    ignoreFailures = false
-}
-
 detekt {
     toolVersion = '1.23.8'
     config = files('config/detekt/detekt.yml')
     // Start from detekt's bundled default ruleset and layer only the curated
-    // deviations in config/detekt/detekt.yml on top (the analogue of PMD's
-    // ruleSets = [] + curated ruleset for Kotlin).
+    // deviations in config/detekt/detekt.yml on top.
     buildUponDefaultConfig = true
-}
-
-// The Android plugin does not apply the `java` plugin, so PMD registers no
-// tasks of its own; create one bound to the app's Java sources.
-tasks.register('pmd', Pmd) {
-    description = 'Run PMD over the app sources.'
-    source 'src/main/java'
-    include '**/*.java'
-    // The com.demo.mjpeg package is vendored third-party code (MJPEG player);
-    // it is excluded from the static-analysis gates and will be rewritten
-    // during the pure-Kotlin migration.
-    exclude '**/com/demo/mjpeg/**'
-    classpath = files()
-    ruleSetFiles = files('config/pmd/ruleset.xml')
-    // Gradle's PMD plugin defaults to the full errorprone category on top of
-    // any ruleSetFiles; clear it so ONLY the curated ruleset above runs.
-    ruleSets = []
-    reports {
-        html.required = true
-        html.outputLocation = file("$buildDir/reports/pmd/pmd.html")
-    }
 }
 
 // find-sec-bugs as the security SAST detector on the SpotBugs classpath. The

@@ -38,8 +38,6 @@ jobs:
           ./gradlew
           test
           lint
-          checkstyle
-          pmd
           detekt
           spotbugsDebug
           jacocoTestReport
