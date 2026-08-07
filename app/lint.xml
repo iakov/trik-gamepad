@@ -14,4 +14,12 @@
     <issue id="ClickableViewAccessibility" severity="ignore">
         <ignore path="src/main/kotlin/com/trikset/gamepad/SquareTouchPadLayout.kt" />
     </issue>
+    <!-- MainActivity's reflected members (processSensor, setSystemUiVisibility,
+         recreateMagicButtons, createPad, mVideo, mVideoURL, ...) must keep their
+         exact private names for the Java MainActivityTest reflection helpers,
+         and its many listeners generate synthetic accessors exactly as the
+         baselined Java did. -->
+    <issue id="SyntheticAccessor" severity="ignore">
+        <ignore path="src/main/kotlin/com/trikset/gamepad/MainActivity.kt" />
+    </issue>
 </lint>
