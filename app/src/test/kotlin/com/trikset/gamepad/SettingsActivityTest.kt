@@ -2,8 +2,8 @@ package com.trikset.gamepad
 
 import android.content.ClipboardManager
 import android.content.Context
-import android.preference.PreferenceManager
 import androidx.preference.Preference
+import androidx.preference.PreferenceManager
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test

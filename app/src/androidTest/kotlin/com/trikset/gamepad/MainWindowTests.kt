@@ -1,8 +1,8 @@
 package com.trikset.gamepad
 
-import android.preference.PreferenceManager
 import android.view.View
 import android.view.ViewGroup
+import androidx.preference.PreferenceManager
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction

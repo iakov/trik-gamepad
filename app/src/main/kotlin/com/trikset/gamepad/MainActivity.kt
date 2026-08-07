@@ -9,7 +9,6 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
-import android.preference.PreferenceManager
 import android.util.Log
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
@@ -28,6 +27,7 @@ import androidx.core.view.MenuItemCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.preference.PreferenceManager
 import com.demo.mjpeg.MjpegView
 import java.net.MalformedURLException
 import java.net.URI
