@@ -25,7 +25,7 @@ import java.util.concurrent.Executors
  */
 class SenderService {
 
-  interface OnEventListener<ArgT> {
+  fun interface OnEventListener<ArgT> {
     fun onEvent(arg: ArgT)
   }
 
