@@ -217,7 +217,10 @@ Details live in `MEMORY.md` — pull a section on demand:
   until confirmed; details in MEMORY.md "CI focus flake"). Residual instrumented
   failures are swiftshader rendering instability (`Failed to find ColorBuffer`
   under load), not code.
-- Next: final retrospective (Phase 14) is the remaining item.
+- Next: the improvement plan (instrumented CI without macOS, androidx.
+  preference migration, MainActivity/WheelController extraction, SenderService
+  constructor injection, SettingsTests refactor, package rename, architecture
+  doc) lives in committed `docs/ROADMAP.md` — start there.
 
 ## Conventions
 
