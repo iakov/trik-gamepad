@@ -7,4 +7,11 @@
          trips depends on which SDK platforms are installed, so a lint baseline
          cannot pin it. Downgrade to ignore; the version is deliberate. -->
     <issue id="OldTargetApi" severity="ignore" />
+    <!-- TouchPadListener#onTouch delegates to SquareTouchPadLayout.onTouch,
+         which DOES call View#performClick() in the ACTION_UP and ACTION_DOWN
+         branches; lint's interprocedural analysis cannot see it through the
+         delegation and reports a false-positive ClickableViewAccessibility. -->
+    <issue id="ClickableViewAccessibility" severity="ignore">
+        <ignore path="src/main/kotlin/com/trikset/gamepad/SquareTouchPadLayout.kt" />
+    </issue>
 </lint>
