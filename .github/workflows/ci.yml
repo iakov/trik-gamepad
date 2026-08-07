@@ -105,14 +105,14 @@ jobs:
             # pops an ImmersiveModeConfirmation overlay that steals window focus
             # and makes every Espresso interaction time out. Pre-empt it.
             adb wait-for-device
-            # Wait for a real boot before touching the settings provider; writing
-            # settings while the system is still booting races the provider and
-            # the value is silently lost (a fresh headless emulator is slow).
+            # Wait for boot to complete; then retry the settings write until the
+            # provider accepts it. sys.boot_completed can report 1 while the
+            # settings provider is still starting, so a single put is silently
+            # lost during a slow headless boot -- which is exactly how the
+            # confirmation overlay appears (CI history: two runs failed with
+            # focus never granted after the pre-empt appeared to run).
             adb shell 'while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 1; done'
-            adb shell settings put secure immersive_mode_confirmations confirmed
-            # settings put is async through the provider; verify the value is
-            # actually applied before running the suite.
-            adb shell 'i=0; while [ $i -lt 20 ]; do [ "$(settings get secure immersive_mode_confirmations)" = "confirmed" ] && break; i=$((i+1)); sleep 1; done'
+            adb shell 'i=0; while [ $i -lt 60 ]; do settings put secure immersive_mode_confirmations confirmed; [ "$(settings get secure immersive_mode_confirmations)" = "confirmed" ] && break; i=$((i+1)); sleep 1; done'
             # Dismiss any keyguard and clear an overlay that may already be up.
             adb shell wm dismiss-keyguard
             adb shell input keyevent 4
@@ -122,9 +122,8 @@ jobs:
             if [ $? -ne 0 ]; then
               echo "instrumented run failed; retrying once"
               adb shell am force-stop com.trikset.gamepad
-              # Re-apply the pre-empt on the retry too: a slow boot may have
-              # swallowed the first settings write.
-              adb shell settings put secure immersive_mode_confirmations confirmed
+              # Re-apply the pre-empt on the retry too (a slow boot may still be racing).
+              adb shell 'i=0; while [ $i -lt 60 ]; do settings put secure immersive_mode_confirmations confirmed; [ "$(settings get secure immersive_mode_confirmations)" = "confirmed" ] && break; i=$((i+1)); sleep 1; done'
               adb shell wm dismiss-keyguard
               ./gradlew connectedDebugAndroidTest -PpreDexEnable=false
             fi
