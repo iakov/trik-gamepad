@@ -238,9 +238,11 @@ spotless {
     }
     kotlin {
         target 'src/**/*.kt'
-        // 0.51.0-FINAL is the last com.pinterest:ktlint artifact Spotless's
-        // ktlint step resolves directly; bumped if a newer 1.x is needed.
-        ktlint('0.51.0-FINAL')
+        // ktfmt (Google's Kotlin formatter, google-java-format's sibling) rather
+        // than ktlint: ktlint 0.51 (the last com.pinterest:ktlint artifact)
+        // embeds a Kotlin 1.9 compiler that cannot parse Kotlin 2.0.21 sources.
+        // 0.63 is the version Spotless 8.9.0 was built against.
+        ktfmt('0.63')
         trimTrailingWhitespace()
         endWithNewline()
     }
