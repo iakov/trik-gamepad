@@ -867,3 +867,36 @@ focus flakes. This ledger supersedes it. CI remains **not green**: the retry
 band-aid is proven insufficient (`31116833261` 7/9 with retry) — do not spend
 further CI runs re-testing it; the next fix is a GPU-capable/macOS runner or a
 focus-wait before Espresso, then verify on a fresh run.
+
+### [2026-08-07] Autonomous-run stall root cause (turn cadence)
+
+**Context:** during the global-refresh execution a swiftshader emulator was
+launched with `Start-Process -PassThru`; the agent ended its turn on the
+liveness check ("PID alive") without issuing the readiness poll. In an
+autonomous run nothing re-pokes the agent, so the run sat idle indefinitely
+until the maintainer noticed. Two adjacent failures the same day: (1) the first
+push of the run shipped a google-java-format violation because only compile +
+instrumented tests were run, not `spotlessCheck`; (2) a GitHub **Partial System
+Outage** silently dropped the push events for three commits
+(`7682f7d`→`a3301b8`) — no CI runs were created even after the status page
+returned to "All Systems Operational" (push events during an outage are not
+backfilled; the next real push re-triggers CI on the accumulated branch head).
+
+**Decision:** three new AGENTS.md operational rules — (1) *async turn-cadence
+invariant*: a turn that launches an async process is not complete until the
+readiness result is recorded; the next call after the liveness check must be a
+single bounded poll (loop + hard cap in one command), or the process is logged
+as a `poll:`/`watch:` todo for the next turn; (2) *pre-push full gate*: every
+push runs the complete logged gate list, not just compile + tests; (3) *CI
+cadence*: one bounded run check per push, document-and-continue if absent,
+re-check at the next push.
+
+**Rationale:** the stall was a cadence break, not a tooling failure — the
+pre-existing "capture handle, verify liveness, wait for readiness" rule lacked
+the explicit *a turn is not complete until readiness is recorded* constraint
+that autonomous execution requires.
+
+**Consequences:** to replicate CI's focus scenario locally, a swiftshader AVD
+(`Swiftshader_API36`, `default` image, `hw.gpu.mode=swiftshader_indirect`,
+config==CLI so it never fights the AVD config) was created; use it to validate
+focus-sensitive changes without burning CI runs.

@@ -116,6 +116,9 @@ configurations, update this section and the referenced config files.
 - **Pre-format `.md` with `uvx mdformat` before pre-commit**: the mdformat hook modifies files on its first run and fails, so a second pass is always needed. Format changed `.md` files first and the hook passes once.
 - **`gh run watch` takes the run **id**, not the object**: passing a PowerShell run object (e.g. from a `ConvertFrom-Json` pipeline) makes `gh` build a bogus URL and 404. Extract `.id` explicitly. Same for any `gh <cmd>` that takes an id.
 - **Every `gh` run command needs `--repo iakov/trik-gamepad`**: without it `gh` resolves to the default repo (upstream `trikset/trik-gamepad`), so `gh run view`/`watch` report a bogus/404 run.
+- **A turn that launches an async process is not complete until its readiness result is recorded**: capturing `Start-Process -PassThru` and confirming liveness is only the first half of the chain — the very next tool call must be the single bounded readiness poll (one command that loops `sys.boot_completed` etc. up to a hard cap). Never end a turn after a bare liveness check: in an autonomous run nothing re-pokes the agent, so the gap is silent and indefinite. If the process is not needed yet, record it as a `poll:`/`watch:` todo item with a timestamp so the next turn opens with it.
+- **Every push runs the full local gate list first**: `./gradlew test lint checkstyle pmd detekt spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck`, logged — not just compile + tests (a missing `spotlessCheck` once shipped a format violation).
+- **CI cadence**: after each push, one bounded run check (~3 min); if no run appears (during a GitHub outage push events can be silently dropped even after recovery), document it and re-check at the next push rather than blocking.
 
 ### On tool error
 
@@ -204,17 +207,18 @@ Details live in `MEMORY.md` — pull a section on demand:
   baseline + SpotBugs (0 bugs); `aosp_atd` local test AVD `Atd_API36`
   (`-gpu host` only); CI uses `default` image + KVM step + `pixel_5`.
 - **CI is NOT green overall**: the last fully-green run (both jobs) was
-  `31103997686`. Full ledger (18 runs): **15 red, 2 green, 1 running** — the
-  running one (`31119028275`) is the retrospective-docs commit's CI; verify it
-  before Phase 13. Most red runs are **adb/emulator boot flakes** (infra, not
+  `31103997686`. Most red runs are **adb/emulator boot flakes** (infra, not
   code); the swiftshader **focus flake** (`RootViewWithoutFocusException`) hit
   7/9 on `31116833261` *with* the retry-once in place — the retry is proven
-  insufficient, do NOT spend more CI runs re-testing it (details: MEMORY.md
-  "CI flake saga" + "Full-session audit").
-- Next: **verify the docs-commit CI run**, then **fix the instrumented focus
-  flake for real** (macOS/GPU runner or a focus-wait before Espresso — the
-  retry-once is a band-aid that does not hold), then Kotlin migration
-  (Phase 13), retrospective (14).
+  insufficient (details: MEMORY.md "CI flake saga" + "Full-session audit").
+  **Current session:** `7682f7d` added a focus-wait rule
+  (`FocusAwareActivityTestRule`, 60 s focus wait per test) + ci.yml pre-empt
+  hardening; 9/9 green locally on `Atd_API36`. No CI runs exist for
+  `7682f7d`..`a3301b8` — a GitHub Partial System Outage dropped the push
+  events (not backfilled); the next push re-triggers CI.
+- Next: **swiftshader instrumented validation** (local `Swiftshader_API36`
+  AVD replicating CI's GPU), then Kotlin migration (Phase 13), coverage push
+  to 90/70, androidTest migration, retrospective (14).
 
 ## Conventions
 
