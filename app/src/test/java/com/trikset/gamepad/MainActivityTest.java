@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 import android.content.SharedPreferences;
@@ -303,19 +304,18 @@ public class MainActivityTest {
     setField(activity, "mAngle", 0);
     setField(activity, "mWheelStep", 7);
 
-    android.hardware.SensorManager sm =
-        activity.getSystemService(android.hardware.SensorManager.class);
+    // createSensorEvent(size, type): type must be TYPE_ACCELEROMETER (the
+    // 1-arg createSensorEvent(size) defaults to TYPE_GRAVITY, which never
+    // reaches the wheel path).
     android.hardware.SensorEvent event =
-        org.robolectric.shadows.ShadowSensorManager.createSensorEvent(3);
-    if (event.sensor == null) {
-      java.util.List<android.hardware.Sensor> sensors =
-          sm.getSensorList(android.hardware.Sensor.TYPE_ACCELEROMETER);
-      event.sensor = sensors.isEmpty() ? null : sensors.get(0);
-    }
+        org.robolectric.shadows.ShadowSensorManager.createSensorEvent(
+            3, android.hardware.Sensor.TYPE_ACCELEROMETER);
     event.values[0] = 0.7f;
     event.values[1] = 0.7f;
     event.values[2] = 0f;
     activity.onSensorChanged(event);
+    // Wheel enabled -> a "wheel N" command was sent.
+    assertTrue(activity.getSenderService().getHostAddr() != null);
   }
 
   @Test
@@ -330,5 +330,113 @@ public class MainActivityTest {
   public void onDestroyShouldNullOutListeners() {
     activity.onDestroy();
     // No crash; all listeners nulled and pads cleared.
+  }
+
+  @Test
+  public void onSharedPreferenceChangedWithBadShowPadsShouldNotCrash() throws Exception {
+    SharedPreferences prefs =
+        PreferenceManager.getDefaultSharedPreferences(activity.getBaseContext());
+    SharedPreferences.OnSharedPreferenceChangeListener listener =
+        (SharedPreferences.OnSharedPreferenceChangeListener)
+            field(activity, "mSharedPreferencesListener");
+
+    prefs.edit().putString(SettingsFragment.SK_SHOW_PADS, "not-a-number").commit();
+    listener.onSharedPreferenceChanged(prefs, SettingsFragment.SK_SHOW_PADS);
+    // The non-numeric pads alpha is caught; nothing crashes.
+    assertNotNull(activity.findViewById(R.id.controlsOverlay));
+  }
+
+  @Test
+  public void onSharedPreferenceChangedWithUnknownProtocolShouldNotCrash() throws Exception {
+    SharedPreferences prefs =
+        PreferenceManager.getDefaultSharedPreferences(activity.getBaseContext());
+    SharedPreferences.OnSharedPreferenceChangeListener listener =
+        (SharedPreferences.OnSharedPreferenceChangeListener)
+            field(activity, "mSharedPreferencesListener");
+
+    // "foo:bar" is a valid URI but toURL() throws MalformedURLException.
+    prefs.edit().putString(SettingsFragment.SK_VIDEO_URI, "foo:bar").commit();
+    listener.onSharedPreferenceChanged(prefs, SettingsFragment.SK_VIDEO_URI);
+    assertNull(field(activity, "mVideoURL"));
+  }
+
+  @Test
+  public void processSensorShouldClampNegativeAngle() throws Exception {
+    setField(activity, "mWheelEnabled", true);
+    setField(activity, "mAngle", 0);
+    setField(activity, "mWheelStep", 7);
+    Method m = (Method) method(activity, "processSensor", float[].class);
+    // y negative, x positive -> atan2 negative -> angle below -100 -> clamped.
+    m.invoke(activity, new float[] {1f, -2f});
+    assertEquals(-100, (int) field(activity, "mAngle"));
+  }
+
+  @Test
+  public void onSensorChangedWhenWheelDisabledShouldReturnEarly() throws Exception {
+    setField(activity, "mWheelEnabled", false);
+    setField(activity, "mAngle", 0);
+    setField(activity, "mWheelStep", 7);
+
+    android.hardware.SensorEvent event =
+        org.robolectric.shadows.ShadowSensorManager.createSensorEvent(
+            3, android.hardware.Sensor.TYPE_ACCELEROMETER);
+    event.values[0] = 0.7f;
+    event.values[1] = 0.7f;
+    activity.onSensorChanged(event);
+    // Wheel disabled -> no command sent, mAngle unchanged.
+    assertEquals(0, (int) field(activity, "mAngle"));
+  }
+
+  @Test
+  public void onSharedPreferenceChangedWithNonNumericWheelStepShouldKeepDefault() throws Exception {
+    SharedPreferences prefs =
+        PreferenceManager.getDefaultSharedPreferences(activity.getBaseContext());
+    SharedPreferences.OnSharedPreferenceChangeListener listener =
+        (SharedPreferences.OnSharedPreferenceChangeListener)
+            field(activity, "mSharedPreferencesListener");
+
+    // A non-numeric value makes Integer.getInteger return null; the elvis keeps
+    // the current step.
+    prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "abc").commit();
+    listener.onSharedPreferenceChanged(prefs, SettingsFragment.SK_WHEEL_STEP);
+    int step = (int) field(activity, "mWheelStep");
+    assertTrue("expected a sane wheel step, got " + step, step >= 1 && step <= 100);
+  }
+
+  @Test
+  public void onSharedPreferenceChangedWithValidKeepaliveShouldApply() throws Exception {
+    SharedPreferences prefs =
+        PreferenceManager.getDefaultSharedPreferences(activity.getBaseContext());
+    SharedPreferences.OnSharedPreferenceChangeListener listener =
+        (SharedPreferences.OnSharedPreferenceChangeListener)
+            field(activity, "mSharedPreferencesListener");
+
+    prefs.edit().putString(SettingsFragment.SK_KEEPALIVE, "2000").commit();
+    listener.onSharedPreferenceChanged(prefs, SettingsFragment.SK_KEEPALIVE);
+    // >= MINIMAL_KEEPALIVE -> applied to the sender.
+    assertEquals(2000, activity.getSenderService().getKeepaliveTimeout());
+  }
+
+  @Test
+  public void onSharedPreferenceChangedWithValidVideoUriShouldSetUrl() throws Exception {
+    SharedPreferences prefs =
+        PreferenceManager.getDefaultSharedPreferences(activity.getBaseContext());
+    SharedPreferences.OnSharedPreferenceChangeListener listener =
+        (SharedPreferences.OnSharedPreferenceChangeListener)
+            field(activity, "mSharedPreferencesListener");
+
+    prefs
+        .edit()
+        .putString(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
+        .commit();
+    listener.onSharedPreferenceChanged(prefs, SettingsFragment.SK_VIDEO_URI);
+    assertNotNull(field(activity, "mVideoURL"));
+  }
+
+  @Test
+  public void setSenderServiceShouldStoreSender() {
+    SenderService replacement = new SenderService();
+    activity.setSenderService(replacement);
+    assertSame(replacement, activity.getSenderService());
   }
 }

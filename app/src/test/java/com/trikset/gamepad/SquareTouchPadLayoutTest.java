@@ -153,6 +153,21 @@ public class SquareTouchPadLayoutTest {
   }
 
   @Test
+  public void measureShouldUseHalfPerimeterWhenOneDimensionIsZero() {
+    // width 0 + height 100 -> width*height==0, halfPerimeter!=0 -> size=100.
+    pad.measure(
+        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        View.MeasureSpec.makeMeasureSpec(100, View.MeasureSpec.EXACTLY));
+    assertEquals(100, pad.getMeasuredWidth());
+    assertEquals(100, pad.getMeasuredHeight());
+  }
+
+  @Test
+  public void padNameShouldRoundTrip() {
+    assertEquals("pad 1", pad.getPadName());
+  }
+
+  @Test
   public void onSizeChangedShouldCenterWhenStartingEmpty() {
     // size changed from (0,0) -> centers the touch point.
     pad.measure(

@@ -6,6 +6,7 @@ import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -97,5 +98,32 @@ class MjpegInputStreamTest {
     val stream = MjpegInputStream(ByteArrayInputStream(frame))
     val result = stream.readMjpegFrame()
     result?.close()
+  }
+
+  @Test
+  fun readMjpegFrameWithZeroLengthBodyShouldDropAndReturnNull() {
+    // Content-Length 0 makes available() >= 2*contentLength, so the success
+    // path is skipped and the "Frame dropped." recovery returns null.
+    val headers = "Content-Type: image/jpeg\r\nContent-Length: 0\r\n\r\n"
+    val headerBytes = headers.toByteArray(StandardCharsets.US_ASCII)
+    val frame = ByteArray(headerBytes.size + 2 + 100)
+    System.arraycopy(headerBytes, 0, frame, 0, headerBytes.size)
+    System.arraycopy(byteArrayOf(0xFF.toByte(), 0xD8.toByte()), 0, frame, headerBytes.size, 2)
+    val stream = MjpegInputStream(ByteArrayInputStream(frame))
+    assertNull(stream.readMjpegFrame())
+  }
+
+  @Test
+  fun readMjpegFrameWithBadContentLengthShouldRecover() {
+    // A non-numeric Content-Length throws NumberFormatException (an
+    // IllegalArgumentException) inside the header parse; the recovery path
+    // re-searches for the header and returns null.
+    val headers = "Content-Type: image/jpeg\r\nContent-Length: abc\r\n\r\n"
+    val headerBytes = headers.toByteArray(StandardCharsets.US_ASCII)
+    val frame = ByteArray(headerBytes.size + 2)
+    System.arraycopy(headerBytes, 0, frame, 0, headerBytes.size)
+    System.arraycopy(byteArrayOf(0xFF.toByte(), 0xD8.toByte()), 0, frame, headerBytes.size, 2)
+    val stream = MjpegInputStream(ByteArrayInputStream(frame))
+    assertNull(stream.readMjpegFrame())
   }
 }

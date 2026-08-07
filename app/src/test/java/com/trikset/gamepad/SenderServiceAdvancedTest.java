@@ -179,6 +179,18 @@ public class SenderServiceAdvancedTest {
   }
 
   @Test
+  public void sendToUnreachablePortShouldNotThrow() throws InterruptedException {
+    SenderService client = new SenderService();
+    client.setExecutor(mExecutor);
+    // Port 1: nothing listens on it, so the connect is refused and connectToTRIK
+    // swallows the IOException.
+    client.setTarget("localhost", 1);
+    client.send("boom");
+    mExecutor.runAll();
+    shadowOf(getMainLooper()).idle();
+  }
+
+  @Test
   public void keepaliveTimeoutBelowMinimumIsStoredUnchanged() {
     SenderService client = new SenderService();
     client.setExecutor(mExecutor);

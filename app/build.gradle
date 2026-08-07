@@ -253,12 +253,11 @@ jacoco {
 }
 
 // Coverage is measured on the debug unit tests; the report is always produced
-// and a verification gate enforces a minimum. The gate is a ratchet that was
-// raised from the measured baseline through the coverage drive (Phase 12 of
-// .PLAN.md) to 85% line / 75% branch as required before the pure-Kotlin
-// migration. MjpegView's render/view threads and the hardware-dependent render
-// loop remain at 0% (SurfaceView/lockCanvas are untestable in Robolectric) and
-// are rewritten during the Kotlin migration.
+// and a verification gate enforces a minimum. The gate is a ratchet: raised to
+// 85% line / 60% branch by the Phase 12 coverage drive, then to 90% line / 70%
+// branch after the Kotlin migration (Phase 3), which made the render logic
+// testable. MjpegView's render-thread plumbing is excluded (see coverageExcludes)
+// with the rationale recorded in MEMORY.md.
 def coverageExcludes = [
         '**/R.class',
         '**/R$*.class',
@@ -266,6 +265,12 @@ def coverageExcludes = [
         '**/Manifest*.*',
         '**/*Test*.*',
         'android/**/*.*',
+        // The MJPEG render-thread plumbing (thread lifecycle, lockCanvas) is
+        // untestable in Robolectric; its logic lives in the covered
+        // MjpegFrameRenderer. Excluded with rationale (see MEMORY.md
+        // "Coverage" design decisions).
+        '**/MjpegView$MjpegRenderThread.class',
+        '**/MjpegView$MjpegViewThread.class',
 ]
 
 def debugClasses = fileTree(dir: "${buildDir}/intermediates/javac/debug/compileDebugJavaWithJavac/classes", excludes: coverageExcludes)
@@ -295,14 +300,14 @@ tasks.register('jacocoTestCoverageVerification', JacocoCoverageVerification) {
             limit {
                 counter = 'LINE'
                 value = 'COVEREDRATIO'
-                minimum = 0.85
+                minimum = 0.90
             }
         }
         rule {
             limit {
                 counter = 'BRANCH'
                 value = 'COVEREDRATIO'
-                minimum = 0.60
+                minimum = 0.70
             }
         }
     }
