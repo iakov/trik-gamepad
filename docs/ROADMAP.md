@@ -36,14 +36,14 @@ document in MEMORY.md; stop as soon as one works.
 
 ## Phase 2 — Legacy API + biggest code smell (local, low risk)
 
-- **D.** Migrate `android.preference.PreferenceManager` →
-  `androidx.preference.PreferenceManager` (25 sites across
-  main/tests/androidTest). Mechanical, same `SharedPreferences`; removes
-  the baselined `Deprecation` lint entries.
-- **E.** Extract `MainActivity`'s ~150-line pref listener into a
+- **D.** ✅ Migrate `android.preference.PreferenceManager` →
+  `androidx.preference.PreferenceManager` (5 files: main + tests/androidTest;
+  import-only, verified same default file via javap). Landed `ac0a406`.
+- **E.** 🔶 Extract `MainActivity`'s ~150-line pref listener into a
   `MainActivitySettingsController` (or focused private methods). Attacks
   the `LongMethod=200` / `CyclomaticComplexMethod=25` detekt relaxations
-  and enables non-reflective tests.
+  and enables non-reflective tests. (Working tree in flight at session close
+  2026-08-08 — see .PLAN.md.)
 - **F.** Extract the sensor-wheel math into a pure `WheelController`
   (`processSensor` is private + reflection-invoked today; a pure function
   gets direct tests and drops more reflection).

@@ -18,7 +18,8 @@ Single Gradle module `app/` (pure Kotlin, 0 `.java`). Two activities:
 - **`SettingsActivity`** — a thin shell that hosts the `SettingsFragment`
   (a `PreferenceFragmentCompat`) as its only content.
 
-The two screens share one `SharedPreferences` store (legacy
+The two screens share one `SharedPreferences` store (androidx
+`androidx.preference.PreferenceManager`, migrated from the legacy
 `android.preference.PreferenceManager`), read/written through the `SK_*` key
 constants in `SettingsFragment`.
 
@@ -115,10 +116,13 @@ and is excluded from the coverage gates.
 Seven keys (`SK_*` in `SettingsFragment`): `SK_HOST_ADDRESS`, `SK_HOST_PORT`,
 `SK_SHOW_PADS` (pad opacity), `SK_VIDEO_URI`, `SK_WHEEL_STEP`,
 `SK_ABOUT_SYSTEM` (read-only system-info row that copies to clipboard),
-`SK_KEEPALIVE`. The preference listener in `MainActivity` reacts to every
-change: retargets `SenderService`, updates the action-bar title, rewrites the
-video URI on host change, animates pad opacity, validates the keepalive value,
-and reads the wheel step.
+`SK_KEEPALIVE`. `MainActivitySettingsController` (implements the `SettingsUi`
+callback interface) owns the preference-change handling: retargets the
+`SenderService`, updates the action-bar title, rewrites the video URI on host
+change, animates pad opacity, parses the video URL, validates the keepalive
+value, and clamps the wheel step. Extracted from `MainActivity`'s inline
+listener (ROADMAP Phase 2-E) so the logic is directly testable without
+reflection.
 
 ## Test layering
 

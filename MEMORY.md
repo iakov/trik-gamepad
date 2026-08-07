@@ -167,9 +167,12 @@ design decision). Cleartext HTTP is enabled via
 
 Keys are `SK_*` constants in `SettingsFragment`: `SK_HOST_ADDRESS`, `SK_HOST_PORT`,
 `SK_SHOW_PADS`, `SK_VIDEO_URI`, `SK_WHEEL_STEP`, `SK_ABOUT_SYSTEM`, `SK_KEEPALIVE`.
-Stored via legacy `PreferenceManager`/`android.preference` APIs; wheel angle uses
-`SK_WHEEL_STEP` for the dead-zone step. `BuildConfig.VERSION_NAME` feeds the
-About/system-info field.
+Stored via androidx `PreferenceManager` (migrated 2026-08-08 from the legacy
+`android.preference.PreferenceManager`; both resolve the same
+`<package>_preferences` default file — verified via javap — so stored values
+survive). Preference-change handling lives in `MainActivitySettingsController`
+(see architecture.md "Settings"). Wheel angle uses `SK_WHEEL_STEP` for the
+dead-zone step. `BuildConfig.VERSION_NAME` feeds the About/system-info field.
 
 ## CI quirks
 
