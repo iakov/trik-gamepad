@@ -118,6 +118,7 @@ configurations, update this section and the referenced config files.
 - **Every `gh` run command needs `--repo iakov/trik-gamepad`**: without it `gh` resolves to the default repo (upstream `trikset/trik-gamepad`), so `gh run view`/`watch` report a bogus/404 run.
 - **A turn that launches an async process is not complete until its readiness result is recorded**: capturing `Start-Process -PassThru` and confirming liveness is only the first half of the chain — the very next tool call must be the single bounded readiness poll (one command that loops `sys.boot_completed` etc. up to a hard cap). Never end a turn after a bare liveness check: in an autonomous run nothing re-pokes the agent, so the gap is silent and indefinite. If the process is not needed yet, record it as a `poll:`/`watch:` todo item with a timestamp so the next turn opens with it.
 - **Every push runs the full local gate list first**: `./gradlew test lint checkstyle pmd detekt spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck`, logged — not just compile + tests (a missing `spotlessCheck` once shipped a format violation).
+- **Verify `git status` is clean before pushing**: the local gates validate the *working tree*, so an uncommitted fix can make them pass while the pushed commits still contain the bug (a missing `fun interface` on `SenderService.OnEventListener` went uncommitted for several pushes — local gates green, CI `compileDebugKotlin` red). `git status --short` must show nothing before `git push`.
 - **CI cadence**: after each push, one bounded run check (~3 min); if no run appears (during a GitHub outage push events can be silently dropped even after recovery), document it and re-check at the next push rather than blocking.
 
 ### On tool error
@@ -163,7 +164,7 @@ configurations, update this section and the referenced config files.
 ./gradlew test                               # Robolectric unit tests, no device needed
 ./gradlew lint                               # lint.xml downgrades MissingTranslation to warning
 ./gradlew connectedDebugAndroidTest          # needs running emulator/device (AEHD)
-./gradlew checkstyle pmd spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck   # quality gates (also run in CI)
+./gradlew detekt spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck   # quality gates (also run in CI; checkstyle/pmd retired after the pure-Kotlin migration)
 ```
 
 ```sh
@@ -200,25 +201,23 @@ Details live in `MEMORY.md` — pull a section on demand:
   sweep + toolchain upgrade to compileSdk/targetSdk 36, minSdk 21, coverage to
   85%, pure-Kotlin migration, commits on `feat/global-refresh`) lives in
   `.PLAN.md`. `.PLAN.md` is gitignored — never commit it.
-- Phases 1–12 are committed and pushed to the fork (layout, cleanup, CI retire,
+- Phases 1–13 are committed and pushed to the fork (layout, cleanup, CI retire,
   gates, format sweep, deterministic tests, toolchain 36, edge-to-edge + MJPEG
-  reconnect, docs refresh, GitHub Actions CI, static analysis, coverage drive).
-  Key state: coverage gate at **85% line / 60% branch**; PMD 7.26 + strict-lint
-  baseline + SpotBugs (0 bugs); `aosp_atd` local test AVD `Atd_API36`
-  (`-gpu host` only); CI uses `default` image + KVM step + `pixel_5`.
-- **CI is NOT green overall**: the last fully-green run (both jobs) was
-  `31103997686`. Most red runs are **adb/emulator boot flakes** (infra, not
-  code); the swiftshader **focus flake** (`RootViewWithoutFocusException`) hit
-  7/9 on `31116833261` *with* the retry-once in place — the retry is proven
-  insufficient (details: MEMORY.md "CI flake saga" + "Full-session audit").
-  **Current session:** `7682f7d` added a focus-wait rule
-  (`FocusAwareActivityTestRule`, 60 s focus wait per test) + ci.yml pre-empt
-  hardening; 9/9 green locally on `Atd_API36`. No CI runs exist for
-  `7682f7d`..`a3301b8` — a GitHub Partial System Outage dropped the push
-  events (not backfilled); the next push re-triggers CI.
-- Next: **swiftshader instrumented validation** (local `Swiftshader_API36`
-  AVD replicating CI's GPU), then Kotlin migration (Phase 13), coverage push
-  to 90/70, androidTest migration, retrospective (14).
+  reconnect, docs refresh, GitHub Actions CI, static analysis, coverage drive,
+  **pure-Kotlin migration**). The whole `app/` source tree is Kotlin
+  (0 `.java`). Key state: coverage gate **90% line / 70% branch** (measured
+  96.9% / 71.2%); detekt + ktfmt + SpotBugs (0 bugs) replace checkstyle/pmd
+  (retired — Java-only, silent no-ops on 0 Java sources); lint baseline
+  regenerated to 12 issues; `aosp_atd` local test AVD `Atd_API36`
+  (`-gpu host` only) + `Swiftshader_API36` (CI GPU replica); CI uses `default`
+  image + KVM step + `pixel_5`.
+- **CI build gate is green; instrumented is best-effort.** The instrumented
+  focus flake was root-caused and fixed (the immersive pre-empt raced the
+  settings provider during slow boot — ci.yml now retries the settings write
+  until confirmed; details in MEMORY.md "CI focus flake"). Residual instrumented
+  failures are swiftshader rendering instability (`Failed to find ColorBuffer`
+  under load), not code.
+- Next: final retrospective (Phase 14) is the remaining item.
 
 ## Conventions
 

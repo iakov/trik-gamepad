@@ -967,3 +967,24 @@ Java-interop/lint traps; each cost a build cycle to pin down.
 **Consequences:** production tree is now 100% Kotlin (9 `.kt`, 0 `.java`);
 coverage 90.2% line / 62.3% branch; 9/9 instrumented green locally on both
 `Atd_API36` (host GPU) and `Swiftshader_API36`.
+
+### [2026-08-07] Uncommitted-fix trap: local gates green, CI compile red
+
+**Context:** after migrating MainActivity to Kotlin, the `fun interface` fix on
+`SenderService.OnEventListener` (needed for the Kotlin lambdas) was made in the
+working tree but never staged — every commit used `git add <specific files>`,
+so the change rode along in the working tree while the commits lacked it. Local
+gates passed (they validate the *working tree*, which had the fix), but CI
+`compileDebugKotlin` failed on every pushed commit since the SenderService
+migration with `Function0 vs OnEventListener` mismatches at MainActivity:90-91.
+The CI build-gate run for `2dd5f7e` surfaced it; the fix commit was `8a96431`.
+
+**Decision:** new AGENTS.md rule — verify `git status --short` is clean before
+`git push` (the local gates validating an uncommitted working tree are
+meaningless for the pushed state). Also caught the same class of issue earlier
+(this session's push of `7682f7d` shipped a spotless violation).
+
+**Consequences:** the whole `app/` tree is now pure Kotlin (9 main + 9 test + 5
+androidTest `.kt`, 0 `.java`); coverage 96.9% line / 71.2% branch; checkstyle/
+pmd retired (0 Java sources → silent no-ops), detekt + ktfmt + SpotBugs are the
+Kotlin gates; lint baseline regenerated 99 → 12 issues.
