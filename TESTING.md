@@ -107,11 +107,18 @@ executor.
 
 - **Sensor tests need a `SensorEvent`, not a `Sensor`.** To feed the
   accelerometer path, build the event via
-  `ShadowSensorManager.createSensorEvent(3)` (the sensor-agnostic 3-float
-  constructor), set `event.values`, and stub the sensor lookup. Trying
+  `ShadowSensorManager.createSensorEvent(3, Sensor.TYPE_ACCELEROMETER)` — the
+  2-arg form. The 1-arg `createSensorEvent(3)` defaults the sensor to
+  **TYPE_GRAVITY (9)**, so `onSensorChanged` never matches the accelerometer
+  branch and the wheel path silently stays uncovered even though the test
+  passes. Set `event.values`, and stub the sensor lookup. Trying
   `shadowOf(Class<Sensor>)` or the wrong constructor is a compile error
   (`no suitable method found for shadowOf`) that the sensor-test saga hit
   twice (see MEMORY.md "Coverage drive to 85%": MainActivityTest).
+- **After adding a coverage test, confirm it moved the needle.** A passing
+  test can still cover nothing (the sensor wheel path was "covered" by a
+  passing test that used the wrong sensor type). Diff the JaCoCo per-class
+  branch numbers for the target class after adding the test.
 - **3 identical failures → stop and read the shadow source.** If the *same*
   test fails identically N≥3 consecutive runs (same exception, same line, log
   sizes near-identical), stop retrying and read the shadow's real API from the

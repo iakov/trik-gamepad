@@ -102,9 +102,15 @@ guaranteed listening before the client connects.
 drives background tasks deterministically, then `shadowOf(getMainLooper()).idle()`.
 
 **Sensor shadow trap (MainActivityTest):** to feed the accelerometer wheel
-path, build the event with `ShadowSensorManager.createSensorEvent(3)` (the
-sensor-agnostic 3-float constructor), fill `event.values`, and stub the sensor
-lookup so `onSensorChanged` receives it. `shadowOf(Class<Sensor>)` or the wrong
+path, build the event with
+`ShadowSensorManager.createSensorEvent(3, Sensor.TYPE_ACCELEROMETER)` (the
+2-arg form). The 1-arg `createSensorEvent(3)` delegates to
+`createSensorEvent(3, 9)` — sensor type **9 = TYPE_GRAVITY** — so
+`onSensorChanged`'s `if (event.sensor.type == TYPE_ACCELEROMETER)` never
+matches and the wheel path stays uncovered even though the test "passes"
+(asserts nothing). This silently fooled the Phase-12 coverage tests until the
+JaCoCo branch report showed the wheel path at 0%; the 2-arg form fixed it.
+Also stub the sensor lookup: `shadowOf(Class<Sensor>)` or the wrong
 constructor is a compile error (`no suitable method found for shadowOf`).
 Discovered the hard way: the sensor test failed identically 4 consecutive runs
 (assertion line shifting 214→219→222 as the test was patched), plus two
@@ -988,3 +994,68 @@ meaningless for the pushed state). Also caught the same class of issue earlier
 androidTest `.kt`, 0 `.java`); coverage 96.9% line / 71.2% branch; checkstyle/
 pmd retired (0 Java sources → silent no-ops), detekt + ktfmt + SpotBugs are the
 Kotlin gates; lint baseline regenerated 99 → 12 issues.
+
+### [2026-08-07] Session retrospective: pure-Kotlin migration (self-improvement)
+
+**What happened:** 23 commits (`7682f7d`..`7fdff04` + docs), 8 CI runs, ~116
+gradle logs. Shipped the pure-Kotlin migration (whole `app/` tree), fixed the
+CI focus flake (pre-empt race), retired checkstyle/pmd, ratcheted coverage to
+90/70, and migrated every test to Kotlin.
+
+**Error ledger (self-inflicted → process fixes, in impact order):**
+
+1. **Uncommitted-fix trap (most expensive).** The `fun interface` fix on
+   `SenderService.OnEventListener` lived in the working tree, not the commits
+   (each commit used `git add <specific files>`), so local gates — which
+   validate the *working tree* — were green while CI `compileDebugKotlin` was
+   red for 2 consecutive runs. Fix: new AGENTS rule *`git status --short` clean
+   before push*. Hardening: review `git diff HEAD --stat` before push; prefer
+   staging the whole intended set and reviewing the staged diff.
+1. **Pushed without the full gate** (`7682f7d` shipped a spotless violation).
+   Fix: full-gate-before-push rule.
+1. **Turn-cadence stall** (ended a turn after an async liveness check). Fix:
+   async turn-cadence rule (a turn is not complete until the readiness result
+   is recorded).
+1. **Sensor-test false confidence.** `createSensorEvent(3)` defaults to
+   TYPE_GRAVITY, so the "accelerometer" test passed but never covered the wheel
+   path — exposed only by the JaCoCo branch report. Fix: TESTING.md rule
+   *confirm a coverage test moved the needle*.
+1. **Focus flake cost ~4 CI runs** before the timestamp diagnostic cracked it
+   (pre-empt raced the settings provider). Fix: new AGENTS rule *when a CI fix
+   doesn't hold, compare step timestamps against the boot-complete time*.
+1. **Gradle daemon console-handle hang** (tool monitor timed out at 30 min even
+   with `*> log` redirect). Fix: `--no-daemon` for every gradle run.
+
+**Reusables (what went as expected — keep doing):**
+
+- **Probe tooling read-only before committing** (javap on jars, decompile the
+  plugin's default config): found `ActivityTestRule.afterActivityLaunched`,
+  Spotless's ktfmt default (0.63), detekt config keys, and the `createSensorEvent`
+  2-arg overload — each probe prevented a compile-retry. Cheap, high yield.
+- **Local swiftshader AVD to replicate CI** validated the focus mechanism and
+  the migrations without burning CI runs.
+- **JaCoCo per-class branch report to target tests** (the recovery-branch gaps
+  were precise targets). Measure, don't estimate.
+- **Leaf→root migration order + one gate-green commit per class** kept every
+  push buildable (once the working-tree hygiene bug was fixed).
+- **Applying documented class traps BEFORE writing tests** (SenderService
+  statics, DummyServer sync-bind) saved CI runs.
+
+**Self-improvement Q&A (asked and answered):**
+
+- *How to prevent state drift between local and pushed?* → git-status check +
+  review the staged diff; the working tree and the commit must be the same.
+- *How to cut CI-run waste?* → the timestamp triage above; never re-test a
+  mechanism the docs say is proven insufficient (the earlier audit warned about
+  the retry band-aid and I still burned a run re-confirming).
+- *How to avoid false test confidence?* → assert meaningful state (not just
+  "doesn't crash") and confirm the coverage needle moved.
+- *How to make build cycles fast and non-blocking?* → `--no-daemon`, short
+  timeouts on probes, parallel independent tool calls.
+- *How to keep session knowledge durable?* → checkpoint `.PLAN.md` after each
+  milestone (this session did, but later than ideal — the uncommitted-fix state
+  was the kind of thing a mid-migration `.PLAN.md` entry would have caught).
+
+**Extracted for the next session:** the improvement roadmap is committed at
+`docs/ROADMAP.md`. The `createSensorEvent` and CI-timestamp corrections are now
+in TESTING.md/AGENTS.md above.
