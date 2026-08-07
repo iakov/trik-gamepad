@@ -1063,3 +1063,34 @@ CI focus flake (pre-empt race), retired checkstyle/pmd, ratcheted coverage to
 **Extracted for the next session:** the improvement roadmap is committed at
 `docs/ROADMAP.md`. The `createSensorEvent` and CI-timestamp corrections are now
 in TESTING.md/AGENTS.md above.
+
+### [2026-08-08] Auto mode contract (rationale for the AGENTS.md rule)
+
+**Context:** the maintainer asked what in their prompt drove high-quality
+autonomous execution, then instructed that "auto mode" be codified in AGENTS.md
+— all of the four motivating factors except the session-continuity one (already
+covered by the standing after-push/retrospective hooks).
+
+**Decision:** AGENTS.md's "run auto" guardrail now expands into a four-point
+auto-mode contract: (1) work inside the stated container without ceremony,
+committing/pushing per the gate rules as you go; (2) apply documented traps and
+hooks from AGENTS/MEMORY/TESTING before acting and probe tooling read-only —
+don't stall on a command call; (3) research the best solution (web/code) before
+deciding, and if still unsure after experiments, think hard and postpone rather
+than guess; (4) implement only proved, reasonable decisions.
+
+**Rationale (why each point earns its place):**
+
+- (1) Autonomy + a defined container removes decision overhead: no
+  second-guessing about commit/push ceremony, just execute and gate.
+- (2) The maintainer pre-loads the exact failure modes (daemon pipe hangs,
+  `--no-daemon`, ephemeral ports, static-state traps) — the agent is expected to
+  *apply* them, not rediscover them; read-only tooling probes (e.g. `javap` on a
+  library API before writing code) prevent compile-retry cycles.
+- (3) Permission to research first and postpone honestly prevents forcing a
+  result; an agent that may defer reasons instead of flailing.
+- (4) The evidence-over-guesses bar is what makes the big-scope mandates
+  ("everything incl. postponed features") safe to grant.
+
+**Consequences:** future "go full auto mode" instructions carry this contract
+without re-explaining it; rationale lives here, rule text lives in AGENTS.md.
