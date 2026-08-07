@@ -2,7 +2,6 @@ package com.trikset.gamepad
 
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.pm.ActivityInfo
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -22,24 +21,19 @@ import android.widget.Button
 import android.widget.CheckBox
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.edit
 import androidx.core.view.MenuItemCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.preference.PreferenceManager
 import com.demo.mjpeg.MjpegView
-import java.net.MalformedURLException
-import java.net.URI
-import java.net.URISyntaxException
 import java.net.URL
-import java.util.Locale
 
 /**
  * The gamepad: two touch pads, five magic buttons, a sensor-driven wheel and the MJPEG video
  * stream, all sending commands through [SenderService].
  */
-class MainActivity : AppCompatActivity(), SensorEventListener {
+class MainActivity :
+    AppCompatActivity(), SensorEventListener, MainActivitySettingsController.SettingsUi {
 
   private var hideRunnable: HideRunnable? = null
   private var mSensorManager: SensorManager? = null
@@ -49,7 +43,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
   private var mWheelStep = WHEEL_STEP_DEFAULT
   private var mVideo: MjpegView? = null
   private var mVideoURL: URL? = null
-  private var mSharedPreferencesListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+  private var mSettingsController: MainActivitySettingsController? = null
 
   private fun createPad(id: Int, strId: String) {
     val pad = findViewById<SquareTouchPadLayout>(id)
@@ -108,123 +102,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     createPad(R.id.leftPad, "1")
     createPad(R.id.rightPad, "2")
 
-    val prefs = PreferenceManager.getDefaultSharedPreferences(baseContext)
-    var prevAlpha = 0f
-    mSharedPreferencesListener =
-        SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, _ ->
-          val addr = sharedPreferences.getString(SettingsFragment.SK_HOST_ADDRESS, "192.168.77.1")!!
-          var portNumber = DEFAULT_PORT
-          val portStr = sharedPreferences.getString(SettingsFragment.SK_HOST_PORT, "4444")!!
-          try {
-            portNumber = portStr.toInt()
-          } catch (e: NumberFormatException) {
-            toast("Port number '$portStr' is incorrect.")
-          }
-          val oldAddr = getSenderService().getHostAddr()
-          getSenderService().setTarget(addr, portNumber)
-
-          val actionBar2 = supportActionBar
-          if (actionBar2 != null) {
-            actionBar2.title = addr
-          } else {
-            toast("Can not change title, not a problem")
-          }
-
-          if (!addr.equals(oldAddr, ignoreCase = true)) {
-            // update video stream URI when target addr changed
-            sharedPreferences.edit {
-              putString(
-                  SettingsFragment.SK_VIDEO_URI,
-                  "http://" + addr.trim() + ":8080/?action=stream",
-              )
-            }
-          }
-
-          val defAlpha = PADS_ALPHA_DEFAULT
-          var padsAlpha = defAlpha
-          try {
-            padsAlpha =
-                sharedPreferences
-                    .getString(SettingsFragment.SK_SHOW_PADS, defAlpha.toString())!!
-                    .toInt()
-          } catch (nfe: NumberFormatException) {
-            // unchanged
-          }
-          val alpha = Math.max(0, Math.min(ALPHA_MAX, padsAlpha)) / ALPHA_MAX.toFloat()
-          val alphaUp = AlphaAnimation(prevAlpha, alpha)
-          prevAlpha = alpha
-          alphaUp.setFillAfter(true)
-          alphaUp.setDuration(ALPHA_ANIMATION_MS)
-          controlsOverlay?.startAnimation(alphaUp)
-          val btns = findViewById<View>(R.id.buttons)
-          if (btns != null) {
-            btns.startAnimation(alphaUp)
-          }
-
-          val videoStreamURI =
-              sharedPreferences.getString(
-                  SettingsFragment.SK_VIDEO_URI,
-                  "http://$addr:8080/?action=stream",
-              )!!
-          try {
-            mVideoURL = if (videoStreamURI.isEmpty()) null else URI(videoStreamURI).toURL()
-          } catch (e: URISyntaxException) {
-            toast("Illegal video stream URL")
-            Log.e(TAG, "onSharedPreferenceChanged: ", e)
-            mVideoURL = null
-          } catch (e: MalformedURLException) {
-            toast("Illegal video stream URL")
-            Log.e(TAG, "onSharedPreferenceChanged: ", e)
-            mVideoURL = null
-          }
-
-          mWheelStep =
-              Integer.getInteger(
-                  sharedPreferences.getString(
-                      SettingsFragment.SK_WHEEL_STEP,
-                      mWheelStep.toString(),
-                  ),
-                  mWheelStep,
-              ) ?: mWheelStep
-          mWheelStep = Math.max(WHEEL_STEP_MIN, Math.min(WHEEL_STEP_MAX, mWheelStep))
-
-          try {
-            val timeout =
-                sharedPreferences
-                    .getString(
-                        SettingsFragment.SK_KEEPALIVE,
-                        SenderService.DEFAULT_KEEPALIVE.toString(),
-                    )!!
-                    .toInt()
-            if (timeout < SenderService.MINIMAL_KEEPALIVE) {
-              toast(
-                  String.format(
-                      Locale.US,
-                      getString(R.string.keepalive_must_be_not_less),
-                      SenderService.MINIMAL_KEEPALIVE,
-                  )
-              )
-              sharedPreferences.edit {
-                putString(
-                    SettingsFragment.SK_KEEPALIVE,
-                    getSenderService().getKeepaliveTimeout().toString(),
-                )
-              }
-            } else {
-              getSenderService().setKeepaliveTimeout(timeout)
-            }
-          } catch (e: NumberFormatException) {
-            toast(getString(R.string.keepalive_must_be_positive_decimal))
-            sharedPreferences.edit {
-              putString(
-                  SettingsFragment.SK_KEEPALIVE,
-                  getSenderService().getKeepaliveTimeout().toString(),
-              )
-            }
-          }
-        }
-    mSharedPreferencesListener?.onSharedPreferenceChanged(prefs, SettingsFragment.SK_HOST_ADDRESS)
-    prefs.registerOnSharedPreferenceChangeListener(mSharedPreferencesListener)
+    mSettingsController = MainActivitySettingsController(this, getSenderService(), this)
+    mSettingsController?.register()
   }
 
   override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -369,13 +248,43 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
   }
 
-  private fun toast(text: String) {
+  override fun setActionBarTitle(title: String): Boolean {
+    val actionBar = supportActionBar
+    return if (actionBar != null) {
+      actionBar.title = title
+      true
+    } else {
+      false
+    }
+  }
+
+  override fun toast(text: String) {
     runOnUiThread { Toast.makeText(this, text, Toast.LENGTH_LONG).show() }
+  }
+
+  override fun animatePadsAlpha(alpha: Float, previousAlpha: Float) {
+    val alphaUp = AlphaAnimation(previousAlpha, alpha)
+    alphaUp.setFillAfter(true)
+    alphaUp.setDuration(ALPHA_ANIMATION_MS)
+    findViewById<View>(R.id.controlsOverlay)?.startAnimation(alphaUp)
+    findViewById<View>(R.id.buttons)?.startAnimation(alphaUp)
+  }
+
+  override fun setVideoUrl(url: URL?) {
+    mVideoURL = url
+  }
+
+  override fun getWheelStep(): Int = mWheelStep
+
+  override fun setWheelStep(step: Int) {
+    mWheelStep = step
   }
 
   fun getSenderService(): SenderService {
     return mSender!!
   }
+
+  fun getSettingsController(): MainActivitySettingsController? = mSettingsController
 
   fun setSenderService(sender: SenderService?) {
     mSender = sender
@@ -408,8 +317,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     findViewById<Button>(R.id.btnSettings)?.setOnClickListener(null)
     findViewById<SquareTouchPadLayout>(R.id.leftPad)?.setSender(null)
     findViewById<SquareTouchPadLayout>(R.id.rightPad)?.setSender(null)
-    PreferenceManager.getDefaultSharedPreferences(baseContext)
-        .unregisterOnSharedPreferenceChangeListener(mSharedPreferencesListener)
+    mSettingsController?.unregister()
+    mSettingsController = null
     getSenderService().setOnDisconnectedListener(null)
     getSenderService().setShowTextCallback(null)
     mSender = null
@@ -421,13 +330,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     const val TAG = "MainActivity"
     const val MAGIC_BUTTON_COUNT = 5
     const val HIDE_DELAY_MS = 3000L
-    const val DEFAULT_PORT = 4444
-    const val PADS_ALPHA_DEFAULT = 100
-    const val ALPHA_MAX = 255
     const val ALPHA_ANIMATION_MS = 2000L
     const val WHEEL_STEP_DEFAULT = 7
-    const val WHEEL_STEP_MIN = 1
-    const val WHEEL_STEP_MAX = 100
     const val MIN_ACCELERATION_X = 1e-6
     const val WHEEL_ANGLE_SCALE = 200
     const val WHEEL_BOOSTER_MULTIPLIER = 1.5
