@@ -72,8 +72,7 @@ docs updated.
 ## Phase 5 — Polish + close-out
 
 - **H.** Rename `com.demo.mjpeg` → `com.trikset.gamepad.mjpeg` (pure
-  rename; first-party now).
-- **K.** `docs/architecture.md`: module map, TCP protocol, render /
-  reconnect design for new contributors.
+  rename; first-party now). Keep `docs/architecture.md` in sync (it documents
+  the current module map / TCP protocol / MJPEG pipeline / test layering).
 - Final retrospective → AGENTS.md / MEMORY.md / TESTING.md / `.PLAN.md`;
   update the last-known-good CI run id.

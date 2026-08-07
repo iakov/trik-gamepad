@@ -17,9 +17,10 @@ Design decisions (dated entries).
   All gradle commands run from the repo root.
 - `_apk/` holds committed release APKs with versioned names
   (`TRIKGamepad-1.40-21.apk`).
-- The `app/` source tree is **Java-only** (0 `.kt`/`.kts` files) even though the
-  Kotlin Android plugin is applied; `compileDebugKotlin` reports NO-SOURCE.
-  Pure-Kotlin migration is planned (gated on green CI + 85% coverage, `.PLAN.md`).
+- The `app/` source tree is **pure Kotlin** (9 main + 9 unit-test + 5
+  androidTest `.kt`, 0 `.java`). The Kotlin migration landed in 2026-08-07
+  (see the session retrospective in "Design decisions"); the 0-`.java`
+  state is what retired checkstyle/pmd.
 - `xamarin/` was an unfinished F# port — **deleted** during the revival
   restructure (git history preserves it). `imgs/` moved to `docs/img/`.
 
@@ -82,7 +83,7 @@ The unit-test `DummyServer` (inner class of `SenderServiceTest`) binds an
 **ephemeral port** (`new ServerSocket(0)`); the client targets
 `server.getPort()`. Fixed ports (historically `localhost:12345` + shifts) are
 forbidden here: the parallel variants collided with `BindException` cascades
-and flaky asserts. The androidTest `DummyServer.java` is a *different* class
+and flaky asserts. The androidTest `DummyServer.kt` is a *different* class
 and still binds `localhost:12345` — don't merge or confuse the two.
 
 ### Deterministic awaits
@@ -137,8 +138,8 @@ full recipe.
   `setTrafficClass(0x0F)`. Connect and send run on a single-thread executor.
 - Commands are newline-terminated plain text: `pad1 x y`, `pad2 x y`,
   `btn N down`, `wheel <angle>`, `keepalive <ms>`.
-- `send()` lazily connects (`connectAsync()` guarded by `mSyncFlag`); a failed
-  send is detected via `mOut.checkError()` in `SendCommandAsyncTask.onPostExecute`
+- `send()` lazily connects (`connectAsync()` guarded by `syncFlag`); a failed
+  send is detected via `mOut.checkError()` posted back to the main thread
   → `disconnect("Send failed.")`.
 - `setTarget()` disconnects when host/port changes.
 
@@ -151,13 +152,13 @@ the timer.
 
 ### MJPEG video
 
-`com.demo.mjpeg` package (`MjpegView`, `StartReadMjpegAsync`). Default URI
+`com.demo.mjpeg` package (`MjpegView`, `MjpegInputStream`, `VideoStreamLoader`). Default URI
 `http://<host>:8080/?action=stream`, rebuilt from `SK_VIDEO_URI`; changing the
 host address rewrites the video URI to match. The stream **reconnects on error**,
 not on a timer: `MjpegView.MjpegRenderThread` stops on `IOException` and invokes
 `OnStreamErrorListener`, which `MainActivity` registers in `onResume` and routes
 to `restartVideoStream()` (main thread, drops the HTTP connection, re-opens via
-`StartReadMjpegAsync`). There is **no forced periodic restart** — the old 30 s
+`VideoStreamLoader`). There is **no forced periodic restart** — the old 30 s
 `mRestartCallback` timer was removed (see the "MJPEG: reconnect-on-error"
 design decision). Cleartext HTTP is enabled via
 `android:usesCleartextTraffic="true"`.
@@ -247,7 +248,7 @@ cross-JVM `BindException`s.
 accept/read race; constructor-bind removes the bind-late race.
 
 **Consequences:** 3× consecutive full `test` runs green. `DummyServer.DEFAULT_PORT`
-no longer exists in the unit test (the androidTest `DummyServer.java` still has
+no longer exists in the unit test (the androidTest `DummyServer.kt` still has
 it).
 
 ### [2026-08-05] local.properties lint escape
@@ -448,7 +449,7 @@ the render thread when `readMjpegFrame()` throws; `MainActivity` registers it in
 `onResume` and calls `restartVideoStream()` (marshalled to the main thread via
 `runOnUiThread`, since the callback fires off-thread). The forced 30 s timer and
 `mRestartCallback` field are gone — the stream restarts only when it breaks.
-`StartReadMjpegAsync` sets 5 s connect/read timeouts so a dead robot surfaces as
+`VideoStreamLoader` sets 5 s connect/read timeouts so a dead robot surfaces as
 an error quickly.
 
 ### [2026-08-06] Operational rules for command hygiene

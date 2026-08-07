@@ -82,7 +82,7 @@ Local instrumented run:
   It binds an **ephemeral port** (`ServerSocket(0)`), exposes `getPort()`,
   `awaitConnection()`, `awaitCommands()` (5 s timeouts), and closes the
   listening socket in `close()`.
-- `app/src/androidTest/.../DummyServer.java` is a separate class binding
+- `app/src/androidTest/.../DummyServer.kt` is a separate class binding
   `localhost:12345`, used by the instrumented tests.
 - **Never reintroduce fixed ports in the unit test**: `./gradlew test` runs
   three variants in parallel JVMs; fixed ports caused `BindException` cascades

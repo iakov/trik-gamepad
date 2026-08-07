@@ -9,8 +9,15 @@ You can get it [here](https://play.google.com/store/apps/details?id=com.trikset.
 
 ## For developers
 
+New session or contributor? Start here:
+
 - `AGENTS.md` — rules, guardrails, and commands for AI agents and contributors.
-- `MEMORY.md` — architecture, design decisions, and quirks (pull on demand).
+- `MEMORY.md` — architecture details, design decisions, and quirks (pull on
+  demand; `AGENTS.md` points to its sections).
 - `TESTING.md` — test strategy and how to run the test suites.
+- `docs/architecture.md` — module map, TCP command protocol, MJPEG video
+  pipeline, and test layering.
+- `docs/ROADMAP.md` — the committed improvement plan (next phases and
+  sequencing).
 - The maintained app lives in the canonical `app/` module at the repo root
   (`settings.gradle` + `app/`); all gradle commands run from the repo root.

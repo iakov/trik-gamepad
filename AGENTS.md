@@ -12,19 +12,20 @@ Removing a documented rule changes agent behavior — only delete if provably in
 
 ## Project
 
-Android app (mixed Kotlin/Java, currently all Java sources — 0 `.kt` files)
-that mimics a gamepad to control TRIK robots. It sends plain-text commands
-over a TCP socket and streams MJPEG video over HTTP. The 85% coverage gate has
-passed; pure-Kotlin migration is next (see `.PLAN.md`).
+Android app (pure Kotlin, 0 `.java` files) that mimics a gamepad to control
+TRIK robots. It sends plain-text commands over a TCP socket and streams MJPEG
+video over HTTP. Coverage gate: 90% line / 70% branch (measured 96.9% / 71.2%).
+Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Layout
 
 - Canonical Android layout at repo root: `settings.gradle` + `app/` module.
   All gradle commands run from the repo root (`./gradlew ...`).
 - `_apk/` — committed release APKs (historical).
-- `.github/workflows/` — CI: build, Robolectric unit tests, lint/checkstyle/
+- `.github/workflows/` — CI: build, Robolectric unit tests, lint/detekt/
   spotbugs/jacoco gates, instrumented tests on emulator.
 - `.opencode/skills/` — opencode skills (e.g. release-notes).
+- `docs/architecture.md` — module map, TCP protocol, MJPEG pipeline, test layering.
 - `docs/img/` — screenshots/logos.
 - `.venv/` — repo-local uv virtualenv (pre-commit, mdformat); gitignored.
 
