@@ -6,6 +6,7 @@ import android.view.View
 import com.demo.mjpeg.MjpegView
 import java.lang.reflect.Field
 import java.lang.reflect.Method
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -23,6 +24,41 @@ import org.robolectric.annotation.Config
 class MainActivityTest {
 
   private lateinit var activity: MainActivity
+
+  // SenderService keeps keepaliveTimeout and mConnectTask STATIC; the sensor
+  // tests trigger real send()s, so a leaked connect task or timeout leaks into
+  // later tests in the shared JVM (the SDK-23 CI variant is most exposed).
+  // Reset like the other SenderService-touching suites, and start each test
+  // with clean shared preferences (they persist across methods in a JVM).
+  @Before
+  fun resetSenderServiceStaticState() {
+    clearConnectTask()
+    SenderService().apply {
+      setKeepaliveTimeout(SenderService.DEFAULT_KEEPALIVE)
+      disconnect("reset")
+    }
+    PreferenceManager.getDefaultSharedPreferences(
+            org.robolectric.RuntimeEnvironment.getApplication()
+        )
+        .edit()
+        .clear()
+        .commit()
+  }
+
+  @After
+  fun tearDown() {
+    clearConnectTask()
+    SenderService().apply {
+      setKeepaliveTimeout(SenderService.DEFAULT_KEEPALIVE)
+      disconnect("teardown")
+    }
+  }
+
+  private fun clearConnectTask() {
+    val f = SenderService::class.java.getDeclaredField("mConnectTask")
+    f.isAccessible = true
+    f.set(null, null)
+  }
 
   @Before
   fun setUp() {
