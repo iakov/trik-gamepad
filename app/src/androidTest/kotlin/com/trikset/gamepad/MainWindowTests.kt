@@ -1,0 +1,252 @@
+package com.trikset.gamepad
+
+import android.preference.PreferenceManager
+import android.view.View
+import android.view.ViewGroup
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.UiController
+import androidx.test.espresso.ViewAction
+import androidx.test.espresso.action.MotionEvents
+import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withId
+import androidx.test.filters.LargeTest
+import java.util.Locale
+import org.hamcrest.Matcher
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.experimental.runners.Enclosed
+import org.junit.runner.RunWith
+import org.junit.runners.JUnit4
+import org.junit.runners.Parameterized
+import org.junit.runners.Parameterized.Parameter
+import org.junit.runners.Parameterized.Parameters
+
+@RunWith(Enclosed::class)
+class MainWindowTests {
+
+  @LargeTest
+  @RunWith(Parameterized::class)
+  class SquareButtonTest {
+    @get:Rule val mActivityTestRule = FocusAwareActivityTestRule(MainActivity::class.java)
+
+    @Parameter @JvmField var currentPadId: Int = 0
+
+    @Parameter(1) @JvmField var currentPadName: String = ""
+
+    @Before
+    fun initNetworkSettings() {
+      val preferences = PreferenceManager.getDefaultSharedPreferences(mActivityTestRule.activity)
+      val preferenceEditor = preferences.edit()
+      preferenceEditor.putString(SettingsFragment.SK_HOST_ADDRESS, DummyServer.IP)
+      preferenceEditor.putString(SettingsFragment.SK_HOST_PORT, DummyServer.DEFAULT_PORT.toString())
+      // In order not to receive keep-alive messages
+      preferenceEditor.putString(SettingsFragment.SK_KEEPALIVE, "100000000")
+      preferenceEditor.commit()
+    }
+
+    @Test
+    fun squareButtonsShouldHandleCircularTapsCorrectly() {
+      val server = DummyServer()
+      onView(withId(currentPadId)).perform(movingTap())
+      server.stopListening()
+
+      val messages = server.receivedMessages.iterator()
+      while (messages.hasNext()) {
+        val current = messages.next()
+        if (messages.hasNext()) {
+          assertNotEquals(String.format(Locale.US, "pad %s up", currentPadName), current)
+          val splitCommand = current.split(" ")
+          assertEquals(4, splitCommand.size)
+          assertEquals("pad", splitCommand[0])
+          assertEquals(currentPadName, splitCommand[1])
+          val x = splitCommand[2].toInt()
+          val y = splitCommand[3].toInt()
+          val radius = Math.sqrt((x * x + y * y).toDouble())
+          assertTrue(radius > 40 && radius < 60)
+        } else {
+          assertEquals(String.format(Locale.US, "pad %s up", currentPadName), current)
+        }
+      }
+    }
+
+    @Test
+    fun squareButtonsShouldHandleDiagonalTapsCorrectly() {
+      val server = DummyServer()
+      onView(withId(currentPadId)).perform(diagonalTap())
+      server.stopListening()
+
+      val messages = server.receivedMessages.iterator()
+      var currentIndex = 0
+      while (messages.hasNext()) {
+        val current = messages.next()
+        if (!messages.hasNext()) {
+          assertEquals(String.format(Locale.US, "pad %s up", currentPadName), current)
+          break
+        }
+        assertNotEquals(String.format(Locale.US, "pad %s up", currentPadName), current)
+        val splitCommand = current.split(" ")
+        assertEquals(4, splitCommand.size)
+        assertEquals("pad", splitCommand[0])
+        assertEquals(currentPadName, splitCommand[1])
+        val x = splitCommand[2].toInt()
+        val y = splitCommand[3].toInt()
+        assertTrue(Math.abs(-100 + currentIndex * 200 / 10 - x) <= 25)
+        assertTrue(Math.abs(100 - currentIndex * 200 / 10 - y) <= 25)
+        ++currentIndex
+      }
+    }
+
+    private fun diagonalTap(): ViewAction {
+      return object : ViewAction {
+        private val tapSegmentCount = 10
+        private val tapPrecision = floatArrayOf(1f, 1f)
+
+        override fun getConstraints(): Matcher<View> = isDisplayed()
+
+        override fun getDescription(): String =
+            "Diagonal tap from top left corner to bottom right corner"
+
+        override fun perform(uiController: UiController, view: View) {
+          val topLeftCoords = IntArray(2)
+          view.getLocationOnScreen(topLeftCoords)
+          val startCoords =
+              floatArrayOf(
+                  topLeftCoords[0] + tapPrecision[0],
+                  topLeftCoords[1] - tapPrecision[1],
+              )
+          val tap = MotionEvents.sendDown(uiController, startCoords, tapPrecision).down
+          uiController.loopMainThreadUntilIdle()
+          try {
+            for (i in 1 until tapSegmentCount) {
+              val currentCoords =
+                  floatArrayOf(
+                      startCoords[0] + i.toFloat() * view.width / tapSegmentCount,
+                      startCoords[1] - i.toFloat() * view.height / tapSegmentCount,
+                  )
+              if (!MotionEvents.sendMovement(uiController, tap, currentCoords)) {
+                MotionEvents.sendCancel(uiController, tap)
+                break
+              }
+            }
+            if (!MotionEvents.sendUp(uiController, tap)) {
+              MotionEvents.sendCancel(uiController, tap)
+            }
+          } finally {
+            tap.recycle()
+          }
+        }
+      }
+    }
+
+    private fun movingTap(): ViewAction {
+      return object : ViewAction {
+        private val tapSegmentCount = 10
+        private val tapPrecision = floatArrayOf(1f, 1f)
+
+        override fun getConstraints(): Matcher<View> = isDisplayed()
+
+        override fun getDescription(): String = "Circular press around the starting point"
+
+        override fun perform(uiController: UiController, view: View) {
+          val tapRadius = view.width / 4
+          val topLeftCoords = IntArray(2)
+          view.getLocationOnScreen(topLeftCoords)
+          val centerCoords =
+              intArrayOf(
+                  topLeftCoords[0] + view.width / 2,
+                  topLeftCoords[1] + view.width / 2,
+              )
+          val startCoords =
+              floatArrayOf(
+                  centerCoords[0] + tapRadius.toFloat(),
+                  centerCoords[1].toFloat(),
+              )
+          val tap = MotionEvents.sendDown(uiController, startCoords, tapPrecision).down
+          uiController.loopMainThreadForAtLeast(100)
+          for (i in 1..tapSegmentCount) {
+            val currentAngle = 2 * i * Math.PI / tapSegmentCount
+            val currentCoords =
+                floatArrayOf(
+                    centerCoords[0] + tapRadius * Math.cos(currentAngle).toFloat(),
+                    centerCoords[1] + tapRadius * Math.sin(currentAngle).toFloat(),
+                )
+            MotionEvents.sendMovement(uiController, tap, currentCoords)
+            uiController.loopMainThreadForAtLeast(50)
+          }
+          MotionEvents.sendUp(uiController, tap)
+        }
+      }
+    }
+
+    companion object {
+      @JvmStatic
+      @Parameters
+      fun data(): Collection<Array<Any>> =
+          listOf(arrayOf(R.id.leftPad, "1"), arrayOf(R.id.rightPad, "2"))
+    }
+  }
+
+  @LargeTest
+  @RunWith(JUnit4::class)
+  class MagicButtonsTests {
+    @get:Rule val mActivityTestRule = FocusAwareActivityTestRule(MainActivity::class.java)
+
+    @Before
+    fun initNetworkSettings() {
+      val preferences = PreferenceManager.getDefaultSharedPreferences(mActivityTestRule.activity)
+      val preferenceEditor = preferences.edit()
+      preferenceEditor.putString(SettingsFragment.SK_HOST_ADDRESS, DummyServer.IP)
+      preferenceEditor.putString(SettingsFragment.SK_HOST_PORT, DummyServer.DEFAULT_PORT.toString())
+      // In order not to receive keep-alive messages
+      preferenceEditor.putString(SettingsFragment.SK_KEEPALIVE, "100000000")
+      preferenceEditor.commit()
+    }
+
+    @Test
+    fun magicButtonsShouldSendCorrectCommands() {
+      val server = DummyServer()
+      onView(withId(R.id.buttons)).perform(pressButtons())
+      server.stopListening()
+
+      val messages = server.receivedMessages.iterator()
+      for (i in 1..5) {
+        assertTrue(messages.hasNext())
+        val currentMessage = messages.next()
+        assertEquals(String.format(Locale.US, "btn %d down", i), currentMessage)
+      }
+      assertFalse(messages.hasNext())
+    }
+
+    private fun pressButtons(): ViewAction {
+      return object : ViewAction {
+        private val tapPrecision = floatArrayOf(1f, 1f)
+
+        override fun getConstraints(): Matcher<View> = isDisplayed()
+
+        override fun getDescription(): String = "Clicks on each of magic buttons"
+
+        override fun perform(uiController: UiController, view: View) {
+          val buttons = view as ViewGroup
+          for (i in 0..4) {
+            val currentButton = buttons.getChildAt(i)
+            val buttonTopLeftCoords = IntArray(2)
+            currentButton.getLocationOnScreen(buttonTopLeftCoords)
+            val clickCoords =
+                floatArrayOf(
+                    buttonTopLeftCoords[0] + currentButton.width / 2f,
+                    buttonTopLeftCoords[1] + currentButton.height / 2f,
+                )
+            val tap = MotionEvents.sendDown(uiController, clickCoords, tapPrecision).down
+            uiController.loopMainThreadForAtLeast(50)
+            MotionEvents.sendUp(uiController, tap)
+          }
+        }
+      }
+    }
+  }
+}
