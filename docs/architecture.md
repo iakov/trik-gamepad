@@ -13,8 +13,10 @@ Single Gradle module `app/` (pure Kotlin, 0 `.java`). Two activities:
 
 - **`MainActivity`** — the gamepad itself: two touch pads, five magic buttons,
   a sensor-driven wheel, and the MJPEG video stream. Owns the
-  `SenderService`, wires the preference listener, and is the only place the
-  app's UI lives.
+  `SenderService`, implements the `SettingsUi` view callbacks, and is the only
+  place the app's UI lives.
+- **`MainActivitySettingsController`** — the preference-change handling
+  extracted from `MainActivity` (ROADMAP Phase 2-E); see "Settings" below.
 - **`SettingsActivity`** — a thin shell that hosts the `SettingsFragment`
   (a `PreferenceFragmentCompat`) as its only content.
 
