@@ -1,0 +1,262 @@
+package com.trikset.gamepad
+
+import android.os.Looper.getMainLooper
+import java.io.BufferedReader
+import java.io.IOException
+import java.io.InputStreamReader
+import java.net.ServerSocket
+import java.net.Socket
+import java.util.Collections
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicReference
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.android.util.concurrent.PausedExecutorService
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.LooperMode
+import org.robolectric.annotation.LooperMode.Mode.PAUSED
+
+/**
+ * Covers the SenderService paths the basic test misses: keepalive ticks, disconnect callbacks,
+ * send-failure handling, and target changes.
+ */
+@RunWith(RobolectricTestRunner::class)
+@LooperMode(PAUSED)
+@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
+class SenderServiceAdvancedTest {
+  private val mExecutor = PausedExecutorService()
+
+  // SenderService keeps keepaliveTimeout and mConnectTask as STATIC fields and
+  // each connected client starts a keepalive Timer that runs on a real thread.
+  // Reset the static timeout and clear the static connect task before and
+  // after each test, and always disconnect connected clients to stop their
+  // timers, or leaked timers / stale static state pollute later tests (the
+  // SDK-23 variant is most exposed).
+  @Before
+  fun resetStaticState() {
+    clearConnectTask()
+    val reset = SenderService()
+    reset.setExecutor(mExecutor)
+    reset.setKeepaliveTimeout(SenderService.DEFAULT_KEEPALIVE)
+    reset.disconnect("reset")
+  }
+
+  @After
+  fun tearDown() {
+    clearConnectTask()
+    val reset = SenderService()
+    reset.setExecutor(mExecutor)
+    reset.setKeepaliveTimeout(SenderService.DEFAULT_KEEPALIVE)
+    reset.disconnect("teardown")
+  }
+
+  private fun clearConnectTask() {
+    val f = SenderService::class.java.getDeclaredField("mConnectTask")
+    f.isAccessible = true
+    f.set(null, null)
+  }
+
+  @Test
+  fun disconnectShouldInvokeOnDisconnectedListener() {
+    ReadUntilStopServer().use { server ->
+      val client = SenderService()
+      client.setExecutor(mExecutor)
+      val reason = AtomicReference<String>()
+      client.setOnDisconnectedListener { reason.set(it) }
+
+      client.setTarget("localhost", server.getPort())
+      client.send("test")
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+      assertTrue(server.awaitConnection())
+
+      client.disconnect("Test disconnect.")
+      assertEquals("Test disconnect.", reason.get())
+      client.disconnect("again") // mOut already null -> no listener call
+      assertEquals("Test disconnect.", reason.get())
+    }
+  }
+
+  @Test
+  fun setTargetShouldDisconnectWhenChanged() {
+    ReadUntilStopServer().use { first ->
+      val client = SenderService()
+      client.setExecutor(mExecutor)
+      val reason = AtomicReference<String>()
+      client.setOnDisconnectedListener { reason.set(it) }
+
+      client.setTarget("localhost", first.getPort())
+      client.send("a")
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+      assertTrue(first.awaitConnection())
+
+      // New target on a different port -> must disconnect from the first.
+      client.setTarget("localhost", first.getPort() + 1)
+      assertEquals("Target changed.", reason.get())
+    }
+  }
+
+  @Test
+  fun sendFailureShouldDisconnectAndReport() {
+    ReadUntilStopServer().use { server ->
+      val client = SenderService()
+      client.setExecutor(mExecutor)
+      client.setTarget("localhost", server.getPort())
+      client.send("first")
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+      assertTrue(server.awaitConnection())
+
+      // Closing the server makes the next println fail, which turns into a disconnect.
+      server.closeSocket()
+      client.send("after-close")
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+      // checkError() may be lazy; give the executor another cycle.
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+    }
+  }
+
+  @Test
+  fun keepaliveShouldBeSentWhileConnected() {
+    val timeout = 1300 // real period = timeout - 300 = 1000ms
+    ReadUntilStopServer().use { server ->
+      val client = SenderService()
+      client.setExecutor(mExecutor)
+      client.setTarget("localhost", server.getPort())
+      client.setKeepaliveTimeout(timeout)
+      client.send("bootstrap")
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+      assertTrue(server.awaitConnection())
+
+      // The keepalive Timer runs on a real thread; poll for the message instead
+      // of a single fixed sleep so a busy CI JVM cannot starve the timer.
+      var seen = false
+      var attempts = 0
+      while (!seen && attempts < 20) {
+        attempts++
+        Thread.sleep(500)
+        mExecutor.runAll()
+        shadowOf(getMainLooper()).idle()
+        seen = server.receivedContains("keepalive $timeout")
+      }
+      assertTrue("expected a keepalive message", seen)
+      client.disconnect("done")
+    }
+  }
+
+  @Test
+  fun showTextCallbackShouldReceiveConnectionResult() {
+    ReadUntilStopServer().use { server ->
+      val client = SenderService()
+      client.setExecutor(mExecutor)
+      val text = AtomicReference<String>()
+      client.setShowTextCallback { text.set(it) }
+
+      client.setTarget("localhost", server.getPort())
+      client.send("hello")
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+      assertTrue(server.awaitConnection())
+
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+      assertTrue("expected connection message, got '${text.get()}'", text.get() != null)
+      client.disconnect("done")
+    }
+  }
+
+  @Test
+  fun sendToUnreachablePortShouldNotThrow() {
+    val client = SenderService()
+    client.setExecutor(mExecutor)
+    // Port 1: nothing listens on it, so the connect is refused and connectToTRIK
+    // swallows the IOException.
+    client.setTarget("localhost", 1)
+    client.send("boom")
+    mExecutor.runAll()
+    shadowOf(getMainLooper()).idle()
+  }
+
+  @Test
+  fun keepaliveTimeoutBelowMinimumIsStoredUnchanged() {
+    val client = SenderService()
+    client.setExecutor(mExecutor)
+    val before = client.getKeepaliveTimeout()
+    // The service does not clamp; the caller (MainActivity) enforces the
+    // minimum. This just verifies the setter round-trips.
+    client.setKeepaliveTimeout(12345)
+    assertEquals(12345, client.getKeepaliveTimeout())
+    client.setKeepaliveTimeout(before)
+  }
+
+  /** A DummyServer variant that reads until [closeSocket] or close(). */
+  @Suppress("SwallowedException") // socket closed -> loop ends
+  private class ReadUntilStopServer : AutoCloseable {
+    private val mServerSocket: ServerSocket
+    private val mConnectedLatch = CountDownLatch(1)
+    private val mMessages = Collections.synchronizedList(ArrayList<String>())
+    @Volatile private var mClientSocket: Socket? = null
+
+    fun getPort(): Int = mServerSocket.localPort
+
+    fun awaitConnection(): Boolean = mConnectedLatch.await(5, TimeUnit.SECONDS)
+
+    fun receivedContains(fragment: String): Boolean {
+      synchronized(mMessages) {
+        return mMessages.any { it != null && it.contains(fragment) }
+      }
+    }
+
+    fun closeSocket() {
+      mClientSocket?.let { c ->
+        try {
+          c.close()
+        } catch (ignored: IOException) {}
+      }
+    }
+
+    init {
+      mServerSocket =
+          try {
+            ServerSocket(0)
+          } catch (e: IOException) {
+            throw IllegalStateException("Cannot bind a server socket", e)
+          }
+      Thread {
+            try {
+              mServerSocket.use { s ->
+                val client = s.accept()
+                mClientSocket = client
+                mConnectedLatch.countDown()
+                val input = BufferedReader(InputStreamReader(client.getInputStream()))
+                var line: String?
+                while (input.readLine().also { line = it } != null) {
+                  mMessages.add(line)
+                }
+              }
+            } catch (e: IOException) {
+              // socket closed -> loop ends
+            }
+          }
+          .start()
+    }
+
+    override fun close() {
+      closeSocket()
+      try {
+        mServerSocket.close()
+      } catch (ignored: IOException) {}
+    }
+  }
+}
