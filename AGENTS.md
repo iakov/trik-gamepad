@@ -93,34 +93,24 @@ configurations, update this section and the referenced config files.
 
 ### Operational rules (command hygiene)
 
-- **Every command runs with a reasonable timeout**, scaled to the task (gradle build ~10 min, downloads ~10 min, emulator boot ~5 min).
-- **Every command is logged**: tee output to `app/build/<task>.log` (gitignored) or `.tmp/`; never run blind. On timeout, read the log and find root cause before re-running.
-- **If a command takes ≥1.5× the expected time, analyze the wrong guess.** Record expected vs actual for each command.
-- **A wrong guess often means an option was not set properly** — re-audit the invocation (e.g. the AVD's `hw.gpu.mode=host` config was the truth that CLI flags must not override).
-- **Slow commands → research (incl. web), apply best practices, tune repeatable tooling** — fix the tooling, not the symptom; document quirks and findings in `MEMORY.md`.
-- **Async tools**: capture a process handle (`Start-Process -PassThru`), verify liveness immediately, wait for the readiness signal with a timeout, then continue independent work — never stall on a poll.
-- **Never pipe a long-lived child through `Select-Object`/`Tee-Object`**: Gradle spawns a daemon that inherits the parent's stdout/stderr pipe handles, so a pipeline never sees EOF and the command blocks until timeout even though Gradle finished in seconds. Redirect to a file instead (`& gradlew ... *> log` or `Start-Process -Wait -RedirectStandardOutput log`), read the file after, and use short timeouts for probes. Use `gradlew --stop` / `--no-daemon` for one-shot probe runs so no daemon lingers.
-- **"Exit 0" ≠ the tool ran**: static analyzers (PMD 7 drops invalid rule names; checkstyle/spotbugs can silently no-op) may exit clean with zero files analyzed. Re-run with `--info`/`--rerun-tasks` and grep for the analysis actually loading config + analyzing sources before trusting a green result.
-- **Static state leaks across Robolectric test classes**: `SenderService` keeps `keepaliveTimeout`/`mConnectTask` static; tests that touch it must reset both via reflection in `@Before`/`@After`, or the 3-variant suite flakes only on CI (SDK-23). Test UI logic without a live TCP dependency when possible (assert `PausedExecutorService.runAll()` count, not server arrival).
-- **Robolectric real-socket HTTP is unreliable**: a fake local HTTP server success-path test flaked; cover the null/error branches of `StartReadMjpegAsync` instead.
-- **CI `script:` blocks must be plain POSIX `sh`** — no `\` line continuations or `{ ...; }` brace groups (they collapse into "Syntax error: end of file unexpected"). Validate the extracted script with `sh -n` before pushing.
-- **Distinguish infra from code failures**: `Failed to resolve action download info` (GitHub Actions) and `adb ... exit code 1` during the runner's boot poll are transient infra/emulator flakes, not code defects. Check which job/step failed and whether it is boot vs tests before changing code. Keep a note of the last known-good CI run id.
-- **When a CI "fix" doesn't hold, read the timestamps, not just the failure**: the focus-flake root cause (a `settings put` racing the settings provider) was invisible in the failure log — it surfaced only by comparing WHEN the pre-empt step ran against WHEN `Boot completed` was logged (`sys.boot_completed` reports 1 before the settings provider is ready). If a setup/prerequisite step ran before its dependency was ready, the race is the bug: make the step wait for (and verify) its prerequisite instead of fire-and-forget.
-- **A focus failure after a targetSdk bump is usually an OS overlay, not app code**: first immersive-mode entry on API 35+ pops an `ImmersiveModeConfirmation` window that steals focus (every Espresso interaction then times out with `RootViewWithoutFocusException`). Check `dumpsys window` `mCurrentFocus` for system windows before editing the app.
-- **Apply documented class traps before writing tests against a class**: MEMORY.md records hard-won hazards per class (e.g. `SenderService` static state, `DummyServer` sync-bind). When adding tests to a known-tricky class, read that class's MEMORY.md/TESTING.md entry FIRST and apply every documented trap in the first draft — re-discovering them costs CI runs (the session hit the static-state and async-bind flakes twice each).
-- **Run the full 3-variant suite twice before pushing test changes**: `./gradlew test` runs debug/release/releaseDebug in parallel JVMs; static-state and timing flakes surface only under full-suite or second-run conditions, not single-test runs. New/edited tests get `test` twice locally before push.
-- **Generate lint baselines with the aggregate `lint` task, not `lintDebug`**: a baseline from `lintDebug` misses issues the aggregate task reports, so CI fails on a "new" issue that is actually in-scope. Env-dependent checks (e.g. `OldTargetApi`) cannot be baselined — suppress them in `lint.xml`.
-- **Gaps escalate**: 1st occurrence — document (canonical doc); 2nd — automate (CI check or pre-commit hook); 3rd+ — tool config (linter rule, structural guard).
-- **Verify "runs automatically" claims against the environment**: a config file existing ≠ the tool being active — confirm with a command.
-- **Measure, don't estimate**: when claiming a refactor reduces SLOC/complexity/test-count, measure before and after; revert a consolidation that backfires; report measured deltas, not estimates.
-- **3 identical failures → stop and read, don't tweak-and-rerun**: if the same Robolectric test fails identically N≥3 consecutive runs (same exception/line, near-identical log size), stop and read the shadow/API source from the jar. The sensor saga burned ~15 runs because each "fix" only shifted the failing line. Applies beyond shadows: identical repeated failures mean a wrong model, not bad luck.
-- **Pre-format `.md` with `uvx mdformat` before pre-commit**: the mdformat hook modifies files on its first run and fails, so a second pass is always needed. Format changed `.md` files first and the hook passes once.
-- **`gh run watch` takes the run **id**, not the object**: passing a PowerShell run object (e.g. from a `ConvertFrom-Json` pipeline) makes `gh` build a bogus URL and 404. Extract `.id` explicitly. Same for any `gh <cmd>` that takes an id.
-- **Every `gh` run command needs `--repo iakov/trik-gamepad`**: without it `gh` resolves to the default repo (upstream `trikset/trik-gamepad`), so `gh run view`/`watch` report a bogus/404 run.
-- **A turn that launches an async process is not complete until its readiness result is recorded**: capturing `Start-Process -PassThru` and confirming liveness is only the first half of the chain — the very next tool call must be the single bounded readiness poll (one command that loops `sys.boot_completed` etc. up to a hard cap). Never end a turn after a bare liveness check: in an autonomous run nothing re-pokes the agent, so the gap is silent and indefinite. If the process is not needed yet, record it as a `poll:`/`watch:` todo item with a timestamp so the next turn opens with it.
-- **Every push runs the full local gate list first**: `./gradlew test lint checkstyle pmd detekt spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck`, logged — not just compile + tests (a missing `spotlessCheck` once shipped a format violation).
-- **Verify `git status` is clean before pushing**: the local gates validate the *working tree*, so an uncommitted fix can make them pass while the pushed commits still contain the bug (a missing `fun interface` on `SenderService.OnEventListener` went uncommitted for several pushes — local gates green, CI `compileDebugKotlin` red). `git status --short` must show nothing before `git push`.
-- **CI cadence**: after each push, one bounded run check (~3 min); if no run appears (during a GitHub outage push events can be silently dropped even after recovery), document it and re-check at the next push rather than blocking.
+- **Command hygiene**: every command runs with a reasonable timeout and is logged (tee to `app/build/<task>.log` or `.tmp/`); on timeout read the log first. If a command takes ≥1.5× the expected time, analyze the wrong guess and record expected vs actual.
+- **A wrong guess usually means an option was not set properly** — re-audit the invocation.
+- **Slow commands → research (incl. web), tune repeatable tooling, document in MEMORY.md** — never fix the symptom.
+- **Async turns**: capture a process handle (`Start-Process -PassThru`), verify liveness immediately, then a single bounded readiness poll in the same working loop — a turn is not complete until the readiness result is recorded; never end a turn on a bare liveness check.
+- **Never pipe long-lived children (gradle/emulator) through Tee/Select** — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) and use `--no-daemon`/`--stop` for probes.
+- **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green.
+- **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries); **run the full 3-variant `test` suite twice** before pushing test changes.
+- **Generate lint baselines with the aggregate `lint` task**, not `lintDebug`; env-dependent checks (e.g. `OldTargetApi`) go in `lint.xml`, not the baseline.
+- **CI `script:` blocks must be plain POSIX `sh`** — no `\` continuations or brace groups; validate with `sh -n` before pushing.
+- **Distinguish infra from code failures** (adb boot flake, GHA action-download) — triage by job/step and boot-vs-tests; keep a note of the last known-good CI run id.
+- **When a CI "fix" doesn't hold, read the step timestamps, not just the failure**: if a setup/prerequisite step ran before its dependency was ready (e.g. `settings put` before the settings provider was up), the race is the bug — make the step wait for and verify its prerequisite.
+- **A focus failure after a targetSdk bump is usually an OS overlay, not app code** — check `dumpsys window` `mCurrentFocus` for system windows before editing the app.
+- **Gaps escalate** (1st: document · 2nd: automate · 3rd+: tool config); **verify "runs automatically" claims with a command**; **measure, don't estimate**.
+- **3 identical failures → stop and read the shadow/API source**, don't tweak-and-rerun.
+- **Pre-format `.md` with `uvx mdformat`** before pre-commit (the first hook run reformats and fails).
+- **`gh` run commands take the run **id**, not a PowerShell object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
+- **Push gates**: the full local gate list is run and logged, and **`git status --short` must be clean** before every push (local gates validate the working tree, not the commits).
+- **CI cadence**: one bounded run check (~3 min) after each push; if no run appears, document it and re-check at the next push rather than blocking.
 
 ### On tool error
 
@@ -177,11 +167,7 @@ uvx mdformat <file>.md
 
 ## App protocol (quick reference)
 
-- `SenderService` keeps one TCP connection to the robot (default `192.168.77.1:4444`) and sends newline-terminated plain-text commands: `pad1 x y`, `pad2 x y`, `btn N down`, `wheel <angle>`, `keepalive <ms>`.
-- Keepalive: default 5000 ms, minimum 1000 ms. The real timer period is `keepaliveTimeout - 300` ms. Disconnect on `mOut.checkError()` or target change.
-- MJPEG video: `com.demo.mjpeg` package, default URI `http://<host>:8080/?action=stream`; the stream reconnects **on error** (`MjpegView.OnStreamErrorListener` → `MainActivity.restartVideoStream()`) — there is no forced periodic restart. Cleartext HTTP is enabled in the manifest.
-- Settings keys live in `SettingsFragment` as `SK_*` constants, stored via legacy `PreferenceManager`/`android.preference` APIs.
-- Deeper details and rationale: MEMORY.md "App protocol".
+TCP protocol, keepalive, MJPEG reconnect, settings keys: MEMORY.md "App protocol".
 
 ## Memory index
 
@@ -198,30 +184,7 @@ Details live in `MEMORY.md` — pull a section on demand:
 
 ## Current work
 
-- Execution plan for the revival (canonical layout + quality gates + format
-  sweep + toolchain upgrade to compileSdk/targetSdk 36, minSdk 21, coverage to
-  85%, pure-Kotlin migration, commits on `feat/global-refresh`) lives in
-  `.PLAN.md`. `.PLAN.md` is gitignored — never commit it.
-- Phases 1–13 are committed and pushed to the fork (layout, cleanup, CI retire,
-  gates, format sweep, deterministic tests, toolchain 36, edge-to-edge + MJPEG
-  reconnect, docs refresh, GitHub Actions CI, static analysis, coverage drive,
-  **pure-Kotlin migration**). The whole `app/` source tree is Kotlin
-  (0 `.java`). Key state: coverage gate **90% line / 70% branch** (measured
-  96.9% / 71.2%); detekt + ktfmt + SpotBugs (0 bugs) replace checkstyle/pmd
-  (retired — Java-only, silent no-ops on 0 Java sources); lint baseline
-  regenerated to 12 issues; `aosp_atd` local test AVD `Atd_API36`
-  (`-gpu host` only) + `Swiftshader_API36` (CI GPU replica); CI uses `default`
-  image + KVM step + `pixel_5`.
-- **CI build gate is green; instrumented is best-effort.** The instrumented
-  focus flake was root-caused and fixed (the immersive pre-empt raced the
-  settings provider during slow boot — ci.yml now retries the settings write
-  until confirmed; details in MEMORY.md "CI focus flake"). Residual instrumented
-  failures are swiftshader rendering instability (`Failed to find ColorBuffer`
-  under load), not code.
-- Next: the improvement plan (instrumented CI without macOS, androidx.
-  preference migration, MainActivity/WheelController extraction, SenderService
-  constructor injection, SettingsTests refactor, package rename, architecture
-  doc) lives in committed `docs/ROADMAP.md` — start there.
+- Execution plan + crash-safety session state: `.PLAN.md` (gitignored — never commit). Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Conventions
 
