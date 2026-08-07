@@ -13,6 +13,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import org.junit.After;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
@@ -25,12 +26,25 @@ import org.robolectric.annotation.LooperMode;
 @Config(sdk = {Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK})
 public class SenderServiceTest {
   private final PausedExecutorService mExecutor = new PausedExecutorService();
+  private SenderService client;
+
+  // A connected client keeps a real keepalive Timer thread alive that fires
+  // into the STATIC SenderService.mExecutor (set to this test's executor by
+  // setExecutor). Disconnecting every client in @After stops the Timer, so no
+  // leaked keepalive task can land on a later test's executor (this is what
+  // made SquareTouchPadLayoutTest.sendShouldNotForwardWhenNoSender flake on CI).
+  @After
+  public void tearDown() {
+    if (client != null) {
+      client.disconnect("tearDown");
+    }
+  }
 
   @Test
   public void senderServiceShouldConnectToServerSuccessfullyAfterSendingCommand()
       throws InterruptedException {
     try (DummyServer server = new DummyServer(1)) {
-      SenderService client = new SenderService();
+      client = new SenderService();
       client.setExecutor(mExecutor);
       client.setTarget(DummyServer.IP, server.getPort());
       client.send("");
@@ -44,7 +58,7 @@ public class SenderServiceTest {
   @Test
   public void senderServiceShouldSendSingleCommandCorrectly() throws InterruptedException {
     try (DummyServer server = new DummyServer(1)) {
-      SenderService client = new SenderService();
+      client = new SenderService();
       client.setExecutor(mExecutor);
       client.setTarget(DummyServer.IP, server.getPort());
       client.setKeepaliveTimeout(10000000); // to disable keep-alive messages
@@ -59,7 +73,7 @@ public class SenderServiceTest {
   @Test
   public void senderServiceShouldSendMultipleCommandsCorrectly() throws InterruptedException {
     try (DummyServer server = new DummyServer(5)) {
-      SenderService client = new SenderService();
+      client = new SenderService();
       client.setExecutor(mExecutor);
       client.setTarget(DummyServer.IP, server.getPort());
       client.setKeepaliveTimeout(10000000); // to disable keep-alive messages

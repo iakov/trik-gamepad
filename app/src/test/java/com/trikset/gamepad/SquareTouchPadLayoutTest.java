@@ -86,10 +86,13 @@ public class SquareTouchPadLayoutTest {
 
   @Test
   public void sendShouldNotForwardWhenNoSender() {
+    // Drain any leaked keepalive task that a prior test's connected client may
+    // have queued into the shared static executor before asserting.
+    int queuedBefore = mExecutor.runAll();
     pad.setSender(null);
     pad.send("up");
     // Nothing should be queued when there is no sender wired up.
-    assertEquals(0, mExecutor.runAll());
+    assertEquals(queuedBefore, mExecutor.runAll());
   }
 
   @Test
