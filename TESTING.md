@@ -51,16 +51,20 @@ Local instrumented run:
 > 8/8 with `RootViewWithoutFocusException` — the exact failure CI saw. Local
 > runs must use `-gpu host`.
 
-> **CI focus flake is frequent, and retry-once is a band-aid.** On the GitHub
-> Actions emulator (`default` image + swiftshader + KVM) the focus loss
-> occasionally still happens even with the immersive pre-empt — identical
-> config has been green 9/9 and failed 7/9 on different runs, including a
-> 7/9 failure on a run that already had the retry. The ci.yml script waits for
-> the device, verifies the `immersive_mode_confirmations` value, dismisses any
-> keyguard, and retries the suite once, but that does **not** reliably hold.
-> The real fix (macOS/GPU runner or a focus-wait before Espresso) is untried.
-> Treat a `RootViewWithoutFocusException` on CI as a known instability, not a
-> code regression.
+> **CI focus flake — root-caused and fixed (2026-08-07).** The
+> `RootViewWithoutFocusException` storm on CI was traced to the immersive
+> pre-empt racing the settings provider: `sys.boot_completed` reports `1`
+> while the provider is still starting, so a single `settings put` during a
+> slow headless boot was silently lost, and the `ImmersiveModeConfirmation`
+> overlay then stole focus for the whole suite. The ci.yml pre-empt now
+> **retries the settings write until `settings get` confirms it** (up to 60 s),
+> and `FocusAwareActivityTestRule` waits (and bounded-BACK-dismisses) for
+> window focus, skipping the wait for non-view tests. Validated on CI: the
+> first ~5 tests pass and no focus assertions fire (previously 0/9).
+> **Remaining CI instrumented instability:** swiftshader rendering errors
+> (`Failed to find ColorBuffer`) can still hang Espresso interactions under
+> load on 2-4-core runners — a software-GPU resource issue, not a code
+> regression. Treat those (not focus) as the known CI flake.
 
 ## Diagnostic discipline
 
