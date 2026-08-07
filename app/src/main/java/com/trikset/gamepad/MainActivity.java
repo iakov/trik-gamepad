@@ -336,13 +336,13 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
   private void restartVideoStream() {
     // The error listener may fire from the render thread; always hop to the
-    // main thread before touching the view hierarchy / launching an AsyncTask.
+    // main thread before touching the view hierarchy / opening the stream.
     runOnUiThread(
         () -> {
           if (mVideo == null) {
             return;
           }
-          new StartReadMjpegAsync(mVideo).execute(mVideoURL);
+          new VideoStreamLoader(mVideo).load(mVideoURL);
         });
   }
 
