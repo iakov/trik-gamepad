@@ -113,13 +113,19 @@ jobs:
             # settings put is async through the provider; verify the value is
             # actually applied before running the suite.
             adb shell 'i=0; while [ $i -lt 20 ]; do [ "$(settings get secure immersive_mode_confirmations)" = "confirmed" ] && break; i=$((i+1)); sleep 1; done'
-            adb shell input keyevent 82
+            # Dismiss any keyguard and clear an overlay that may already be up.
+            adb shell wm dismiss-keyguard
+            adb shell input keyevent 4
             # Swiftshader under KVM occasionally boots with a focus-less app
             # window; retry the suite once to ride out the transient flake.
             ./gradlew connectedDebugAndroidTest -PpreDexEnable=false
             if [ $? -ne 0 ]; then
               echo "instrumented run failed; retrying once"
               adb shell am force-stop com.trikset.gamepad
+              # Re-apply the pre-empt on the retry too: a slow boot may have
+              # swallowed the first settings write.
+              adb shell settings put secure immersive_mode_confirmations confirmed
+              adb shell wm dismiss-keyguard
               ./gradlew connectedDebugAndroidTest -PpreDexEnable=false
             fi
 

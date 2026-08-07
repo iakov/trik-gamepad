@@ -14,8 +14,10 @@ import org.junit.runners.JUnit4;
 @RunWith(JUnit4.class)
 public class KeepAliveTests {
   @Rule
+  // KeepAliveTests never interact with the view hierarchy, so they do not need
+  // the focus-wait (and must not be slowed by it on a focus-less CI emulator).
   public final FocusAwareActivityTestRule<MainActivity> mActivityTestRule =
-      new FocusAwareActivityTestRule<>(MainActivity.class);
+      new FocusAwareActivityTestRule<>(MainActivity.class, false);
 
   @Test
   public void keepAliveShouldBeReceivedAfterGivenTimePeriod() throws InterruptedException {
