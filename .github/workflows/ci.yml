@@ -35,7 +35,10 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5.0.2
         with:
-          cache-read-only: ${{ github.ref != 'refs/heads/master' }}
+          # Single-branch no-PR workflow (AGENTS.md): pushes only ever land on
+          # feat/global-refresh, never master, so the default read-only cache
+          # would make every CI run cold. Write the cache back on this branch.
+          cache-read-only: false
 
       - name: Build debug + androidTest APKs
         run: ./gradlew assembleDebug assembleDebugAndroidTest -PpreDexEnable=false --build-cache
@@ -88,7 +91,8 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5.0.2
         with:
-          cache-read-only: true
+          # Same single-branch write-back reasoning as the build job.
+          cache-read-only: false
 
       - name: Instrumented tests on emulator
         uses: reactivecircus/android-emulator-runner@v2.38.0
