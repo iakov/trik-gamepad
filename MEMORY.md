@@ -1477,5 +1477,9 @@ Deferred to the AGP 9 migration (Gradle 9 makes config-cache the norm) — then
 re-evaluate. The keystore detection logic itself is unchanged (still
 `exists()`-gated, still local-only).
 
-**Implementation status: PENDING** (recorded in `.PLAN.md` — flip the property,
-verify two consecutive runs no longer print the message, run the gate once).
+**Implementation status: DONE (2026-08-08).** `org.gradle.configuration-cache=false`
+landed; two consecutive `gradlew help` runs printed no "configuration cache"
+message at all (verified), full gate green. Interim cleanup — **may be reversed
+by the AGP 9 / Gradle 9 migration** (Gradle 9 makes config-cache the norm), at
+which point the keystore `exists()` + `https.proxyHost` blockers are re-checked
+against AGP 9's own behavior.
