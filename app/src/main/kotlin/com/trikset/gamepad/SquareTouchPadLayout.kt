@@ -12,7 +12,6 @@ import android.view.View
 import android.widget.RelativeLayout
 import androidx.core.content.res.ResourcesCompat
 import java.util.Locale
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -23,10 +22,9 @@ class SquareTouchPadLayout : RelativeLayout {
   private var absY = 0f
   private var padName: String? = null
   private var sender: SenderService? = null
-  private var prevX = 0
-  private var prevY = 0
   private var maxX = 0f
   private var maxY = 0f
+  private val touchPadController = TouchPadController()
 
   constructor(context: Context) : super(context) {
     init()
@@ -145,20 +143,13 @@ class SquareTouchPadLayout : RelativeLayout {
       MotionEvent.ACTION_MOVE -> {
         parent?.requestDisallowInterceptTouchEvent(true)
         performClick()
-        setAbsXY(
-            max(0f, min(event.x, maxX)),
-            max(0f, min(event.y, maxY)),
-        )
+        val x = max(0f, min(event.x, maxX))
+        val y = max(0f, min(event.y, maxY))
+        setAbsXY(x, y)
 
-        val rX = (COORDINATE_SCALE * SCALE * (absX / maxX - CENTER_OFFSET).toDouble()).toInt()
-        val rY = -(COORDINATE_SCALE * SCALE * (absY / maxY - CENTER_OFFSET).toDouble()).toInt()
-        val curY = max(-MAX_COORDINATE, min(rY, MAX_COORDINATE))
-        val curX = max(-MAX_COORDINATE, min(rX, MAX_COORDINATE))
-
-        if (abs(curX - prevX) > SENSITIVITY || abs(curY - prevY) > SENSITIVITY) {
-          prevX = curX
-          prevY = curY
-          send(String.format(Locale.US, "%d %d", curX, curY))
+        val command = touchPadController.nextCoordinates(x, y, maxX, maxY)
+        if (command != null) {
+          send(String.format(Locale.US, "%d %d", command.x, command.y))
         }
 
         true
@@ -178,11 +169,6 @@ class SquareTouchPadLayout : RelativeLayout {
   private companion object {
     const val DEFAULT_SIZE = 100
     const val CIRCLE_RADIUS_DIVISOR = 20
-    const val SENSITIVITY = 3
-    const val SCALE = 1.15
     const val OPAQUE_ALPHA = 255
-    const val COORDINATE_SCALE = 200.0
-    const val CENTER_OFFSET = 0.5
-    const val MAX_COORDINATE = 100
   }
 }
