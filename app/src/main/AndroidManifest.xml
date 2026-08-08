@@ -13,7 +13,7 @@
         android:icon="@mipmap/trik_gamepad_logo_512x512"
         android:label="@string/appLabel"
         android:theme="@style/AppTheme"
-        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="m">
        <!--  <service android:name=".SenderService" />  -->
 

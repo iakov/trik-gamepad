@@ -6,7 +6,6 @@ import java.io.DataInputStream
 import java.io.IOException
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
-import java.util.Properties
 import org.apache.commons.io.input.BoundedInputStream
 
 /**
@@ -26,8 +25,6 @@ class MjpegInputStream(input: InputStream) :
     private val SOI_MARKER = byteArrayOf(0xFF.toByte(), 0xD8.toByte())
     private val CONTENT_LENGTH_MARKER = CONTENT_LENGTH.toByteArray(StandardCharsets.UTF_8)
   }
-
-  private val props = Properties()
 
   @Suppress("SwallowedException") // a truncated read just means "not found"
   private fun getEndOfSequence(sequence: ByteArray): Int {
@@ -62,6 +59,39 @@ class MjpegInputStream(input: InputStream) :
     return if (end < 0) -1 else end - sequence.size
   }
 
+  /**
+   * Reads the multipart header block (bounded by the SOI marker) and extracts the `Content-Length`
+   * value. Unlike `java.util.Properties.load`, this is a plain CRLF line-scanner faithful to
+   * multipart/x-mixed-replace headers (no backslash/whitespace quirks). Returns null when the
+   * header has no parseable Content-Length.
+   */
+  private fun parseContentLength(header: InputStream): Int? {
+    var line = ByteArray(0)
+    val lineBuffer = java.io.ByteArrayOutputStream()
+    while (true) {
+      val b = header.read()
+      if (b < 0 || b == '\n'.code) {
+        if (lineBuffer.size() > 0) {
+          line = lineBuffer.toByteArray()
+          lineBuffer.reset()
+          val text = String(line, StandardCharsets.UTF_8).trim()
+          val separator = text.indexOf(':')
+          if (
+              separator > 0 &&
+                  text.substring(0, separator).equals(CONTENT_LENGTH, ignoreCase = true)
+          ) {
+            return text.substring(separator + 1).trim().toIntOrNull()
+          }
+        }
+        if (b < 0) {
+          return null
+        }
+      } else {
+        lineBuffer.write(b)
+      }
+    }
+  }
+
   /** @throws IOException if the stream is broken and recovery fails */
   @Throws(IOException::class)
   fun readMjpegFrame(): BoundedInputStream? {
@@ -75,9 +105,7 @@ class MjpegInputStream(input: InputStream) :
       val headerLen = getStartOfSequence(SOI_MARKER)
       val headerIn = BoundedInputStream(this, headerLen.toLong())
       headerIn.setPropagateClose(false)
-      props.clear()
-      props.load(headerIn)
-      contentLength = props.getProperty(CONTENT_LENGTH)!!.toInt()
+      contentLength = parseContentLength(headerIn) ?: -1
       headerIn.close()
 
       if (contentLength >= 0 && available() < 2 * contentLength) {
