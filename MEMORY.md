@@ -1570,3 +1570,178 @@ unaffected by the AGP 9 / built-in-Kotlin switch.
   wrapper after the AGP-9 version bump (NoClassDefFoundError); editing
   `gradle-wrapper.properties` directly, then re-running `wrapper` once 9.5 was
   active, was the workable order.
+
+### [2026-08-08] Domain review — full-project audit + web best-practice research
+
+A strict review of the whole project against current Android/Kotlin/testing
+best practice (source: code audit + developer.android.com / kotlinlang.org /
+robolectric.org / ReactiveCircus README / detekt+AGP release notes, via Wayback
+where the live site was unreachable). Two parts: **findings** (concrete, per
+file/line) and **domain knowledge** (durable reference for future sessions).
+
+#### Part A — Code findings (Campaign 3 backlog; execution order in `.PLAN.md`)
+
+**Correctness:**
+
+- `MainActivitySettingsController.kt:113` — `Integer.getInteger(pref, default)`
+  reads a **JVM system property named by the pref string**, NOT the stored
+  preference; the `wheelSens` setting silently never applies. Fix: parse the
+  string (`toIntOrNull() ?: default`), clamp [1..100]. The test at
+  `MainActivityTest.kt:147` documents the quirk instead of fixing it.
+- `MainActivity.kt:162` — `getDefaultSensor(Sensor.TYPE_ALL)`: `TYPE_ALL` is a
+  mask for `getSensorList`, `getDefaultSensor` usually returns null → the
+  `registerListener` NPEs; and `onSensorChanged` logs every other sensor type
+  at `Log.i` per event. Use `getDefaultSensor(TYPE_ACCELEROMETER)`.
+- `SenderService.kt:158` — `setKeepaliveTimeout` restarts the timer BEFORE
+  assigning the new value (restart runs with the old timeout). Swap order.
+- `MainActivity.kt:225` — `getSenderService()` does `mSender!!`; a stray
+  callback after `onDestroy` nulls it → crash.
+
+**Leak (the big one):**
+
+- `MjpegView.stopPlayback()` joins a render thread that is usually blocked in a
+  non-interruptible `InputStream.read` inside `readMjpegFrame()`. `join(3000)`
+  times out, the thread + HTTP connection linger, and `onResume` opens a NEW
+  connection — leaks accumulate across pause/resume. The documented unblock
+  pattern is to close the `HttpURLConnection`/stream from another thread (a
+  blocking read is not interruptible). Verify with a Robolectric stop/start
+  cycle that no thread leaks.
+
+**Cross-thread:** `disconnect()` (main thread) closes `PrintWriter` while the
+executor thread may be mid-`println` — `PrintWriter` isn't thread-safe; latent
+race.
+
+**Parsing:** `MjpegInputStream` parses headers with `java.util.Properties.load`
+— fragile for MJPEG (backslash/whitespace/encoding quirks); a plain CRLF header
+line-scanner is more faithful to `multipart/x-mixed-replace`.
+
+**Security:** `usesCleartextTraffic="true"` is global; targetSdk 36 defaults
+cleartext OFF. Scope to the robot host via Network Security Config
+`<domain-config>` instead (Play flags cleartext).
+
+#### Part B — Domain knowledge (durable reference)
+
+**Raw TCP sockets in an Activity (gamepad pattern):** per Android docs, work
+that runs only while the user interacts belongs on a thread/executor created by
+the component, NOT a Service — a Service spawns its own thread anyway and a
+started Service is still killable. A **foreground Service** is only for
+surviving the user leaving the app, and needs a declared
+`android:foregroundServiceType` + permission on targetSdk 34+ and Play scrutiny
+(a gamepad connection has no natural FGS type). **The real problem is
+rotation**: an Activity-owned socket is closed/reopened on every config change.
+The recommended fix is a **ViewModel-owned** connection (survives rotation,
+`onCleared()` closes it) — process death still kills it, but settings live in
+SharedPreferences so re-derivation is free.
+
+**Threading model:** coroutines are the modern recommendation, but the socket
+must be cancelled cooperatively — a blocking `read()` will NOT cancel; the only
+reliable unblock is closing the socket/connection from another thread. Keep the
+single dedicated connection thread + SurfaceView render thread if not migrating
+to coroutines; create the pool once, not per connection.
+
+**MJPEG-over-HTTP client:** `multipart/x-mixed-replace` — per-part
+`Content-Length` is often ABSENT, so byte-scan to the next boundary. Read/socket
+timeouts must exceed the inter-frame gap (else a paused robot causes a
+needless reconnect). On any IOException: tear down fully + reconnect (with
+backoff); validate HTTP 200 + Content-Type first. `InputStream.read` blocks and
+is not interruptible — unblock by disconnecting. Decode JPEGs off the network
+thread; reuse Bitmaps; always draw the LATEST complete frame.
+
+**SurfaceView vs TextureView:** SurfaceView is the recommended, higher-perf
+pattern for a render thread (`lockCanvas`); it punches a hole in the window so
+sibling overlays cost an alpha-blend per frame, and post-layout transforms of
+siblings glitch below API 24. TextureView behaves like a normal View (overlays
+"just work") but does an extra buffer copy per frame and has
+hardware-acceleration + single-producer constraints. For this app the FPS text
+is already drawn INTO the Surface canvas — keep it that way (fastest).
+
+**ViewModel/StateFlow:** ViewModel is the sanctioned "business logic state
+holder"; survives rotation, cleared on Activity finish via `onCleared()`
+(close the socket there). `viewModelScope` is hardcoded to `Dispatchers.Main` —
+background it with `withContext(Dispatchers.IO)` for socket work. Don't hold a
+Context in a ViewModel (use `AndroidViewModel` if you must). Expose connection
+state as an immutable `StateFlow<ConnectionState>` (sealed
+Connecting/Connected/Disconnected); collect with
+`repeatOnLifecycle(STARTED)` — NOT the deprecated `launchWhenX` (they suspend
+instead of cancel, wasting resources). `SavedStateHandle` = survives process
+death; only primitives/small strings (never sockets/threads). UI-logic state →
+`onSaveInstanceState`.
+
+**Preferences in 2026:** androidx.preference is still the documented settings
+UI (the platform `android.preference` package is deprecated since API 29).
+Backend defaults to SharedPreferences; **DataStore** is the recommended storage
+layer (async, transactional, Flow reads, singleton per file) via
+`PreferenceDataStore`. The `OnSharedPreferenceChangeListener` is held strongly
+and process-global — an Activity that registers one and skips unregister LEAKS;
+the fragment-managed `setOnPreferenceChangeListener` or a DataStore Flow avoids
+manual lifetime entirely.
+
+**Sensors:** register in `onResume`, unregister in `onPause` (hard best
+practice — the system doesn't disable sensors on screen-off; unregistered
+listeners drain battery). Use the slowest rate that works (`SENSOR_DELAY_NORMAL`
+= 200ms, `UI` = 60ms, `GAME` = 20ms; capped at 200 Hz). For a gamepad wheel,
+`SENSOR_DELAY_GAME` is the sweet spot.
+
+**Edge-to-edge (targetSdk 35+/36):** enforced — the window draws behind the
+system bars automatically; you must handle insets. `WindowCompat.enableEdgeToEdge`
+for older devices. The options-menu + `onCreateOptionsMenu` pattern is still
+current; the modernization is hosting it in a `MaterialToolbar` rather than the
+legacy ActionBar.
+
+**Kotlin idioms:** prefer string templates to `String.format` for pure
+interpolation (keep format only for locale-aware numeric padding); the current
+recommendation is **`Locale.ROOT`, not `Locale.US`** (detekt 2.0-alpha.6 ships
+a rule). Prefer `if` for binary conditions, `when` for 3+ options; `data class`
+for value holders (e.g. `TouchPadController.Command`); `@JvmField`/`@JvmOverloads`/
+`@JvmStatic` exist only for Java interop — this repo has 0 Java files, so they
+are dead weight to remove. Default to `private`, use `internal` only for
+cross-package test access.
+
+**AGP 9 / Gradle 9 build:** AGP 9 runtime-depends on KGP 2.2.10 (the repo's
+built-in Kotlin). Config cache is preferred and will be on by default in Gradle
+10; when active it FORCES intra-project parallelism (the spotlessApply-vs-test
+race is inherent — two-invocation gate.ps1 is correct). Version catalogs
+(`gradle/libs.versions.toml`) are the documented centralization (Google's AGP-9
+migration docs assume TOML). Dependency locking optional at this size. **detekt
+1.23.8 predates AGP 9** (built vs AGP 8.8/Gradle 8.12) — 2.0.0-alpha.3+ adds
+real built-in-Kotlin support; upgrade when stable, don't disable config-cache if
+detekt flakes. ktfmt = deterministic zero-config formatter; ktlint = linter
+(de-facto standard, ships detekt integration). Lint 9.3.1: report-output DSL
+(`htmlReport`/`textReport`) is deprecated → `SingleArtifact.LINT_*_REPORT`;
+known lint bugs (SDK resolution not a task input → caching, "Could not clean up
+K2 caches"). The repo's "generate baselines with aggregate `lint`" rule matches
+the docs.
+
+**Robolectric:** PAUSED is the only recommended LooperMode (LEGACY deprecated).
+Threads/executors are NOT under the shadow scheduler — stop every
+ExecutorService explicitly and gate on latches/timeouts. Plain
+`java.net.Socket` works on the JVM. **Robolectric 4.16 dropped API 21/22 (min
+now 23)** — the app's minSdk is 21, so `Config.OLDEST_SDK` resolves to 23;
+verify that's intended. `@Config(sdk = [OLDEST, TARGET, NEWEST])` triples run
+time (each SDK downloads its own android-all jar). Known AGP-9 issue: built-in
+Kotlin breaks kapt-based custom-shadow registration (workaround
+`com.android.legacy-kapt`; fix = KSP).
+
+**Espresso on headless CI:** `RootViewWithoutFocusException` causes are system
+overlays/dialogs, animations mid-flight, keyguard, keyboard, immersive
+confirmation. Fixes: disable all 3 animation scales, dismiss keyguard, request
+focus, `inRoot(...)`, verify with `dumpsys window mCurrentFocus`. Custom
+ViewActions: always send UP in `finally` (a missed UP hangs); coords must be
+within the view's visible bounds; known Espresso bugs to avoid replicating
+(TOOL_TYPE_UNKNOWN swipes, coordinate defect #1840).
+
+**CI emulator:** aosp_atd = less CPU/faster boot/no GMS but documented as less
+reliable for complex UI tests (this repo's 9 tests pass — fine). Use KVM on
+ubuntu-latest; `swiftshader_indirect` is the correct headless GPU.
+Orchestrator: per-test restarts (crash isolation + clean package data) vs
+runtime cost — for a 9-test suite it's a deliberate keep; re-weigh if it grows.
+Fixed `localhost:12345` DummyServer port collides if ever sharded.
+
+**JaCoCo:** branch > line as a signal; a 95/80 gate matches the recommended
+shape. `includeNoLocationClasses` defaults false (Kotlin classes silently
+excluded → report can look better than reality). Verification task reports only
+the FIRST violated rule. Instrumented tests aren't covered by the JVM agent
+(offline instrumentation needed) — the 95/80 gate measures Robolectric + JVM
+only. Coverage measures what RAN, not correctness — the wheel-step and TYPE_ALL
+bugs passed a 95/80 gate because their tests assert "no crash", not real
+behavior.

@@ -44,6 +44,26 @@ B2 → B4 → C → B3 → A → D → E → F. Full detail + execution record:
   DummyServer note already in TESTING.md) + MEMORY retrospective added.
   **Campaign 2 complete.**
 
+## Campaign 3 — strict full-project review (planned 2026-08-08)
+
+Full code audit + web best-practice research; findings and durable reference in
+MEMORY.md "Domain review". Priorities: **P0 correctness → P1 leak fix → P2
+architecture → P3 hygiene** (each item one commit, gate, push; detailed plan:
+`.PLAN.md` "Campaign 3").
+
+- **P0** Fix `Integer.getInteger` wheel-step bug (setting never applies);
+  `Sensor.TYPE_ALL` → `TYPE_ACCELEROMETER` (NPE risk + log spam); keepalive
+  timer ordering; `mSender!!` guard.
+- **P1** MJPEG render-thread/socket leak on pause/resume — unblock the blocking
+  read by closing the connection from another thread.
+- **P2** Hoist `SenderService` into an Activity-scoped ViewModel; expose
+  `StateFlow<ConnectionState>` + `repeatOnLifecycle(STARTED)`; remove the
+  `OnSharedPreferenceChangeListener` leak footgun.
+- **P3** Network Security Config for cleartext (scope to robot host); MJPEG
+  header line-scanner (drop `Properties.load`); Kotlin idiom cleanup
+  (`@JvmOverloads`, `Locale.ROOT`); detekt 2.0.0 when stable; version catalogs;
+  AGP 9.3 lint report-DSL migration.
+
 ## Phase 1 — Instrumented CI without macOS
 
 Explicit decision: **no macOS/GPU runner.** ✅ **DONE — experiment 2 won.**

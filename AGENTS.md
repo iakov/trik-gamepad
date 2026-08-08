@@ -213,6 +213,7 @@ Details live in `MEMORY.md` — pull a section on demand:
 | CI (GitHub Actions), emulator prerequisites | CI quirks |
 | Branch/PR and release workflows | Workflows |
 | Rationale for tool choices and past fixes | Design decisions |
+| Full-project audit findings + Android/Kotlin/CI best-practice reference (ViewModels, coroutines, MJPEG, SurfaceView, sensors, lint, detekt, JaCoCo) | Domain review |
 
 ## Current work
 
