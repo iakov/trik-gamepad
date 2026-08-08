@@ -142,7 +142,7 @@ spotbugs {
     // resolve java.rmi.Remote and other JDK-platform types that android.jar
     // references, which aborts analysis with a missing-class error. Only our
     // own code is of interest anyway.
-    onlyAnalyze = ['com.trikset.*', 'com.demo.*']
+    onlyAnalyze = ['com.trikset.*']
 }
 
 detekt {

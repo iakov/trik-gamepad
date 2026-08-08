@@ -155,7 +155,8 @@ full recipe.
 
 ### MJPEG video
 
-`com.demo.mjpeg` package (`MjpegView`, `MjpegInputStream`, `VideoStreamLoader`). Default URI
+`com.trikset.gamepad.mjpeg` package (`MjpegView`, `MjpegInputStream`,
+`MjpegFrameRenderer`; renamed from `com.demo.mjpeg` in Phase 5). Default URI
 `http://<host>:8080/?action=stream`, rebuilt from `SK_VIDEO_URI`; changing the
 host address rewrites the video URI to match. The stream **reconnects on error**,
 not on a timer: `MjpegView.MjpegRenderThread` stops on `IOException` and invokes
@@ -519,7 +520,8 @@ down. Recorded so future sessions do not re-discover them.
 - **`onlyAnalyze` is required on JDK 17+.** Without it, analysis of
   `android.jar` references aborts: "The following classes needed for analysis
   were missing: java.rmi.Remote" (exit code 3). Restrict to app packages:
-  `onlyAnalyze = ['com.trikset.*', 'com.demo.*']`.
+  `onlyAnalyze = ['com.trikset.*']` (the old `com.demo.*` was dropped when the
+  vendored mjpeg package was renamed in Phase 5).
 - **SpotBugs engine version** comes from `toolVersion` (4.10.3); find-sec-bugs
   1.14.0 is added via `spotbugsPlugins`. The engine is NOT a separate `spotbugs`
   dependency line.

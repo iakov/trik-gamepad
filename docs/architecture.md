@@ -30,10 +30,10 @@ constants in `SettingsFragment`.
 - `com.trikset.gamepad` — app logic: `MainActivity`, `SettingsActivity`,
   `SettingsFragment`, `SenderService` (TCP), `SquareTouchPadLayout` (pads),
   `VideoStreamLoader` (MJPEG HTTP opener).
-- `com.demo.mjpeg` — the MJPEG player (vendored origin, now first-party):
-  `MjpegView` (SurfaceView + render thread), `MjpegInputStream` (frame
-  parser), `MjpegFrameRenderer` (decoding + letterbox + FPS overlay).
-  Renamed to `com.trikset.gamepad.mjpeg` on the ROADMAP (Phase 5).
+- `com.trikset.gamepad.mjpeg` — the MJPEG player (vendored origin, renamed
+  from `com.demo.mjpeg` in Phase 5): `MjpegView` (SurfaceView + render
+  thread), `MjpegInputStream` (frame parser), `MjpegFrameRenderer` (decoding
+  - letterbox + FPS overlay).
 
 ## TCP command protocol (`SenderService`)
 

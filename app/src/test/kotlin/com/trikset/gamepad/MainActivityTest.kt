@@ -2,7 +2,7 @@ package com.trikset.gamepad
 
 import android.view.View
 import androidx.preference.PreferenceManager
-import com.demo.mjpeg.MjpegView
+import com.trikset.gamepad.mjpeg.MjpegView
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import org.junit.Assert.assertEquals

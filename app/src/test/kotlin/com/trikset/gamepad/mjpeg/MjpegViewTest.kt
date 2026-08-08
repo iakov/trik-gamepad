@@ -1,4 +1,4 @@
-package com.demo.mjpeg
+package com.trikset.gamepad.mjpeg
 
 import java.io.ByteArrayInputStream
 import org.junit.Assert.assertNotNull

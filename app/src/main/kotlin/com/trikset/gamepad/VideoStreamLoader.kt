@@ -3,8 +3,8 @@ package com.trikset.gamepad
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import com.demo.mjpeg.MjpegInputStream
-import com.demo.mjpeg.MjpegView
+import com.trikset.gamepad.mjpeg.MjpegInputStream
+import com.trikset.gamepad.mjpeg.MjpegView
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL

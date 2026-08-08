@@ -1,6 +1,6 @@
 package com.trikset.gamepad
 
-import com.demo.mjpeg.MjpegView
+import com.trikset.gamepad.mjpeg.MjpegView
 import java.net.URL
 import org.junit.Assert.assertNull
 import org.junit.Test

@@ -25,7 +25,7 @@ import androidx.core.view.MenuItemCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import com.demo.mjpeg.MjpegView
+import com.trikset.gamepad.mjpeg.MjpegView
 import java.net.URL
 
 /**

@@ -1,4 +1,4 @@
-package com.demo.mjpeg
+package com.trikset.gamepad.mjpeg
 
 import android.content.Context
 import android.graphics.Canvas

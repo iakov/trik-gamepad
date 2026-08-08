@@ -1,4 +1,4 @@
-package com.demo.mjpeg
+package com.trikset.gamepad.mjpeg
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory

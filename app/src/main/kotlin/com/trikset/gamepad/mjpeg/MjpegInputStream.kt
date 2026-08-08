@@ -1,4 +1,4 @@
-package com.demo.mjpeg
+package com.trikset.gamepad.mjpeg
 
 import android.util.Log
 import java.io.BufferedInputStream
