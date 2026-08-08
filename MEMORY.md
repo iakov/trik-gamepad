@@ -419,6 +419,14 @@ even though `config.ini` declares `firstboot.saveToLocalSnapshot=yes` — a
 snapshot-policy discrepancy to revisit. Never pass `-no-snapshot` for local
 iteration; only for pristine CI-style cold boots.
 
+**Resolution (2026-08-08):** this is a local-only cosmetic quirk, not a bug.
+`emulator -help-snapshot` confirms save/load follows the emulator's own config
+resolution; the aosp_atd image is CI-oriented (snapshot writing is inert even
+with `firstboot.saveToLocalSnapshot=yes`), while snapshot *loading* still works
+(boot ~0 s from the existing `default-boot` snapshot). CI always uses
+`-no-snapshot`, so this never affects the pipeline. Closed as investigated;
+no config change needed.
+
 ### [2026-08-06] Immersive mode confirmation steals focus on API 35+ (instrumented tests)
 
 **Context:** after the SDK 36 / targetSdk 36 upgrade, every Espresso
@@ -1307,3 +1315,76 @@ tests green; only spotless formatting remained at close.
   96.4% — per the JaCoCo XML), then A/D/E.
 - Next session: finish B2 (spotlessApply → gate → commit), then B3, B4, C,
   A, D, E per .PLAN.md Campaign 2 table.
+
+### [2026-08-08] Campaign 2 execution run — B2..E landed, CI hardening + cache tuning
+
+**Context:** a long full-auto run executed Campaign 2 in order
+B2 → B4 → C → B3 → A → D → E. All landed on `feat/global-refresh` (fork
+origin). CI went green on the final head (`31259006525`: build 5m08s +
+instrumented 3m33s, 9/9).
+
+**What landed (commits in order):**
+
+- `3ac7c7e` refactor: extract `SystemUiController` from MainActivity (B2 —
+  spotlessApply then gate; the working-tree in-flight work was committed
+  as-is after formatting).
+- `53c55f6` refactor: extract `TouchPadController` from SquareTouchPadLayout
+  (B4). **Signature note:** the planned stateless
+  `nextCoordinates(x, y, maxX, maxY, prevX, prevY)` hit detekt
+  `LongParameterList` (threshold 6), so the controller owns `prevX/prevY`
+  internally → `nextCoordinates(x, y, maxX, maxY): Command?`. This also
+  removed the layout's `prevX/prevY` fields entirely. TouchPadControllerTest
+  is 100% JaCoCo (4/4 branch).
+- `04cb084` test: direct MainActivitySettingsController coverage (fake
+  `SettingsUi`; uncovered branches: title-failure toast, addr-unchanged
+  no-rewrite, pads-alpha clamps, empty-video-URI).
+- `af22a16` + `6f95589` test: branch coverage push + ratchet gate to
+  **95% line / 80% branch** (measured **97.3% / 81.9%**). Key technique:
+  the lifecycle null-branches in MainActivity's `onPause`/`onResume` were
+  only coverable by **explicitly `setField(activity, ..., null)` via
+  reflection** before invoking — the layout always provides non-null views,
+  so the earlier "no-op" lifecycle tests covered nothing.
+- `13a6ad8` refactor: split SenderService inner classes (`ConnectRunnable`,
+  `KeepAliveTimer`) into own files (B3). `KeepAliveTimer` gained a sender
+  reference + `restart`/`stop`; `ConnectRunnable` delegates to
+  `sender.connectToTRIK()` + `onConnectionFinished()`.
+- `8fe0d03` ci: add concurrency guard (`concurrency: ci-<wf>-<ref>`,
+  cancel-in-progress) — cancelled a stale run live during the session.
+- `44ba0b7` build: migrate to plugins DSL (E, AGP 9 prep). `apply plugin:` +
+  `buildscript` + `allprojects` removed; plugin versions move to
+  `settings.gradle` `plugins {}` block with `apply false`. No AGP/Gradle
+  bump. The `AndroidGradlePluginVersion` lint-baseline entry became stale
+  (it pointed at the removed `classpath` line) and was removed — baseline is
+  now just the core-ktx `GradleDependency` entry.
+- `3f58eab` test: bound await in `sendWhileConnectedShouldSkipReconnect`
+  (see trap below).
+- `55e32ba` ci: enable gradle cache write-back + `org.gradle.parallel=true`
+  (D). The build job's `cache-read-only: ${{ github.ref != 'refs/heads/master' }}`
+  meant the cache was NEVER written (single-branch no-PR never pushes
+  master) — every CI run was cold. Set `cache-read-only: false` on both jobs.
+
+**Traps hit / lessons:**
+
+1. **CI caught a race in a new test.** `sendWhileConnectedShouldSkipReconnect`
+   asserted `server.receivedContains("two")` immediately after `runAll()` +
+   `idle()`. The DummyServer reads asynchronously, so under CI load the second
+   command hadn't been read yet → `AssertionError` on `[23]` (and it failed
+   identically across 3 runs before the fix). Fixed with a bounded poll loop
+   (same pattern as `keepaliveShouldBeSentWhileConnected`). LESSON: **any
+   assert on server-received data must be a bounded await, never a bare
+   assert** — the async server thread is the whole point of the `await*`
+   helpers. This validates the "run the full suite twice" rule; local ran
+   green but CI did not.
+1. **The ratchet needs real headroom.** BRANCH 81.9% vs the 80% gate is 1.9pt
+   — enough. The plan's "measured 93/72" was instruction/line confusion;
+   LINE was ~97% the whole time; the entire C push was BRANCH 72.6 → 81.9.
+1. **Robolectric parallel-variant lock race** (`Couldn't create lock file ~/.robolectric-download-lock`) hit once on the release variant — the 3
+   parallel test JVMs race for the user-level download lock. Transient;
+   re-running the variant passed. Not caused by the plugins-DSL migration.
+1. **`org.gradle.parallel=true` is low-risk here** (single module) but also
+   low-reward; the real D win was the cache write-back.
+
+**State at close:** B2/B3/B4/C/E done; A has the concurrency guard +
+3+ observed runs; D has cache write-back + parallel (one green run
+measured). Remaining: F retrospective docs (this entry), final .PLAN.md /
+ROADMAP status update, and the CI flake-rate conclusion (see .PLAN.md).

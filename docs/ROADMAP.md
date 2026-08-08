@@ -16,26 +16,32 @@ spotlessCheck) before each push, `git status --short` clean before push.
 Scope set by user decision (2026-08-08). **Strategy: coverage-first** — increase
 test coverage before refactoring, maintain it through refactoring (B4 is the one
 granted exception: it reduces test-writing complexity). Revised order
-B2 → B4 → C → B3 → A → D → E → F. Full detail + in-flight crash-safety state:
+B2 → B4 → C → B3 → A → D → E → F. Full detail + execution record:
 `.PLAN.md` "Campaign 2".
 
 - **B1** ✅ `MagicButtonPanel` extracted (buttons + haptic; direct tests). `ee4a91b`.
-- **B2** 🔶 `SystemUiController` extracted (immersive toggle + auto-hide);
-  in flight, spotless-pending; show-then-auto-hide UX confirmed by user.
-- **B4** ⬜ `TouchPadController` pure touch-math (BEFORE C — reduces test complexity).
-- **C** ⬜ Coverage → **95 line / 80 branch floor** (LINE already 96.9%;
-  the work is BRANCH 72.6 → 80); targets: MainActivity 39/68, MjpegInputStream
-  20/26, SettingsFragment 6/10, MainActivitySettingsController 8/12, MjpegView
-  7/10, SenderService 21/24, MjpegFrameRendererKt 0%; ratchet gate as measured.
-- **B3** ⬜ SenderService inner classes → separate files (after C — no test
-  benefit, keep the coverage net green).
-- **A** ⬜ CI hardening (concurrency guard; aosp_atd flake-rate probe ×3;
-  batch-split if flaky).
-- **D** ⬜ CI cache tuning (measure; parallel/jvmargs/CC-strict; one CI run each).
-- **E** ⬜ AGP-9 PREP ONLY (settings.gradle + buildscript → plugins DSL; stay
-  on AGP 8.13.2 / Gradle 8.14.5; no version bump).
-- **F** ⬜ Cleanup (emulator snapshot discrepancy, DummyServer note) +
-  final retrospective.
+- **B2** ✅ `SystemUiController` extracted (immersive toggle + auto-hide;
+  `lazy`-wired in MainActivity; direct tests). `3ac7c7e`.
+- **B4** ✅ `TouchPadController` pure touch-math (owns prevX/prevY; 100%
+  JaCoCo). `53c55f6`.
+- **C** ✅ Coverage → **95 line / 80 branch floor** (measured **97.3% / 81.9%**,
+  ratcheted `6f95589`); targets hit: MainActivity lifecycle null-branches,
+  MainActivitySettingsController (11/12), SettingsFragment summary paths,
+  SquareTouchPadLayout, SenderService reconnect, MjpegFrameRenderer bitmap
+  reuse. Remaining gaps (MainActivity onCreate/onDestroy view-null paths,
+  MjpegInputStream parser edges, SenderService `Log.isLoggable` branches) are
+  not cleanly reachable under Robolectric.
+- **B3** ✅ SenderService inner classes (`ConnectRunnable`, `KeepAliveTimer`)
+  → own files. `13a6ad8`.
+- **A** 🔶 Concurrency guard landed (`8fe0d03`); aosp_atd flake probe 1/1 green
+  on the final head; batch-split only if the ×3 probe shows flakes.
+- **D** 🔶 Cache write-back + `org.gradle.parallel=true` landed (`55e32ba`,
+  one green run); further jvmargs/CC-strict tuning optional.
+- **E** ✅ AGP-9 PREP ONLY (settings.gradle + buildscript → plugins DSL; still
+  AGP 8.13.2 / Gradle 8.14.5; lint baseline trimmed to core-ktx entry). `44ba0b7`.
+- **F** 🔶 Cleanup (emulator snapshot discrepancy **closed as cosmetic**;
+  DummyServer note already in TESTING.md) + MEMORY retrospective added; final
+  retrospective wrap-up next.
 
 ## Phase 1 — Instrumented CI without macOS
 
