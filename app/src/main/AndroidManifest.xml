@@ -3,14 +3,14 @@
     xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-feature android:name="android.hardware.screen.landscape" android:required="true" />
-    <uses-feature android:name="android.hardware.touchscreen.multitouch.distinct" android:required="true" />
+    <uses-feature android:name="android.hardware.touchscreen.multitouch.distinct" android:required="false" />
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
 
   <!--  <uses-permission android:name="android.permission.VIBRATE" /> -->
 
     <application
-        android:icon="@drawable/trik_gamepad_logo_512x512"
+        android:icon="@mipmap/trik_gamepad_logo_512x512"
         android:label="@string/appLabel"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="true"
@@ -27,7 +27,7 @@
         </activity>
         <activity
             android:name="com.trikset.gamepad.SettingsActivity"
-            android:label="@string/title_activity_settings"
+            android:label="@string/menu_settings"
             android:parentActivityName=".MainActivity"
             android:theme="@style/Theme.AppCompat.Light.NoActionBar.FullScreen">
             <meta-data

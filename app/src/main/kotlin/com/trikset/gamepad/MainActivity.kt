@@ -71,7 +71,7 @@ class MainActivity :
     if (actionBar != null) {
       actionBar.setDisplayShowHomeEnabled(true)
       actionBar.setDisplayUseLogoEnabled(false)
-      actionBar.setLogo(R.drawable.trik_gamepad_logo_512x512)
+      actionBar.setLogo(R.mipmap.trik_gamepad_logo_512x512)
       actionBar.setDisplayShowTitleEnabled(true)
     }
 
