@@ -12,6 +12,9 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Maintains one TCP connection to the robot and sends newline-terminated plain-text commands (`pad1
@@ -50,6 +53,8 @@ class SenderService(
   private var mHostAddr: String? = null
   private var mHostPort = 0
   private val keepAliveTimer = KeepAliveTimer(this, keepAliveScheduler)
+  private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected(""))
+  val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
   fun setShowTextCallback(showTextCallback: OnEventListener<String>?) {
     this.showTextCallback = showTextCallback
@@ -64,6 +69,7 @@ class SenderService(
       if (mConnectTask != null) {
         return
       }
+      _connectionState.value = ConnectionState.Connecting
       val task = ConnectRunnable(this)
       mConnectTask = task
       executor.execute(task)
@@ -88,6 +94,7 @@ class SenderService(
         keepAliveTimer.restart()
         try {
           mOut = PrintWriter(osw, true)
+          _connectionState.value = ConnectionState.Connected
         } catch (e: Exception) {
           Log.e("TCP", "GetStream: Error", e)
           socket.close()
@@ -131,6 +138,7 @@ class SenderService(
         Log.d(TCP_TAG, "Disconnected.")
       }
       onDisconnectedListener?.onEvent(reason)
+      _connectionState.value = ConnectionState.Disconnected(reason)
     }
   }
 

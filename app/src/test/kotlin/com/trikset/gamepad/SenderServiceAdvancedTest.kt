@@ -52,6 +52,24 @@ class SenderServiceAdvancedTest {
   }
 
   @Test
+  fun connectionStateShouldTransitionConnectingConnectedDisconnected() {
+    ReadUntilStopServer().use { server ->
+      val client = SenderService(mExecutor)
+
+      client.setTarget("localhost", server.getPort())
+      client.send("test")
+      assertEquals(ConnectionState.Connecting, client.connectionState.value)
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+      assertTrue(server.awaitConnection())
+      assertEquals(ConnectionState.Connected, client.connectionState.value)
+
+      client.disconnect("Bye")
+      assertEquals(ConnectionState.Disconnected("Bye"), client.connectionState.value)
+    }
+  }
+
+  @Test
   fun setTargetShouldDisconnectWhenChanged() {
     ReadUntilStopServer().use { first ->
       val client = SenderService(mExecutor)

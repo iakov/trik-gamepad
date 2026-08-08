@@ -20,8 +20,12 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.MenuItemCompat
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import com.trikset.gamepad.mjpeg.MjpegView
 import java.net.URL
+import kotlinx.coroutines.launch
 
 /**
  * The gamepad: two touch pads, five magic buttons, a sensor-driven wheel and the MJPEG video
@@ -88,7 +92,6 @@ class MainActivity :
       magicButtons.populate(buttonsView, MAGIC_BUTTON_COUNT)
     }
 
-    getSenderService().setOnDisconnectedListener { toast("Disconnected." + it) }
     getSenderService().setShowTextCallback { toast(it) }
 
     val btnSettings = findViewById<Button>(R.id.btnSettings)
@@ -133,6 +136,22 @@ class MainActivity :
         }
         else -> super.onOptionsItemSelected(item)
       }
+
+  override fun onStart() {
+    super.onStart()
+    // Observe the TCP connection state for its lifetime; repeatOnLifecycle
+    // (not the deprecated launchWhenX) so the collection stops on STOP and
+    // restarts fresh on each START (no stale emissions across pauses).
+    lifecycleScope.launch {
+      repeatOnLifecycle(Lifecycle.State.STARTED) {
+        senderViewModel.connectionState.collect { state ->
+          if (state is ConnectionState.Disconnected && state.reason.isNotEmpty()) {
+            toast("Disconnected." + state.reason)
+          }
+        }
+      }
+    }
+  }
 
   override fun onPause() {
     mSensorManager?.unregisterListener(this)
@@ -246,7 +265,6 @@ class MainActivity :
     findViewById<SquareTouchPadLayout>(R.id.rightPad)?.setSender(null)
     mSettingsController?.unregister()
     mSettingsController = null
-    getSenderService().setOnDisconnectedListener(null)
     getSenderService().setShowTextCallback(null)
     super.onDestroy()
   }

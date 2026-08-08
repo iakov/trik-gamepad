@@ -1,6 +1,7 @@
 package com.trikset.gamepad
 
 import androidx.lifecycle.ViewModel
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * Activity-scoped owner of the [SenderService] (Campaign 3 P2). Survives configuration changes so
@@ -13,6 +14,8 @@ class SenderViewModel : ViewModel() {
 
   var sender: SenderService = SenderService()
     internal set
+
+  val connectionState: StateFlow<ConnectionState> = sender.connectionState
 
   override fun onCleared() {
     sender.disconnect("ViewModel cleared")
