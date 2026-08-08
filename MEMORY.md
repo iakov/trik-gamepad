@@ -1107,3 +1107,32 @@ than guess; (4) implement only proved, reasonable decisions.
 
 **Consequences:** future "go full auto mode" instructions carry this contract
 without re-explaining it; rationale lives here, rule text lives in AGENTS.md.
+
+### [2026-08-08] Lint baseline cleanup: 11 → 2 (ROADMAP Phase 6)
+
+**Context:** the strict-lint baseline had 11 entries (AGP/deps/resources from
+the Kotlin-migration head). Phase 6 drove it to 2, leaving only the two
+version-lock entries that are recorded, intentional decisions.
+
+**Changes (fix / keep / convert):**
+
+- `GradleDependency annotation 1.9.1 → 1.10.0`: **fixed** (bump in
+  `app/build.gradle`).
+- `UnsupportedChromeOsHardware` (multitouch.distinct `required="true"`):
+  **fixed** to `required="false"` — the pads track a single pointer each
+  (`SquareTouchPadLayout` has no multi-pointer math), so the app runs fine on
+  devices without distinct multitouch; Chrome OS installs are allowed.
+- `UnusedResources` ×2 (`menu_wheel_condensed`, `pref_header_general`):
+  **deleted**.
+- `DuplicateStrings` ×2 ("Settings", "Wheel"): **consolidated**. One
+  `menu_settings` resource now serves the action-bar title, the menu title, and
+  the Settings activity label (`strings_activity_settings.xml` deleted).
+- `IconLocation` ×2: **moved to density buckets** — `trik_gamepad_logo_512x512`
+  → `mipmap-xxxhdpi`, `oxygen_actions_transform_move_icon` → `drawable-nodpi`.
+- `ConvertToWebp` ×2: **converted** with ImageMagick (available locally; no
+  cwebp in the SDK) to lossless `.webp` (24 KB → 7 KB, 20 KB → 5 KB). The
+  logo was resized to 192×192 to satisfy `IconExpectedSize` for xxxhdpi.
+
+**Kept baselined (recorded decisions):** `AndroidGradlePluginVersion` (AGP 9
+deferred, R7/ROADMAP Phase 7) and `GradleDependency core-ktx 1.19.0` (minSdk 21
+lock). No relaxation in `lint.xml` was needed; the baseline is the ratchet.
