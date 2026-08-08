@@ -49,8 +49,9 @@ Commands are newline-terminated plain text:
 
 Connection setup: connect timeout 5 s, `tcpNoDelay`, `keepAlive`,
 `setSoLinger(true, 0)`, traffic class `0x0F`, input half-close. All network
-work runs on one shared single-thread executor (`SenderService.mExecutor`,
-static, injectable via `setExecutor` for tests). `connectAsync()` is guarded
+work runs on a single-thread executor injected via the `SenderService`
+constructor (default `Executors.newSingleThreadExecutor()`; tests substitute a
+Robolectric `PausedExecutorService`). `connectAsync()` is guarded
 by a `syncFlag` so only one connect task is ever in flight.
 
 `send()` lazily connects, posts the write to the executor, and confirms on the
@@ -60,17 +61,11 @@ the host or port changes (the preference listener calls it on every change).
 
 ### Keepalive
 
-`DEFAULT_KEEPALIVE = 5000` ms, `MINIMAL_KEEPALIVE = 1000` ms. A `java.util.Timer`
-(`KeepAliveTimer`) fires every `keepaliveTimeout - 300` ms (300 ms "to
+`DEFAULT_KEEPALIVE = 5000` ms, `MINIMAL_KEEPALIVE = 1000` ms. A
+`ScheduledExecutorService` (constructor-injected, daemon-thread default)
+fires a keepalive tick every `keepaliveTimeout - 300` ms (300 ms "to
 compensate ping") and sends `keepalive <ms>`. Any sent command restarts the
 timer. The timeout is configurable via `SK_KEEPALIVE`.
-
-### Shared state (known hazard)
-
-`mExecutor`, `keepaliveTimeout`, and `mConnectTask` are **static** fields —
-they outlive any single `SenderService` instance, and tests must reset them
-(see `TESTING.md`). Constructor injection of the executor + keepalive period
-is planned (ROADMAP Phase 3).
 
 ## Input handling
 

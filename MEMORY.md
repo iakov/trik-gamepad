@@ -99,8 +99,9 @@ guaranteed listening before the client connects.
 `@RunWith(RobolectricTestRunner.class)`, `@LooperMode(PAUSED)`,
 `@Config(sdk = {Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK})`
 (the `[21]`/`[34]`/default suffixes in reports are the per-SDK runs), and a
-`PausedExecutorService` for the `SenderService` executor — `mExecutor.runAll()`
-drives background tasks deterministically, then `shadowOf(getMainLooper()).idle()`.
+`PausedExecutorService` injected via `SenderService(mExecutor)` —
+`mExecutor.runAll()` drives background tasks deterministically, then
+`shadowOf(getMainLooper()).idle()`.
 
 **Sensor shadow trap (MainActivityTest):** to feed the accelerometer wheel
 path, build the event with
@@ -135,7 +136,9 @@ full recipe.
 
 - One TCP connection to the robot, default `192.168.77.1:4444`; connect timeout
   `TIMEOUT = 5000` ms; `setTcpNoDelay(true)`, `setSoLinger(true,0)`,
-  `setTrafficClass(0x0F)`. Connect and send run on a single-thread executor.
+  `setTrafficClass(0x0F)`. Connect and send run on a single-thread executor
+  injected via the constructor (default `Executors.newSingleThreadExecutor()`;
+  tests substitute a Robolectric `PausedExecutorService`).
 - Commands are newline-terminated plain text: `pad1 x y`, `pad2 x y`,
   `btn N down`, `wheel <angle>`, `keepalive <ms>`.
 - `send()` lazily connects (`connectAsync()` guarded by `syncFlag`); a failed
@@ -146,9 +149,9 @@ full recipe.
 ### Keepalive
 
 `DEFAULT_KEEPALIVE = 5000` ms, `MINIMAL_KEEPALIVE = 1000` ms. The `KeepAliveTimer`
-(a `java.util.Timer`) schedules every `keepaliveTimeout - 300` ms ("300 in order
-to compensate ping"), sending `keepalive <ms>`. Sending any command restarts
-the timer.
+(an injected `ScheduledExecutorService`, daemon-thread default) schedules every
+`keepaliveTimeout - 300` ms ("300 in order to compensate ping"), sending
+`keepalive <ms>`. Sending any command restarts the timer.
 
 ### MJPEG video
 
@@ -544,7 +547,10 @@ stay ~0% (SurfaceView `lockCanvas` + hardware surface untestable in Robolectric)
 and are rewritten during the Kotlin migration. SenderService keeps
 `keepaliveTimeout`/`mConnectTask` **static** — new tests reset them via
 reflection in `@Before`/`@After` or the 3-variant suite flakes on the SDK-23
-config.
+config. **RESOLVED 2026-08-08 (ROADMAP Phase 3):** the statics were removed;
+`executor`/`keepaliveTimeout`/`mConnectTask` are now instance fields injected
+via the constructor, so the reflection reset is gone and the hazard no longer
+exists.
 
 ### [2026-08-06] CI emulator image: google_apis broken-pipe → aosp_atd
 
@@ -681,7 +687,9 @@ Several Robolectric-specific traps emerged.
   variant** (execution order). Fix: reset both statics via reflection in
   `@Before`/`@After` (`SenderServiceAdvancedTest`,
   `SquareTouchPadLayoutTest`). New tests that touch a real `SenderService`
-  must do the same.
+  must do the same. **Obsolete since 2026-08-08 (ROADMAP Phase 3):** the
+  statics were removed and replaced with constructor-injected instance
+  fields — new tests only need `SenderService(mExecutor)`.
 - **Test UI logic without a network dependency.** `SquareTouchPadLayoutTest`
   originally asserted TCP arrival (server latch), which flaked on CI under
   load. The pad's logic under test is command-string construction + touch
@@ -951,7 +959,9 @@ Java-interop/lint traps; each cost a build cycle to pin down.
   `mVideoURL`, `mWheelEnabled`, `mAngle`, `mWheelStep`;
   SenderService/SquareTouchPadLayout tests
   reflect static `mConnectTask`). The wheel-math reflection tests were removed
-  in Phase 2-F when `processSensor` was extracted into the pure `WheelController`.
+  in Phase 2-F when `processSensor` was extracted into the pure `WheelController`;
+  the static-`mConnectTask` reflection in SenderService/Advanced/pad tests was
+  removed in Phase 3 when the statics became constructor-injected fields.
 - **Inner classes/lambdas accessing private members → synthetic accessors** →
   lint `SyntheticAccessor`. Fix by making the member `internal` (SenderService)
   or path-scoping the suppression in lint.xml with rationale (MainActivity —

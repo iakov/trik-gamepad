@@ -97,11 +97,11 @@ asserting connected/command state.
 
 ### Robolectric determinism
 
-`@LooperMode(PAUSED)` + a `PausedExecutorService` injected via
-`client.setExecutor(...)` make background task execution deterministic:
-`mExecutor.runAll()` runs queued AsyncTask work; then idle the main looper to
-run `onPostExecute`. Do not rely on real threads for the `SenderService`
-executor.
+`@LooperMode(PAUSED)` + a `PausedExecutorService` injected via the
+`SenderService(mExecutor)` constructor make background task execution
+deterministic: `mExecutor.runAll()` runs queued AsyncTask work; then idle the
+main looper to run `onPostExecute`. Do not rely on real threads for the
+`SenderService` executor.
 
 ### Robolectric shadow traps
 
