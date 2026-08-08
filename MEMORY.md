@@ -1863,3 +1863,14 @@ drop/restore and perf tests run on the full `[OLDEST, TARGET, NEWEST]` triple.
 Also: the `MjpegInputStream` `available() < 2*contentLength` frame-drop gate is
 size-sensitive — small frames are dropped first when the client lags, so seeded
 frames should have comparable JPEG sizes, and clients should be paced (~50ms).
+
+**Gate trap hit live (Campaign 4):** after adding the two synthetic-server test
+files, the local `scripts/gate.ps1` detekt step "passed" while CI's detekt failed
+with 8 issues (`NestedBlockDepth` ×2, `SwallowedException` ×5, `UnusedPrivateProperty`
+×1). Root cause: detekt was **UP-TO-DATE** in the local run — Gradle didn't re-analyze
+the new files (they were added via the untracked-path after a cached config, and the
+detekt inputs weren't invalidated). The "Exit 0 ≠ the tool ran" rule applied to a
+*static-analysis task*, not just execution. Fix: run `./gradlew detekt --rerun-tasks`
+once after adding/renaming sources, then the normal gate. Prefer
+`--rerun-tasks` over trusting UP-TO-DATE for the analyzers on first analysis of
+new files.
