@@ -256,20 +256,6 @@ class MainActivityTest {
   }
 
   @Test
-  fun setSystemUiVisibilityHideShouldRun() {
-    val m = method(activity, "setSystemUiVisibility", Boolean::class.javaPrimitiveType!!)
-    m.invoke(activity, false)
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
-  }
-
-  @Test
-  fun setSystemUiVisibilityShowShouldRun() {
-    val m = method(activity, "setSystemUiVisibility", Boolean::class.javaPrimitiveType!!)
-    m.invoke(activity, true)
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
-  }
-
-  @Test
   fun createPadShouldWireSender() {
     val m = method(activity, "createPad", Int::class.javaPrimitiveType!!, String::class.java)
     m.invoke(activity, R.id.leftPad, "1")

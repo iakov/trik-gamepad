@@ -20,8 +20,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.MenuItemCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import com.trikset.gamepad.mjpeg.MjpegView
 import java.net.URL
 
@@ -32,7 +30,6 @@ import java.net.URL
 class MainActivity :
     AppCompatActivity(), SensorEventListener, MainActivitySettingsController.SettingsUi {
 
-  private var hideRunnable: HideRunnable? = null
   private var mSensorManager: SensorManager? = null
   private var mAngle = 0 // -100% .. +100%
   private var mWheelEnabled = false
@@ -43,6 +40,16 @@ class MainActivity :
   private var mSettingsController: MainActivitySettingsController? = null
   private val wheelController = WheelController()
   private val magicButtons = MagicButtonPanel(this) { getSenderService().send(it) }
+  // Lazy: `window` is only assigned during Activity.attach(), which runs after
+  // construction — a field initializer touching it would NPE/throw in Robolectric.
+  private val systemUiController: SystemUiController by lazy {
+    SystemUiController(
+        window,
+        mainViewProvider = { findViewById(R.id.main) },
+        actionBarProvider = { supportActionBar },
+        hideDelayMs = HIDE_DELAY_MS,
+    )
+  }
 
   private fun createPad(id: Int, strId: String) {
     val pad = findViewById<SquareTouchPadLayout>(id)
@@ -63,8 +70,7 @@ class MainActivity :
     WindowCompat.setDecorFitsSystemWindows(window, false)
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
-    hideRunnable = HideRunnable()
-    setSystemUiVisibility(false)
+    systemUiController.setVisibility(false)
     val actionBar = supportActionBar
     if (actionBar != null) {
       actionBar.setDisplayShowHomeEnabled(true)
@@ -91,7 +97,7 @@ class MainActivity :
       btnSettings.setOnClickListener {
         val actionBar1 = supportActionBar
         if (actionBar1 != null) {
-          setSystemUiVisibility(!actionBar1.isShowing)
+          systemUiController.setVisibility(!actionBar1.isShowing)
         }
       }
     }
@@ -183,28 +189,6 @@ class MainActivity :
     getSenderService().send("wheel $mAngle")
   }
 
-  private fun setSystemUiVisibility(show: Boolean) {
-    val mainView = findViewById<View>(R.id.main) ?: return
-    val controller = WindowCompat.getInsetsController(window, mainView) ?: return
-    if (show) {
-      controller.show(WindowInsetsCompat.Type.systemBars())
-      val actionBar = supportActionBar
-      if (actionBar != null) {
-        actionBar.show()
-      }
-    } else {
-      controller.hide(WindowInsetsCompat.Type.systemBars())
-      controller.setSystemBarsBehavior(
-          WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-      )
-    }
-    val hideRunnable = getHideRunnable()
-    if (hideRunnable != null) {
-      mainView.removeCallbacks(hideRunnable)
-      mainView.postDelayed(hideRunnable, HIDE_DELAY_MS)
-    }
-  }
-
   override fun setActionBarTitle(title: String): Boolean {
     val actionBar = supportActionBar
     return if (actionBar != null) {
@@ -247,14 +231,6 @@ class MainActivity :
     mSender = sender
   }
 
-  private fun getHideRunnable(): HideRunnable? = hideRunnable
-
-  private inner class HideRunnable : Runnable {
-    override fun run() {
-      setSystemUiVisibility(false)
-    }
-  }
-
   override fun onDestroy() {
     mSensorManager?.unregisterListener(this)
     val video = mVideo
@@ -263,8 +239,7 @@ class MainActivity :
       video.setOnStreamErrorListener(null)
       mVideo = null
     }
-    val mainView = findViewById<View>(R.id.main)
-    getHideRunnable()?.let { mainView.removeCallbacks(it) }
+    systemUiController.detach()
     val buttonsView = findViewById<ViewGroup>(R.id.buttons)
     if (buttonsView != null) {
       magicButtons.clearListeners(buttonsView)
@@ -277,7 +252,6 @@ class MainActivity :
     getSenderService().setOnDisconnectedListener(null)
     getSenderService().setShowTextCallback(null)
     mSender = null
-    hideRunnable = null
     super.onDestroy()
   }
 
