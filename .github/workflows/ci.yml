@@ -115,17 +115,10 @@ jobs:
             # Dismiss any keyguard and clear an overlay that may already be up.
             adb shell wm dismiss-keyguard
             adb shell input keyevent 4
-            # Swiftshader under KVM occasionally boots with a focus-less app
-            # window; retry the suite once to ride out the transient flake.
-            ./gradlew connectedDebugAndroidTest -PpreDexEnable=false
-            if [ $? -ne 0 ]; then
-              echo "instrumented run failed; retrying once"
-              adb shell am force-stop com.trikset.gamepad
-              # Re-apply the pre-empt on the retry too (a slow boot may still be racing).
-              adb shell 'i=0; while [ $i -lt 60 ]; do settings put secure immersive_mode_confirmations confirmed; [ "$(settings get secure immersive_mode_confirmations)" = "confirmed" ] && break; i=$((i+1)); sleep 1; done'
-              adb shell wm dismiss-keyguard
-              ./gradlew connectedDebugAndroidTest -PpreDexEnable=false
-            fi
+            # Retry once on failure. NOTE: reactivecircus/android-emulator-runner
+            # runs each `script:` LINE as its own `sh -c`, so the retry must be
+            # a single line (no if/fi block, no backslash continuation).
+            ./gradlew connectedDebugAndroidTest -PpreDexEnable=false || { echo "instrumented run failed; retrying once"; adb shell am force-stop com.trikset.gamepad; adb shell 'i=0; while [ $i -lt 60 ]; do settings put secure immersive_mode_confirmations confirmed; [ "$(settings get secure immersive_mode_confirmations)" = "confirmed" ] && break; i=$((i+1)); sleep 1; done'; adb shell wm dismiss-keyguard; ./gradlew connectedDebugAndroidTest -PpreDexEnable=false; }
 
       - name: Upload instrumented test results
         if: always()
