@@ -1451,3 +1451,31 @@ survives across tests in the same JVM — always pair with `unregister()` in a
 empty-video-URI branches are unreachable via the activity.
 
 **Plugins-DSL lint baseline** — see the "Lint baseline cleanup" entry update.
+
+### [2026-08-08] Configuration cache disabled — external keystore defeats it
+
+**Symptom:** every single Gradle invocation (both sessions, ~84 logs) printed
+`configuration cache cannot be reused because an input to unknown location has changed` — config-cache was silently invalidated on every run, delivering zero
+benefit while re-deriving the task graph each time.
+
+**Root cause (confirmed from the config-cache problem report):** two inputs
+Gradle cannot fingerprint:
+
+1. `file system entry "android-keystorage.jks"` — `app/build.gradle:40`
+   evaluates `keystoreFile.exists()` where `keystoreFile = file('../android-keystorage.jks')`
+   resolves **outside the project root** (`C:\Users\me\Documents\trik\android-keystorage.jks`).
+   Files outside the project are "unknown locations" to config-cache.
+1. `system property "https.proxyHost"` — read inside the AGP plugin
+   (`com.android.internal.application`); an AGP-internal sys-prop read we
+   cannot change from our build files.
+
+**Decision (user, 2026-08-08): disable configuration cache.**
+`gradle.properties`: `org.gradle.configuration-cache=false`. Rationale: it has
+delivered zero benefit (invalidated every run); the AGP sys-prop read is
+unfixable from our side, so even fixing the keystore might not restore reuse.
+Deferred to the AGP 9 migration (Gradle 9 makes config-cache the norm) — then
+re-evaluate. The keystore detection logic itself is unchanged (still
+`exists()`-gated, still local-only).
+
+**Implementation status: PENDING** (recorded in `.PLAN.md` — flip the property,
+verify two consecutive runs no longer print the message, run the gate once).

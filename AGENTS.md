@@ -81,6 +81,12 @@ configurations, update this section and the referenced config files.
   patterns.
 - Capture every rule deviation/missing rule NOW — end with `AGENTS.md`/
   `MEMORY.md` updated or an explicit decision not to.
+- **Frequency-scan the session logs, not just failures**: `grep -c` the session
+  command logs for repeated diagnostics (e.g. "configuration cache cannot be
+  reused", "Deprecated Gradle features", "spotlessKotlinCheck FAILED"), sort by
+  count, and root-cause the top ones. Recurring messages in *every* run mean a
+  systemic cause, not noise — this is how the config-cache invalidation and the
+  Gradle-9 deprecation warnings were missed (both in ~every log).
 
 ### After merge
 
@@ -106,6 +112,7 @@ configurations, update this section and the referenced config files.
 - **Never pipe long-lived children (gradle/emulator) through Tee/Select** — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) and use `--no-daemon`/`--stop` for probes.
 - **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green.
 - **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries); **run the full 3-variant `test` suite twice** before pushing test changes.
+- **Format before you gate — automate, don't remember.** Every touched file type has a formatter: `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`. Run them **before** the gate (`spotlessCheck` will otherwise fail the first gate run and cost a wasted ~2-min rerun — hit 4× in one session). Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` — in one invocation it rewrites `.kt` while `test` compiles the same files (a race). The mdformat pre-commit hook runs `.md` automatically; a `spotlessApply` pre-commit hook + `scripts/gate.ps1` are PENDING automation (see `.PLAN.md`).
 - **Generate lint baselines with the aggregate `lint` task**, not `lintDebug`; env-dependent checks (e.g. `OldTargetApi`) go in `lint.xml`, not the baseline.
 - **CI `script:` blocks run per-line.** `reactivecircus/android-emulator-runner`
   splits `script:` into individual lines and runs each as its own `sh -c`
@@ -116,7 +123,7 @@ configurations, update this section and the referenced config files.
 - **When a CI "fix" doesn't hold, read the step timestamps, not just the failure**: if a setup/prerequisite step ran before its dependency was ready (e.g. `settings put` before the settings provider was up), the race is the bug — make the step wait for and verify its prerequisite.
 - **A focus failure after a targetSdk bump is usually an OS overlay, not app code** — check `dumpsys window` `mCurrentFocus` for system windows before editing the app.
 - **Gaps escalate** (1st: document · 2nd: automate · 3rd+: tool config); **verify "runs automatically" claims with a command**; **measure, don't estimate**.
-- **3 identical failures → stop and read the shadow/API source**, don't tweak-and-rerun.
+- **3 identical failures → stop and read the shadow/API source**, don't tweak-and-rerun. This applies to **any repeated tooling signal, not just test assertions**: the same message appearing N≥3 times across commands (e.g. `spotlessKotlinCheck FAILED`, "configuration cache cannot be reused") means a systemic cause — find and fix it, don't absorb it.
 - **Never read `window`/activity-scoped state in a field initializer** — `Activity.window` is only assigned during `attach()` (after the constructor), so a field initializer referencing it throws in Robolectric ("Window creation failed!") and NPEs on device. Use `by lazy` or a provider lambda; declare such fields with a default that defers the access.
 - **Pre-format `.md` with `uvx mdformat`** before pre-commit (the first hook run reformats and fails).
 - **`gh` run commands take the run **id**, not a PowerShell object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
