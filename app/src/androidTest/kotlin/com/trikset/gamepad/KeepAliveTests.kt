@@ -28,14 +28,14 @@ class KeepAliveTests {
     client.send("test")
 
     // Wait for the keepalive to arrive instead of guessing at a sleep budget.
-    assertTrue(server.awaitMessage(String.format(Locale.US, "keepalive %d", timeout), 30000))
+    assertTrue(server.awaitMessage(String.format(Locale.ROOT, "keepalive %d", timeout), 30000))
     server.stopListening()
 
     val messages = server.receivedMessages.listIterator()
     while (messages.hasNext()) {
       messages.next()
     }
-    assertEquals(String.format(Locale.US, "keepalive %d", timeout), messages.previous())
+    assertEquals(String.format(Locale.ROOT, "keepalive %d", timeout), messages.previous())
   }
 
   @Test

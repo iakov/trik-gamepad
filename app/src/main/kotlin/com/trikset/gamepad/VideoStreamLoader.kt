@@ -17,7 +17,6 @@ import java.util.concurrent.Executors
  * deterministically without real sockets.
  */
 class VideoStreamLoader
-@JvmOverloads
 constructor(
     private val view: MjpegView,
     private val executor: Executor = Executors.newSingleThreadExecutor(),

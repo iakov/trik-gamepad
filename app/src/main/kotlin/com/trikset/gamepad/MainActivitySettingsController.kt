@@ -137,7 +137,7 @@ class MainActivitySettingsController(
       if (timeout < SenderService.MINIMAL_KEEPALIVE) {
         ui.toast(
             String.format(
-                Locale.US,
+                Locale.ROOT,
                 context.getString(R.string.keepalive_must_be_not_less),
                 SenderService.MINIMAL_KEEPALIVE,
             )

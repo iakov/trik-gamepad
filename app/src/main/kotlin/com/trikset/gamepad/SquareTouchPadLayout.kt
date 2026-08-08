@@ -149,7 +149,7 @@ class SquareTouchPadLayout : RelativeLayout {
 
         val command = touchPadController.nextCoordinates(x, y, maxX, maxY)
         if (command != null) {
-          send(String.format(Locale.US, "%d %d", command.x, command.y))
+          send(String.format(Locale.ROOT, "%d %d", command.x, command.y))
         }
 
         true

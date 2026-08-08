@@ -44,8 +44,7 @@ class SenderService(
   private var executor: Executor = executor
   private var keepaliveTimeout: Int = initialKeepaliveTimeout
   private var mConnectTask: Runnable? = null
-  // internal (not private) so the extracted ConnectRunnable / KeepAliveTimer reach them
-  // without synthetic accessors (lint SyntheticAccessor, previously baselined on the Java source).
+  // internal (not private) so ConnectRunnable / KeepAliveTimer can reach them.
   internal val mainHandler = Handler(Looper.getMainLooper())
   internal var showTextCallback: OnEventListener<String>? = null
   internal var onDisconnectedListener: OnEventListener<String>? = null

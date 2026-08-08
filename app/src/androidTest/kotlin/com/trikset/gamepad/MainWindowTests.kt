@@ -59,7 +59,7 @@ class MainWindowTests {
       while (messages.hasNext()) {
         val current = messages.next()
         if (messages.hasNext()) {
-          assertNotEquals(String.format(Locale.US, "pad %s up", currentPadName), current)
+          assertNotEquals(String.format(Locale.ROOT, "pad %s up", currentPadName), current)
           val splitCommand = current.split(" ")
           assertEquals(4, splitCommand.size)
           assertEquals("pad", splitCommand[0])
@@ -69,7 +69,7 @@ class MainWindowTests {
           val radius = Math.sqrt((x * x + y * y).toDouble())
           assertTrue(radius > 40 && radius < 60)
         } else {
-          assertEquals(String.format(Locale.US, "pad %s up", currentPadName), current)
+          assertEquals(String.format(Locale.ROOT, "pad %s up", currentPadName), current)
         }
       }
     }
@@ -85,10 +85,10 @@ class MainWindowTests {
       while (messages.hasNext()) {
         val current = messages.next()
         if (!messages.hasNext()) {
-          assertEquals(String.format(Locale.US, "pad %s up", currentPadName), current)
+          assertEquals(String.format(Locale.ROOT, "pad %s up", currentPadName), current)
           break
         }
-        assertNotEquals(String.format(Locale.US, "pad %s up", currentPadName), current)
+        assertNotEquals(String.format(Locale.ROOT, "pad %s up", currentPadName), current)
         val splitCommand = current.split(" ")
         assertEquals(4, splitCommand.size)
         assertEquals("pad", splitCommand[0])
@@ -217,7 +217,7 @@ class MainWindowTests {
       for (i in 1..5) {
         assertTrue(messages.hasNext())
         val currentMessage = messages.next()
-        assertEquals(String.format(Locale.US, "btn %d down", i), currentMessage)
+        assertEquals(String.format(Locale.ROOT, "btn %d down", i), currentMessage)
       }
       assertFalse(messages.hasNext())
     }

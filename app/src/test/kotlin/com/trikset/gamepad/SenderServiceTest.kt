@@ -69,7 +69,7 @@ class SenderServiceTest {
       client!!.setKeepaliveTimeout(10000000) // to disable keep-alive messages
 
       for (i in 0 until 5) {
-        client!!.send(String.format(Locale.US, "%d checking", i))
+        client!!.send(String.format(Locale.ROOT, "%d checking", i))
       }
       mExecutor.runAll()
       shadowOf(getMainLooper()).idle()
