@@ -10,3 +10,16 @@ repos:
     rev: 0.7.21
     hooks:
       - id: mdformat
+  # Format Kotlin at commit time so spotlessCheck never fails the gate on
+  # formatting (AGENTS.md "Format before you gate"). Probed on Windows 2026-08-08:
+  # `cmd /c gradlew.bat` is required (language: system has no shell lookup for
+  # .bat). pass_filenames=false + files \.kt$ so the hook fires only when a Kotlin
+  # file changes but formats the whole tree.
+  - repo: local
+    hooks:
+      - id: spotless-apply
+        name: spotless apply (ktfmt)
+        entry: cmd /c gradlew.bat spotlessApply
+        language: system
+        pass_filenames: false
+        files: \.kt$

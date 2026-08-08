@@ -112,7 +112,7 @@ configurations, update this section and the referenced config files.
 - **Never pipe long-lived children (gradle/emulator) through Tee/Select** — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) and use `--no-daemon`/`--stop` for probes.
 - **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green.
 - **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries); **run the full 3-variant `test` suite twice** before pushing test changes.
-- **Format before you gate — automate, don't remember.** Every touched file type has a formatter: `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`. Run them **before** the gate (`spotlessCheck` will otherwise fail the first gate run and cost a wasted ~2-min rerun — hit 4× in one session). Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` — in one invocation it rewrites `.kt` while `test` compiles the same files (a race). The mdformat pre-commit hook runs `.md` automatically; a `spotlessApply` pre-commit hook + `scripts/gate.ps1` are PENDING automation (see `.PLAN.md`).
+- **Format before you gate — automate, don't remember.** Every touched file type has a formatter: `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`. Run them **before** the gate (`spotlessCheck` will otherwise fail the first gate run and cost a wasted ~2-min rerun — hit 4× in one session). Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` — in one invocation it rewrites `.kt` while `test` compiles the same files (a race). Both are now automated: the pre-commit `spotless-apply` local hook runs `gradlew.bat spotlessApply` on `.kt` changes (Windows-probed; `cmd /c` is required for `language: system`), the mdformat pre-commit hook covers `.md`, and `scripts/gate.ps1` is the canonical gate (two invocations — see Commands).
 - **Generate lint baselines with the aggregate `lint` task**, not `lintDebug`; env-dependent checks (e.g. `OldTargetApi`) go in `lint.xml`, not the baseline.
 - **CI `script:` blocks run per-line.** `reactivecircus/android-emulator-runner`
   splits `script:` into individual lines and runs each as its own `sh -c`
@@ -173,6 +173,8 @@ configurations, update this section and the referenced config files.
 ./gradlew test                               # Robolectric unit tests, no device needed
 ./gradlew lint                               # lint.xml downgrades MissingTranslation to warning
 ./gradlew connectedDebugAndroidTest          # needs running emulator/device (AEHD)
+./scripts/gate.ps1                           # canonical local gate: spotlessApply THEN the
+                                             # full quality suite, each --no-daemon, tee'd to .tmp/gate.log
 ./gradlew detekt spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck   # quality gates (also run in CI; checkstyle/pmd retired after the pure-Kotlin migration)
 ```
 
