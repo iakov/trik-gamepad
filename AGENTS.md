@@ -34,7 +34,9 @@ Improvement roadmap: `docs/ROADMAP.md`.
 - Planned toolchain (locked in `.PLAN.md`): Gradle 8.14.5, AGP 8.13.2, Kotlin 2.x, Java 11 source/target — but Gradle runs under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`, `targetSdk 36`, `minSdk 21`, `maxSdk 36` — single main flavor, no product flavors. Do not migrate to AGP 9 / Gradle 9 without a settings.gradle restructure.
 - Three build types (`debug`/`release`/`releaseDebug`); `./gradlew test` runs
   Robolectric under all three in parallel JVMs — unit tests must use ephemeral
-  ports and reset static state (TESTING.md).
+  ports and reset SharedPreferences per test (they persist across methods in a
+  JVM; the old SenderService static-state trap was removed in ROADMAP Phase 3 —
+  see TESTING.md).
 - `settings.gradle` at repo root: `rootProject.name = 'trik-gamepad'`, `include ':app'`.
 - `local.properties` (gitignored): `sdk.dir` must escape the drive-colon (`C\:/...`) or lint's `PropertyEscape` check fails the build.
 - Signing: `app/build.gradle` applies a release signing config conditionally — only when `file('../android-keystorage.jks')` exists. Debug builds fall back to the auto-generated debug keystore in CI. See MEMORY.md "Build & layout" for gitignore status and how the path resolves.
