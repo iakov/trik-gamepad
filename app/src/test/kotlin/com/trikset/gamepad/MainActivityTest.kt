@@ -270,21 +270,6 @@ class MainActivityTest {
   }
 
   @Test
-  fun recreateMagicButtonsShouldCreateButtonsThatSendCommands() {
-    val m = method(activity, "recreateMagicButtons", Int::class.javaPrimitiveType!!)
-    m.invoke(activity, 3)
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
-
-    val buttonsView = activity.findViewById<android.view.ViewGroup>(R.id.buttons)
-    assertNotNull(buttonsView)
-    assertTrue(buttonsView!!.childCount == 3)
-    // Clicking a magic button sends "btn N down" via the sender.
-    val first = buttonsView.getChildAt(0)
-    first.performClick()
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
-  }
-
-  @Test
   fun createPadShouldWireSender() {
     val m = method(activity, "createPad", Int::class.javaPrimitiveType!!, String::class.java)
     m.invoke(activity, R.id.leftPad, "1")

@@ -9,13 +9,10 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
 import android.util.Log
-import android.view.Gravity
-import android.view.HapticFeedbackConstants
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.view.ViewGroup.LayoutParams
 import android.view.animation.AlphaAnimation
 import android.widget.Button
 import android.widget.CheckBox
@@ -45,6 +42,7 @@ class MainActivity :
   private var mVideoURL: URL? = null
   private var mSettingsController: MainActivitySettingsController? = null
   private val wheelController = WheelController()
+  private val magicButtons = MagicButtonPanel(this) { getSenderService().send(it) }
 
   private fun createPad(id: Int, strId: String) {
     val pad = findViewById<SquareTouchPadLayout>(id)
@@ -80,7 +78,10 @@ class MainActivity :
 
     mVideo = findViewById(R.id.video)
 
-    recreateMagicButtons(MAGIC_BUTTON_COUNT)
+    val buttonsView = findViewById<ViewGroup>(R.id.buttons)
+    if (buttonsView != null) {
+      magicButtons.populate(buttonsView, MAGIC_BUTTON_COUNT)
+    }
 
     getSenderService().setOnDisconnectedListener { toast("Disconnected." + it) }
     getSenderService().setShowTextCallback { toast(it) }
@@ -182,31 +183,6 @@ class MainActivity :
     getSenderService().send("wheel $mAngle")
   }
 
-  private fun recreateMagicButtons(count: Int) {
-    val buttonsView = findViewById<ViewGroup>(R.id.buttons) ?: return
-    buttonsView.removeAllViews()
-    for (num in 1..count) {
-      val btn = Button(this)
-      btn.isHapticFeedbackEnabled = true
-      btn.gravity = Gravity.CENTER
-      btn.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-      val name = num.toString()
-      btn.text = name
-      btn.setBackgroundResource(R.drawable.button_shape)
-      btn.setOnClickListener {
-        val sender = getSenderService()
-        if (sender != null) {
-          sender.send("btn $name down")
-          btn.performHapticFeedback(
-              HapticFeedbackConstants.LONG_PRESS,
-              HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING,
-          )
-        }
-      }
-      buttonsView.addView(btn)
-    }
-  }
-
   private fun setSystemUiVisibility(show: Boolean) {
     val mainView = findViewById<View>(R.id.main) ?: return
     val controller = WindowCompat.getInsetsController(window, mainView) ?: return
@@ -291,9 +267,7 @@ class MainActivity :
     getHideRunnable()?.let { mainView.removeCallbacks(it) }
     val buttonsView = findViewById<ViewGroup>(R.id.buttons)
     if (buttonsView != null) {
-      for (i in 0 until buttonsView.childCount) {
-        buttonsView.getChildAt(i).setOnClickListener(null)
-      }
+      magicButtons.clearListeners(buttonsView)
     }
     findViewById<Button>(R.id.btnSettings)?.setOnClickListener(null)
     findViewById<SquareTouchPadLayout>(R.id.leftPad)?.setSender(null)
