@@ -1,0 +1,145 @@
+package com.trikset.gamepad
+
+import android.content.Context
+import android.content.SharedPreferences
+import androidx.preference.PreferenceManager
+import java.net.URL
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+import org.robolectric.android.util.concurrent.PausedExecutorService
+
+/** Direct tests for [MainActivitySettingsController] (ROADMAP Phase 2-E, coverage push). */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
+class MainActivitySettingsControllerTest {
+
+  private class FakeUi : MainActivitySettingsController.SettingsUi {
+    var title: String? = null
+    var titleSet = true
+    var toasts = mutableListOf<String>()
+    var url: URL? = null
+    var lastAlpha = 0f
+    var previousAlpha = 0f
+    var step = 7
+
+    override fun setActionBarTitle(title: String): Boolean {
+      this.title = title
+      return titleSet
+    }
+
+    override fun toast(text: String) {
+      toasts.add(text)
+    }
+
+    override fun animatePadsAlpha(alpha: Float, previousAlpha: Float) {
+      lastAlpha = alpha
+      this.previousAlpha = previousAlpha
+    }
+
+    override fun setVideoUrl(url: URL?) {
+      this.url = url
+    }
+
+    override fun getWheelStep(): Int = step
+
+    override fun setWheelStep(step: Int) {
+      this.step = step
+    }
+  }
+
+  private lateinit var context: Context
+  private lateinit var prefs: SharedPreferences
+  private lateinit var sender: SenderService
+  private lateinit var ui: FakeUi
+  private lateinit var controller: MainActivitySettingsController
+
+  @Before
+  fun setUp() {
+    context = RuntimeEnvironment.getApplication()
+    prefs = PreferenceManager.getDefaultSharedPreferences(context)
+    prefs.edit().clear().commit()
+    sender = SenderService(PausedExecutorService())
+    sender.setKeepaliveTimeout(10000000) // disable keepalive noise
+    ui = FakeUi()
+    controller = MainActivitySettingsController(context, sender, ui)
+  }
+
+  @Test
+  fun onPreferenceChangedWithTitleFailureShouldToast() {
+    ui.titleSet = false
+    controller.onPreferenceChanged(prefs)
+    assertTrue(ui.toasts.any { it.contains("title") })
+  }
+
+  @Test
+  fun onPreferenceChangedWithUnchangedAddrShouldNotRewriteVideoUri() {
+    // First pass establishes the address; a second identical pass keeps the
+    // address the same -> the video-URI rewrite is skipped.
+    controller.onPreferenceChanged(prefs)
+    prefs
+        .edit()
+        .putString(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
+        .commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals(
+        "http://10.0.0.7:8080/?action=stream",
+        prefs.getString(SettingsFragment.SK_VIDEO_URI, ""),
+    )
+  }
+
+  @Test
+  fun onPreferenceChangedShouldClampPadsAlphaLow() {
+    prefs.edit().putString(SettingsFragment.SK_SHOW_PADS, "-50").commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals(0f, ui.lastAlpha, 0.001f)
+  }
+
+  @Test
+  fun onPreferenceChangedShouldClampPadsAlphaHigh() {
+    prefs.edit().putString(SettingsFragment.SK_SHOW_PADS, "999").commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals(1f, ui.lastAlpha, 0.001f)
+  }
+
+  @Test
+  fun onPreferenceChangedWithEmptyVideoUriShouldNullTheUrl() {
+    // Establish the default address first so the video-URI rewrite-on-host-change
+    // does not overwrite the empty value we set next.
+    controller.onPreferenceChanged(prefs)
+    prefs.edit().putString(SettingsFragment.SK_VIDEO_URI, "").commit()
+    controller.onPreferenceChanged(prefs)
+    assertNull(ui.url)
+  }
+
+  @Test
+  fun onPreferenceChangedWithVideoUriShouldSetUrl() {
+    controller.onPreferenceChanged(prefs)
+    prefs
+        .edit()
+        .putString(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
+        .commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals("http://10.0.0.7:8080/?action=stream", ui.url.toString())
+  }
+
+  @Test
+  fun registerShouldApplyDefaultPreferences() {
+    controller.register()
+    try {
+      // register() calls onPreferenceChanged with the (empty) prefs -> the
+      // defaults are applied: default address + default port.
+      assertEquals("192.168.77.1", sender.getHostAddr())
+      assertEquals(7, ui.step)
+    } finally {
+      // Do not leak the shared-prefs listener into later tests in this JVM.
+      controller.unregister()
+    }
+  }
+}
