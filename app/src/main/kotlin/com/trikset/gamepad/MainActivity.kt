@@ -8,7 +8,6 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -39,7 +38,7 @@ class MainActivity :
   private var mVideoURL: URL? = null
   private var mSettingsController: MainActivitySettingsController? = null
   private val wheelController = WheelController()
-  private val magicButtons = MagicButtonPanel(this) { getSenderService().send(it) }
+  private val magicButtons = MagicButtonPanel(this) { getSenderService()?.send(it) }
   // Lazy: `window` is only assigned during Activity.attach(), which runs after
   // construction — a field initializer touching it would NPE/throw in Robolectric.
   private val systemUiController: SystemUiController by lazy {
@@ -89,8 +88,8 @@ class MainActivity :
       magicButtons.populate(buttonsView, MAGIC_BUTTON_COUNT)
     }
 
-    getSenderService().setOnDisconnectedListener { toast("Disconnected." + it) }
-    getSenderService().setShowTextCallback { toast(it) }
+    getSenderService()?.setOnDisconnectedListener { toast("Disconnected." + it) }
+    getSenderService()?.setShowTextCallback { toast(it) }
 
     val btnSettings = findViewById<Button>(R.id.btnSettings)
     if (btnSettings != null) {
@@ -110,7 +109,8 @@ class MainActivity :
     createPad(R.id.leftPad, "1")
     createPad(R.id.rightPad, "2")
 
-    mSettingsController = MainActivitySettingsController(this, getSenderService(), this)
+    mSettingsController =
+        MainActivitySettingsController(this, requireNotNull(getSenderService()), this)
     mSettingsController?.register()
   }
 
@@ -137,7 +137,7 @@ class MainActivity :
 
   override fun onPause() {
     mSensorManager?.unregisterListener(this)
-    getSenderService().disconnect("Inactive gamepad")
+    getSenderService()?.disconnect("Inactive gamepad")
     val video = mVideo
     if (video != null) {
       video.stopPlayback()
@@ -159,7 +159,7 @@ class MainActivity :
     if (sensorManager != null) {
       sensorManager.registerListener(
           this,
-          sensorManager.getDefaultSensor(Sensor.TYPE_ALL),
+          sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
           SensorManager.SENSOR_DELAY_NORMAL,
       )
     }
@@ -177,8 +177,6 @@ class MainActivity :
   override fun onSensorChanged(event: SensorEvent) {
     if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
       processSensor(event.values)
-    } else {
-      Log.i("Sensor", event.sensor.type.toString())
     }
   }
 
@@ -186,7 +184,7 @@ class MainActivity :
     val angle =
         wheelController.nextAngle(values[0], values[1], mAngle, mWheelStep, mWheelEnabled) ?: return
     mAngle = angle
-    getSenderService().send("wheel $mAngle")
+    getSenderService()?.send("wheel $mAngle")
   }
 
   override fun setActionBarTitle(title: String): Boolean {
@@ -221,9 +219,7 @@ class MainActivity :
     mWheelStep = step
   }
 
-  fun getSenderService(): SenderService {
-    return mSender!!
-  }
+  fun getSenderService(): SenderService? = mSender
 
   fun getSettingsController(): MainActivitySettingsController? = mSettingsController
 
@@ -249,8 +245,8 @@ class MainActivity :
     findViewById<SquareTouchPadLayout>(R.id.rightPad)?.setSender(null)
     mSettingsController?.unregister()
     mSettingsController = null
-    getSenderService().setOnDisconnectedListener(null)
-    getSenderService().setShowTextCallback(null)
+    getSenderService()?.setOnDisconnectedListener(null)
+    getSenderService()?.setShowTextCallback(null)
     mSender = null
     super.onDestroy()
   }

@@ -157,8 +157,8 @@ class SenderService(
 
   fun setKeepaliveTimeout(timeout: Int) {
     if (timeout != keepaliveTimeout) {
-      keepAliveTimer.restart()
       keepaliveTimeout = timeout
+      keepAliveTimer.restart()
     }
   }
 
