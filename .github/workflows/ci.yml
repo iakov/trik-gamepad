@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [master]
 
+# Never run two pushes' builds at once: a stale run finishing after a newer one
+# uploads misleading artifacts and wastes runner minutes. Cancel the in-progress
+# run when a new push arrives.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
