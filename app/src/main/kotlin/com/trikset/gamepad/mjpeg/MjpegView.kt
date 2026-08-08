@@ -21,8 +21,9 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
 
   private val fpsTextPaint = Paint()
   private var viewThread: MjpegViewThread? = null
-  private var input: MjpegInputStream? = null
+  @Volatile private var input: MjpegInputStream? = null
   @Volatile private var running = false
+  @Volatile private var stopping = false
   @Volatile private var surfaceDone = false
   @Volatile private var dispWidth = 0
   @Volatile private var dispHeight = 0
@@ -68,7 +69,22 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
   fun stopPlayback() {
     if (running) {
       running = false
+      stopping = true
+      // The render thread may be blocked in a non-interruptible
+      // InputStream.read inside readMjpegFrame(); close() from this thread
+      // unblocks it (the documented unblock pattern for a blocked read) so
+      // the join below returns instead of timing out and leaking the thread
+      // and its HTTP connection across pause/resume cycles.
+      val current = input
+      if (current != null) {
+        try {
+          current.close()
+        } catch (e: IOException) {
+          Log.e(TAG, "Failed to close MJPEG stream on stop", e)
+        }
+      }
       viewThread?.join()
+      stopping = false
     }
   }
 
@@ -150,7 +166,9 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
         }
       } catch (e: IOException) {
         running = false
-        onStreamErrorListener?.onStreamError()
+        if (!stopping) {
+          onStreamErrorListener?.onStreamError()
+        }
       } finally {
         if (canvas != null) {
           holder.unlockCanvasAndPost(canvas)
