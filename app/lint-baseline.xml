@@ -2,17 +2,6 @@
 <issues format="6" by="lint 8.13.2" type="baseline" client="gradle" dependencies="false" name="AGP (8.13.2)" variant="all" version="8.13.2">
 
     <issue
-        id="AndroidGradlePluginVersion"
-        message="A newer version of com.android.tools.build:gradle than 8.13.2 is available: 9.3.1"
-        errorLine1="        classpath &apos;com.android.tools.build:gradle:8.13.2&apos;"
-        errorLine2="                  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle"
-            line="26"
-            column="19"/>
-    </issue>
-
-    <issue
         id="GradleDependency"
         message="A newer version of androidx.core:core-ktx than 1.16.0 is available: 1.19.0"
         errorLine1="    implementation &apos;androidx.core:core-ktx:1.16.0&apos;"

@@ -1,10 +1,12 @@
-apply plugin: 'idea'
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply plugin: 'io.gitlab.arturbosch.detekt'
-apply plugin: 'jacoco'
-apply plugin: 'com.github.spotbugs'
-apply plugin: 'com.diffplug.spotless'
+plugins {
+    id 'idea'
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'io.gitlab.arturbosch.detekt'
+    id 'jacoco'
+    id 'com.github.spotbugs'
+    id 'com.diffplug.spotless'
+}
 
 def abiCode = 0 // just for fun
 def appMajorVersion = 1 // single digit for each SDK/ABI
@@ -15,28 +17,6 @@ def appMinorVersion = 41 // two digits for each major version
 // never enters CI. Debug builds in CI fall back to the auto-generated debug
 // keystore; release signing stays local-only and keystore-gated.
 def keystoreFile = file('../android-keystorage.jks')
-
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-        gradlePluginPortal()
-    }
-    dependencies {
-        classpath 'com.android.tools.build:gradle:8.13.2'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:2.0.21"
-        classpath 'io.gitlab.arturbosch.detekt:detekt-gradle-plugin:1.23.8'
-        classpath 'com.github.spotbugs:com.github.spotbugs.gradle.plugin:6.5.10'
-        classpath 'com.diffplug.spotless:com.diffplug.spotless.gradle.plugin:8.9.0'
-    }
-}
-
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
-    }
-}
 
 android {
     signingConfigs {
