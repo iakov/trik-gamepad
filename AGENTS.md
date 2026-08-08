@@ -14,7 +14,7 @@ Removing a documented rule changes agent behavior — only delete if provably in
 
 Android app (pure Kotlin, 0 `.java` files) that mimics a gamepad to control
 TRIK robots. It sends plain-text commands over a TCP socket and streams MJPEG
-video over HTTP. Coverage gate: 90% line / 70% branch (measured 96.9% / 71.2%).
+video over HTTP. Coverage gate: 92% line / 71% branch (measured 93% / 72%).
 Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Layout

@@ -139,10 +139,11 @@ Every batch of changes touching `SenderService` or the tests should consider:
 
 ## Known gaps
 
-- Coverage gate is a JaCoCo ratchet at **90% line / 70% branch**
+- Coverage gate is a JaCoCo ratchet at **92% line / 71% branch**
   (`jacocoTestCoverageVerification`, raised from 85/60 through the Phase 3
-  post-migration coverage push); `jacocoTestReport` always produces the full
-  report. Measured 96.9% line / 71.2% branch. MjpegView's render-thread
+  post-migration coverage push, then to 92/71 after the ROADMAP Phase 2-E/2-F/3
+  extractions); `jacocoTestReport` always produces the full
+  report. Measured 93% line / 72% branch. MjpegView's render-thread
   plumbing (`MjpegView$MjpegRenderThread`/`MjpegViewThread`) is excluded from
   the gate with a recorded rationale (untestable thread lifecycle; the render
   logic lives in the covered `MjpegFrameRenderer`).

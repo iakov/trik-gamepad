@@ -4,7 +4,7 @@
 
 Scope: maintainability and quality improvements after the pure-Kotlin
 migration. Baseline (verified 2026-08-07): `app/` is 0 `.java`; 170 unit
-tests; coverage gate 90% line / 70% branch (measured 96.9% / 71.2%); CI
+tests; coverage gate 92% line / 71% branch (measured 93% / 72%); CI
 build gate green; instrumented CI is best-effort (swiftshader
 `Failed to find ColorBuffer` hangs — not focus, which is fixed).
 
