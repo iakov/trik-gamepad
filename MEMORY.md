@@ -1218,3 +1218,92 @@ CI red on all (focus/render flakes — best-effort). Next: read `31231669287`
 (aosp_atd experiment); if still red, apply ROADMAP Phase 1 fallback (experiment
 6: keep instrumented best-effort, build gate authoritative) and close out with
 the .PLAN.md final retrospective.
+
+### [2026-08-08] Campaign 2 retrospective (strict — post-ROADMAP start)
+
+**Context:** the ROADMAP campaign (phases 0–6 + Phase 1) is complete and CI is
+fully green (4 consecutive runs, last-known-good `31233230621`). A new campaign
+was scoped by user decision: refactoring (B), coverage push (C), CI hardening
+(A), CI cache tuning (D), AGP9/Gradle9 (E, last), cleanup + retrospective (F).
+Execution order B/C → A/D → E. Release 1.42, dependabot auto-merge and GPG were
+explicitly deferred. Session stopped mid-B2 (in-flight work in .PLAN.md).
+
+**What landed (Campaign 2):**
+
+- `ee4a91b` refactor: extract `MagicButtonPanel` from MainActivity — buttons
+  `1..count` send `btn N down` + haptic; `recreateMagicButtons` (and its
+  reflection test) removed; onDestroy uses `magicButtons.clearListeners`.
+  Direct `MagicButtonPanelTest` (populate order, replace, click→command,
+  clearListeners) replaces reflection. Gate green ×2.
+
+**B2 (IN FLIGHT at close):** `SystemUiController` extracted — owns immersive
+system-bar toggle + delayed auto-hide (`hideRunnable`), constructor takes
+`(window, mainViewProvider, actionBarProvider, hideDelayMs)`. MainActivity
+wires it lazily. Tests: `SystemUiControllerTest` (null-provider/no-crash paths;
+the ActionBar-fake `show()` test was dropped as too brittle). Compile + target
+tests green; only spotless formatting remained at close.
+
+**GOOD decisions (save for reuse):**
+
+1. **Extraction pattern = class + provider-based constructor + direct test.**
+   `MagicButtonPanel(this) { getSenderService().send(it) }` and
+   `SystemUiController(window, mainViewProvider = {...}, actionBarProvider = {...}, ...)` keep activities thin while remaining Robolectric-testable —
+   the same shape that made WheelController/MainActivitySettingsController
+   work in the ROADMAP campaign. Reflection tests are deleted as logic moves
+   out; the 100%-covered classes stay 100% via direct tests.
+1. **Providers over values for anything activity-bound.** `window`,
+   `supportActionBar`, `findViewById(...)` are only valid after `attach()` /
+   `setContentView`. Passing providers lets a field be declared before
+   `onCreate` runs.
+1. **`lazy` for any activity-window field.** See bad decisions — the one real
+   bug this session.
+1. **Trapping the flake class early.** The `[23]` NPE flake in B1 was
+   recognized as the documented pre-existing SenderService real-thread connect
+   race (not caused by B1) and verified by re-running green before committing —
+   avoids chasing a ghost.
+1. **Test-first verification of the suspicious failure.** B2's multi-test
+   `[23]` failure was read in full (the stack pointed at `MainActivity.<init>`
+   line 45, not a SenderService toast) — that distinction is what exposed the
+   real `window`-at-init bug instead of dismissing it as the known flake.
+
+**BAD decisions / traps (save as experience):**
+
+1. **`window` in a field initializer → "Window creation failed!".** The first
+   B2 wiring evaluated `window` at `MainActivity` construction. `Activity.window`
+   is assigned during `attach()`, which runs AFTER the constructor — so any
+   field initializer touching it fails (Robolectric throws, real device would
+   NPE). Fix: `by lazy`. LESSON: never read `window`/activity-scoped state in a
+   field initializer; if the value only exists post-attach, use `lazy` or a
+   provider. The crash read as "Robolectric flake" at first glance; the stack
+   trace disambiguated it.
+1. **ActionBar abstract-fake in tests is a dead end.** Writing an anonymous
+   `ActionBar` subclass to verify `show()` produced a cascade of "overrides
+   nothing" / missing abstract members that differ across Robolectric/AGP
+   versions. Deleted; the real path is covered by MainActivity integration
+   tests. LESSON: don't fake framework abstract classes; cover thin
+   view-plumbing branches via the host class's integration tests.
+1. **`$?` after `*> redirect` is not the exit code** — use `$LASTEXITCODE`
+   (re-learned; also in ROADMAP retrospective — keeps biting).
+1. **Two `@Before` ordering is not guaranteed.** MainActivityTest has
+   `resetSharedPreferences` and `setUp` both `@Before`; failures pointed at
+   whichever ran first. Not changed here, but any future test-hook work must
+   not assume order.
+1. **Reflection-test removal must be paired with a real replacement.** B1/B2
+   removed `recreateMagicButtons` / `setSystemUiVisibility` reflection tests;
+   the gate would silently lose coverage if the new direct tests didn't cover
+   the same paths. The JaCoCo needle moved cleanly because replacements were
+   written first.
+
+**Session knowledge worth persisting:**
+
+- Robolectric `Config.OLDEST_SDK` (`[23]`) variant is the most exposed to
+  cross-test real-thread races and to any activity-construction regression —
+  check `[23]` specifically when a MainActivity change breaks tests.
+- `MagicButtonPanel` + `SystemUiController` now exist; MainActivity (~265
+  lines) still owns pads, sensor, video, menu, settings. B3 (SenderService
+  inner classes) and B4 (SquareTouchPadLayout touch-math) remain; then C
+  (coverage targets: `MjpegFrameRendererKt` 0%, `VideoStreamLoader` 88%,
+  `MjpegInputStream` 91.5%, `SenderService` 93.1%, `MainActivitySettingsController`
+  96.4% — per the JaCoCo XML), then A/D/E.
+- Next session: finish B2 (spotlessApply → gate → commit), then B3, B4, C,
+  A, D, E per .PLAN.md Campaign 2 table.

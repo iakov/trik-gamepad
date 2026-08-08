@@ -14,7 +14,9 @@ Single Gradle module `app/` (pure Kotlin, 0 `.java`). Two activities:
 - **`MainActivity`** — the gamepad itself: two touch pads, five magic buttons,
   a sensor-driven wheel, and the MJPEG video stream. Owns the
   `SenderService`, implements the `SettingsUi` view callbacks, and is the only
-  place the app's UI lives.
+  place the app's UI lives. UI helpers extracted (Campaign 2): `MagicButtonPanel`
+  builds the `btn N down` buttons; `SystemUiController` owns the immersive
+  system-bar toggle + delayed auto-hide.
 - **`MainActivitySettingsController`** — the preference-change handling
   extracted from `MainActivity` (ROADMAP Phase 2-E); see "Settings" below.
 - **`SettingsActivity`** — a thin shell that hosts the `SettingsFragment`
@@ -29,7 +31,8 @@ constants in `SettingsFragment`.
 
 - `com.trikset.gamepad` — app logic: `MainActivity`, `SettingsActivity`,
   `SettingsFragment`, `SenderService` (TCP), `SquareTouchPadLayout` (pads),
-  `VideoStreamLoader` (MJPEG HTTP opener).
+  `VideoStreamLoader` (MJPEG HTTP opener), `WheelController`, `MagicButtonPanel`,
+  `SystemUiController`, `MainActivitySettingsController`.
 - `com.trikset.gamepad.mjpeg` — the MJPEG player (vendored origin, renamed
   from `com.demo.mjpeg` in Phase 5): `MjpegView` (SurfaceView + render
   thread), `MjpegInputStream` (frame parser), `MjpegFrameRenderer` (decoding

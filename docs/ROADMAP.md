@@ -3,14 +3,34 @@
 <!-- encoding: utf-8 -->
 
 Scope: maintainability and quality improvements after the pure-Kotlin
-migration. Baseline (verified 2026-08-07): `app/` is 0 `.java`; 170 unit
-tests; coverage gate 92% line / 71% branch (measured 93% / 72%); CI
-build gate green; instrumented CI is best-effort (swiftshader
-`Failed to find ColorBuffer` hangs — not focus, which is fixed).
+migration. Baseline (verified 2026-08-08): `app/` is 0 `.java`; coverage gate
+92% line / 71% branch (measured 93% / 72%); CI **fully green** (build + all 9
+instrumented on `aosp_atd`).
 
 Each item: commit-per-concern, gated by the full local suite (test lint
 detekt spotbugsDebug jacocoTestReport jacocoTestCoverageVerification
 spotlessCheck) before each push, `git status --short` clean before push.
+
+## Campaign 2 (post-ROADMAP — in progress 2026-08-08)
+
+Scope set by user decision. Execution order B/C → A/D → E. Full detail +
+in-flight crash-safety state: `.PLAN.md` "Campaign 2".
+
+- **B1** ✅ `MagicButtonPanel` extracted (buttons + haptic; direct tests). `ee4a91b`.
+- **B2** 🔶 `SystemUiController` extracted (immersive toggle + auto-hide);
+  in flight, spotless-pending.
+- **B3** ⬜ SenderService inner classes → separate files.
+- **B4** ⬜ SquareTouchPadLayout pure touch-math.
+- **C** ⬜ Coverage → ~95 line / ~80 branch (targets: MjpegFrameRendererKt 0%,
+  VideoStreamLoader 88%, MjpegInputStream 91.5%, SenderService 93.1%,
+  MainActivitySettingsController 96.4%); ratchet gate as measured.
+- **A** ⬜ CI hardening (concurrency guard; aosp_atd flake-rate probe ×3;
+  batch-split if flaky).
+- **D** ⬜ CI cache tuning (measure; parallel/jvmargs/CC-strict; one CI run each).
+- **E** ⬜ AGP9/Gradle9 (research → settings.gradle restructure → plugins DSL →
+  upgrade; full gate each step).
+- **F** ⬜ Cleanup (emulator snapshot discrepancy, DummyServer note) +
+  final retrospective.
 
 ## Phase 1 — Instrumented CI without macOS
 

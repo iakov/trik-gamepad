@@ -114,6 +114,7 @@ configurations, update this section and the referenced config files.
 - **A focus failure after a targetSdk bump is usually an OS overlay, not app code** — check `dumpsys window` `mCurrentFocus` for system windows before editing the app.
 - **Gaps escalate** (1st: document · 2nd: automate · 3rd+: tool config); **verify "runs automatically" claims with a command**; **measure, don't estimate**.
 - **3 identical failures → stop and read the shadow/API source**, don't tweak-and-rerun.
+- **Never read `window`/activity-scoped state in a field initializer** — `Activity.window` is only assigned during `attach()` (after the constructor), so a field initializer referencing it throws in Robolectric ("Window creation failed!") and NPEs on device. Use `by lazy` or a provider lambda; declare such fields with a default that defers the access.
 - **Pre-format `.md` with `uvx mdformat`** before pre-commit (the first hook run reformats and fails).
 - **`gh` run commands take the run **id**, not a PowerShell object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
 - **Push gates**: the full local gate list is run and logged, and **`git status --short` must be clean** before every push (local gates validate the working tree, not the commits).
