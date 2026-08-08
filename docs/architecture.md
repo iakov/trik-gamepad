@@ -82,9 +82,11 @@ is planned (ROADMAP Phase 3).
 - **Magic buttons**: five buttons created in code (`recreateMagicButtons`),
   each sends `btn N down` and fires haptic feedback.
 - **Wheel**: `MainActivity` registers an accelerometer `SensorEventListener`.
-  `processSensor` maps the tilt to a `-100..100` angle (dead zone, clamp, and a
-  `SK_WHEEL_STEP`-sized hysteresis step) and sends `wheel <angle>` only when the
-  angle has moved enough.
+  The tilt maps to a `-100..100` angle in the pure `WheelController`
+  (`nextAngle(x, y, currentAngle, step, enabled)`: acceleration floor, dead
+  zone, clamp, and a `SK_WHEEL_STEP`-sized hysteresis step), and `MainActivity`
+  sends `wheel <angle>` only when the controller reports a new angle (extracted
+  from `processSensor`, ROADMAP Phase 2-F).
 
 ## MJPEG video pipeline
 

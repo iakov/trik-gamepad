@@ -946,11 +946,12 @@ Java-interop/lint traps; each cost a build cycle to pin down.
 - **Kotlin mangles `internal` member names on the JVM** (`foo$main`), so Java
   callers cannot see them. Members the Java side (MainActivity, Java tests)
   needs must be `public`. Reflected members must stay `private` *and* exactly
-  named (`MainActivityTest` reflects `processSensor`, `recreateMagicButtons`,
+  named (`MainActivityTest` reflects `recreateMagicButtons`,
   `createPad`, `setSystemUiVisibility`, `restartVideoStream`, fields `mVideo`,
-  `mVideoURL`, `mWheelEnabled`, `mAngle`, `mWheelStep`,
-  `mSharedPreferencesListener`; SenderService/SquareTouchPadLayout tests
-  reflect static `mConnectTask`).
+  `mVideoURL`, `mWheelEnabled`, `mAngle`, `mWheelStep`;
+  SenderService/SquareTouchPadLayout tests
+  reflect static `mConnectTask`). The wheel-math reflection tests were removed
+  in Phase 2-F when `processSensor` was extracted into the pure `WheelController`.
 - **Inner classes/lambdas accessing private members → synthetic accessors** →
   lint `SyntheticAccessor`. Fix by making the member `internal` (SenderService)
   or path-scoping the suppression in lint.xml with rationale (MainActivity —
