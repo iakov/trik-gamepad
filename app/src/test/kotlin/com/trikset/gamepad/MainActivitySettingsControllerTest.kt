@@ -144,6 +144,20 @@ class MainActivitySettingsControllerTest {
   }
 
   @Test
+  fun doubleRegisterShouldNotDoubleApplyOrLeak() {
+    controller.register()
+    controller.register() // idempotent: second call is a no-op
+    try {
+      assertEquals("192.168.77.1", sender.getHostAddr())
+      // A single unregister still releases the listener (no double-register leak).
+      controller.unregister()
+      controller.unregister() // idempotent no-op
+    } finally {
+      controller.unregister()
+    }
+  }
+
+  @Test
   fun onPreferenceChangedShouldApplyStoredWheelStep() {
     prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "42").commit()
     controller.onPreferenceChanged(prefs)

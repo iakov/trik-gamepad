@@ -42,18 +42,29 @@ class MainActivitySettingsController(
   private val context = context.applicationContext
   private val preferences = PreferenceManager.getDefaultSharedPreferences(context)
   private var prevAlpha = 0f
+  private var registered = false
 
-  val listener: SharedPreferences.OnSharedPreferenceChangeListener =
+  // Private so the listener cannot be registered anywhere else (a leak footgun);
+  // register()/unregister() are the only entry points and are idempotent.
+  private val listener: SharedPreferences.OnSharedPreferenceChangeListener =
       SharedPreferences.OnSharedPreferenceChangeListener { prefs, _ ->
         onPreferenceChanged(prefs)
       }
 
   fun register() {
+    if (registered) {
+      return
+    }
+    registered = true
     onPreferenceChanged(preferences)
     preferences.registerOnSharedPreferenceChangeListener(listener)
   }
 
   fun unregister() {
+    if (!registered) {
+      return
+    }
+    registered = false
     preferences.unregisterOnSharedPreferenceChangeListener(listener)
   }
 
