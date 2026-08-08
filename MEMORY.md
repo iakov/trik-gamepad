@@ -192,6 +192,16 @@ dead-zone step. `BuildConfig.VERSION_NAME` feeds the About/system-info field.
 - DummyServer tests bind `localhost:12345` inside the app process, so they run
   on-device via Firebase without firewall changes.
 
+**Cache write-back (2026-08-08):** `gradle/actions/setup-gradle` defaults to
+`cache-read-only: ${{ github.ref != 'refs/heads/master' }}`. This workflow is
+single-branch no-PR (everything lives on `feat/global-refresh`, never
+`master`), so the cache was **never written** — every CI run was a cold build.
+Setting `cache-read-only: false` on both jobs dropped the build gate from
+4m27s to 1m05s (~4×; instrumented unchanged at 3m10-3m33s). The first run
+after the change was 5m08s — polluted by config-cache invalidation from the
+plugins-DSL migration; the second run on the same head showed the real gain.
+Always measure the second run after a build-script change.
+
 **CI failure taxonomy (from the session retrospective, Aug 6):** three
 *distinct* failure classes — do not conflate them:
 
@@ -1145,6 +1155,17 @@ version-lock entries that are recorded, intentional decisions.
 deferred, R7/ROADMAP Phase 7) and `GradleDependency core-ktx 1.19.0` (minSdk 21
 lock). No relaxation in `lint.xml` was needed; the baseline is the ratchet.
 
+**Update (2026-08-08, plugins-DSL migration):** the `AndroidGradlePluginVersion`
+entry pointed at the `classpath` line in `app/build.gradle`'s `buildscript`
+block. Migrating to the plugins DSL removed that line, so lint reported
+"1 errors/warnings were listed in the baseline file but not found in the
+project" — **AGP never auto-prunes stale baseline entries** (it only writes the
+baseline when there are *new* issues). The stale entry was removed by hand;
+the baseline is now just the core-ktx `GradleDependency` entry. LESSON: after a
+build-file refactor that moves/removes a baselined issue's location, run `lint`,
+read the "listed in the baseline but not found" line, and prune the stale
+`<issue>` manually.
+
 ### [2026-08-08] Phase 1 experiment 2: aosp_atd + swiftshader PASSES instrumented
 
 **Context:** every CI instrumented run had failed (build gate green throughout).
@@ -1395,3 +1416,38 @@ single biggest CI win this campaign — see .PLAN.md flake-probe data.
 3+ observed runs; D has cache write-back + parallel (one green run
 measured). Remaining: F retrospective docs (this entry), final .PLAN.md /
 ROADMAP status update, and the CI flake-rate conclusion (see .PLAN.md).
+
+### [2026-08-08] Campaign 2 retrospective — reusable knowledge (F wrap-up)
+
+**GPG signing (per-commit flag).** `commit.gpgsign=true` is set in the repo's
+local git config, but gpg has no interactive agent in this environment, so a
+plain `git commit` hangs until the timeout and fails with "gpg: signing failed:
+Timeout". Never touch `git config` (Repo hygiene) — commit with
+`git commit --no-gpg-sign` every time.
+
+**Coverage-report tooling.** The JaCoCo report is at
+`app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml` (note the
+extra `jacocoTestReport/` directory — `.PLAN.md` once referenced a path one
+level shorter). The XML carries **method-level** `<counter type="BRANCH">`
+entries but **no line-level branch detail** — analyze per-method branch misses
+to plan tests. When reading totals, remember LINE and BRANCH differ hugely
+(LINE ~97% vs BRANCH ~73% at campaign start).
+
+**Kotlin accessor clash.** Implementing an interface method whose name
+collides with a property's accessors breaks compilation with "Platform
+declaration clash" (e.g. a fake `SettingsUi` with `var videoUrl` + an override
+`setVideoUrl(url)`, or `var wheelStep` + `getWheelStep()`). Name the backing
+property differently (`var url`, `var step`).
+
+**MainActivitySettingsController test traps.** (1) `onPreferenceChanged`
+auto-rewrites `SK_VIDEO_URI` whenever the host address changes — a test that
+sets the URI *before* the first call gets it overwritten; establish the address
+first (call `onPreferenceChanged` once), then set the URI. (2) `register()`
+registers a real `SharedPreferences.OnSharedPreferenceChangeListener` that
+survives across tests in the same JVM — always pair with `unregister()` in a
+`finally`, or drive `onPreferenceChanged` directly and never call `register()`.
+(3) Test the controller directly with a fake `SettingsUi` instead of through
+`MainActivity` — the title-failure toast, addr-unchanged, pads-alpha clamp and
+empty-video-URI branches are unreachable via the activity.
+
+**Plugins-DSL lint baseline** — see the "Lint baseline cleanup" entry update.

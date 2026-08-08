@@ -31,7 +31,7 @@ Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Build (from repo root)
 
-- Planned toolchain (locked in `.PLAN.md`): Gradle 8.14.5, AGP 8.13.2, Kotlin 2.x, Java 11 source/target — but Gradle runs under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`, `targetSdk 36`, `minSdk 21`, `maxSdk 36` — single main flavor, no product flavors. Do not migrate to AGP 9 / Gradle 9 without a settings.gradle restructure.
+- Planned toolchain (locked in `.PLAN.md`): Gradle 8.14.5, AGP 8.13.2, Kotlin 2.x, Java 11 source/target — but Gradle runs under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`, `targetSdk 36`, `minSdk 21`, `maxSdk 36` — single main flavor, no product flavors. The **AGP-9 prep (plugins DSL) is done** (`settings.gradle` `plugins {}` block + no `buildscript`/`apply plugin:` left); do **not** bump to AGP 9 / Gradle 9 itself yet — deferred.
 - Three build types (`debug`/`release`/`releaseDebug`); `./gradlew test` runs
   Robolectric under all three in parallel JVMs — unit tests must use ephemeral
   ports and reset SharedPreferences per test (they persist across methods in a
@@ -55,6 +55,7 @@ configurations, update this section and the referenced config files.
 ### Before commit
 
 - When pre-commit is installed, run `.venv/Scripts/pre-commit run --all-files`; otherwise at least `uvx mdformat` on changed `.md` files.
+- Commit with `git commit --no-gpg-sign`: `commit.gpgsign=true` is set locally but gpg has no interactive agent here, so a plain `git commit` hangs until timeout. Never change git config (Repo hygiene); pass the flag per commit instead. Rationale: MEMORY.md.
 - New tool/config → update this section and `MEMORY.md`.
 - Editing `AGENTS.md`: review `git diff HEAD -- AGENTS.md`, merge old content
   into the new rather than deleting outright; confirm each deletion is
@@ -99,6 +100,8 @@ configurations, update this section and the referenced config files.
 - **Command hygiene**: every command runs with a reasonable timeout and is logged (tee to `app/build/<task>.log` or `.tmp/`); on timeout read the log first. If a command takes ≥1.5× the expected time, analyze the wrong guess and record expected vs actual.
 - **A wrong guess usually means an option was not set properly** — re-audit the invocation.
 - **Slow commands → research (incl. web), tune repeatable tooling, document in MEMORY.md** — never fix the symptom.
+- **Single-branch CI cache trap**: `gradle/actions/setup-gradle` `cache-read-only: ${{ github.ref != 'refs/heads/master' }}` means the cache is **never written** when the workflow never pushes to `master` (single-branch no-PR) — every CI run is cold. Set `cache-read-only: false` and verify a follow-up run is faster. Measured here: build gate 4m27s → 1m05s (~4×).
+- **Measure the second CI run after a build change**: the first run after a `settings.gradle`/`build.gradle` change is polluted by config-cache invalidation — compare the second run on the same head, not the first.
 - **Async turns**: capture a process handle (`Start-Process -PassThru`), verify liveness immediately, then a single bounded readiness poll in the same working loop — a turn is not complete until the readiness result is recorded; never end a turn on a bare liveness check.
 - **Never pipe long-lived children (gradle/emulator) through Tee/Select** — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) and use `--no-daemon`/`--stop` for probes.
 - **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green.

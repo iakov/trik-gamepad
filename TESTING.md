@@ -28,6 +28,14 @@ Two layers:
 ./gradlew connectedDebugAndroidTest # instrumented; needs emulator/device
 ```
 
+> **Known local flake: Robolectric download lock.** `./gradlew test` runs the
+> three variants in parallel JVMs, which race for the user-level
+> `~/.robolectric-download-lock` file. One variant can fail its whole class
+> with `Couldn't create lock file C:\Users\...\.robolectric-download-lock`
+> (`IllegalStateException` at `MavenDependencyResolver`). Transient infra —
+> re-run the failed variant (e.g. `testReleaseUnitTest`) and it passes. Never
+> treat this as a code regression.
+
 Local instrumented run:
 
 1. Verify acceleration: `emulator -accel-check` (needs AEHD → returns `0`).
@@ -95,6 +103,16 @@ The server thread accepts and reads asynchronously. Asserting immediately after
 Always await the latch (`awaitConnection()` / `awaitCommands()`) before
 asserting connected/command state.
 
+**Bounded polls for server-received data, never bare asserts.** A test that
+asserts `server.receivedContains("two")` right after `runAll()` + `idle()`
+passes locally but can fail on CI under load — the server read thread simply
+hasn't drained the socket yet (a `sendWhileConnectedShouldSkipReconnect`
+regression caught only by CI, 3 red runs). Any assert on *server-received
+content* must poll in a bounded loop (the
+`keepaliveShouldBeSentWhileConnected` pattern: `while (!seen && attempts < N) { Thread.sleep(...); runAll(); idle(); }`), or use the latch/`anyMessageWithin`
+helpers. Rule: **local green ≠ CI green for async-server tests** — write the
+bounded poll from the start, don't rely on the "run twice" rule to catch it.
+
 ### Robolectric determinism
 
 `@LooperMode(PAUSED)` + a `PausedExecutorService` injected via the
@@ -119,6 +137,13 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
   test can still cover nothing (the sensor wheel path was "covered" by a
   passing test that used the wrong sensor type). Diff the JaCoCo per-class
   branch numbers for the target class after adding the test.
+- **Covering null-guard branches on layout-populated fields needs explicit
+  nulling.** `MainActivity.onPause`/`onResume` guard `mVideo`/`mSensorManager`
+  with null checks, but the activity layout always provides those views in
+  Robolectric — so a "no-op" test that just calls `onPause()` covers nothing
+  (the JaCoCo needle did not move). To cover the null branch, explicitly
+  `setField(activity, "mVideo", null)` (and `mSensorManager`) via reflection
+  **before** invoking the method.
 - **3 identical failures → stop and read the shadow source.** If the *same*
   test fails identically N≥3 consecutive runs (same exception, same line, log
   sizes near-identical), stop retrying and read the shadow's real API from the
