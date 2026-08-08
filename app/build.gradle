@@ -1,7 +1,6 @@
 plugins {
     id 'idea'
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android'
     id 'io.gitlab.arturbosch.detekt'
     id 'jacoco'
     id 'com.github.spotbugs'
@@ -89,9 +88,6 @@ android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
-    }
-    kotlinOptions {
-        jvmTarget = '11'
     }
     lint {
         // MissingTranslation is downgraded in lint.xml by convention (English-only
