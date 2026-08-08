@@ -38,7 +38,7 @@ android {
         // Only sign with the local keystore when it actually exists (CI has no
         // keystore and must fall back to the debug keystore). See MEMORY.md.
         if (keystoreFile.exists()) {
-            signingConfig signingConfigs.config
+            signingConfig = signingConfigs.config
         }
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments clearPackageData: 'true'
@@ -49,10 +49,10 @@ android {
     buildTypes {
         release {
             minifyEnabled true
-            shrinkResources true
+            shrinkResources = true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
             debuggable false
-            signingConfig signingConfigs.config
+            signingConfig = signingConfigs.config
         }
         releaseDebug {
             minifyEnabled false
@@ -61,7 +61,7 @@ android {
         }
     }
     testOptions {
-        animationsDisabled true
+        animationsDisabled = true
         unitTests {
             includeAndroidResources = true
             all {
@@ -82,10 +82,10 @@ android {
                 }
             }
         }
-        execution 'ANDROIDX_TEST_ORCHESTRATOR'
+        execution = 'ANDROIDX_TEST_ORCHESTRATOR'
     }
 
-    namespace 'com.trikset.gamepad'
+    namespace = 'com.trikset.gamepad'
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
@@ -96,14 +96,14 @@ android {
     lint {
         // MissingTranslation is downgraded in lint.xml by convention (English-only
         // resources); everything else fails the build.
-        abortOnError true
+        abortOnError = true
         // Report warnings too (checkAllWarnings) and ratchet via a baseline:
         // the current warnings (pinned dep versions, AsyncTask leak patterns to
         // be rewritten in the Kotlin migration, densityless icons) are recorded
         // in lint-baseline.xml; any NEW warning fails the build.
-        checkAllWarnings true
+        checkAllWarnings = true
         baseline = file('lint-baseline.xml')
-        warningsAsErrors true
+        warningsAsErrors = true
     }
 }
 

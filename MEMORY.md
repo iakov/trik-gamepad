@@ -1483,3 +1483,24 @@ message at all (verified), full gate green. Interim cleanup — **may be reverse
 by the AGP 9 / Gradle 9 migration** (Gradle 9 makes config-cache the norm), at
 which point the keystore `exists()` + `https.proxyHost` blockers are re-checked
 against AGP 9's own behavior.
+
+### [2026-08-08] Deprecation audit — Gradle 9 prep input (Campaign-2 E-step follow-up)
+
+`./gradlew test --warning-mode all` on Gradle 8.14.5 produced exactly **one
+deprecation class**: the Groovy DSL "space-assignment" syntax (e.g.
+`shrinkResources true` instead of `shrinkResources = true`) — scheduled for
+removal in **Gradle 10.0**. 8 warnings, 9 call sites in `app/build.gradle`
+(`signingConfig` appears twice; Gradle dedups identical warnings). No other
+deprecations on the current toolchain.
+
+**Fixed (this session):** converted all 9 to `propName = value` assignment:
+`signingConfig` ×2, `shrinkResources`, `animationsDisabled`, `execution`,
+`namespace`, `abortOnError`, `checkAllWarnings`, `warningsAsErrors`. Verified
+`--warning-mode all` prints zero deprecations afterward. `minifyEnabled`/
+`debuggable` use the same visual pattern but are NOT flagged — they are plain
+Groovy method calls, not the Gradle-generated property-setter syntax, so left
+as-is. Full gate green after the change.
+
+**Lesson for AGP 9:** this was the only Gradle-level deprecation our build
+triggers; the AGP-9 bump itself (Phase E) is the bigger risk surface (new DSL,
+built-in Kotlin).
