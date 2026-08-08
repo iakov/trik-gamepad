@@ -140,3 +140,33 @@ jobs:
             app/build/outputs/androidTest-results/
             app/build/reports/androidTests/
           if-no-files-found: ignore
+
+  publish:
+    name: Publish installable APK
+    # Only publish once ALL tests (build gate + instrumented) are green, and
+    # only on master merges/pushes. Dormant during the single-branch no-PR
+    # workflow (nothing pushes to master); activates when a master merge lands.
+    needs: [build, instrumented]
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5.0.2
+
+      - name: Build releaseDebug APK (debug-signed, installable)
+        run: ./gradlew assembleReleaseDebug -PpreDexEnable=false --build-cache
+
+      - name: Upload APK artifact for early adopters
+        uses: actions/upload-artifact@v7
+        with:
+          name: trik-gamepad-releaseDebug
+          path: app/build/outputs/apk/releaseDebug/*.apk
+          if-no-files-found: error
