@@ -1749,3 +1749,85 @@ the FIRST violated rule. Instrumented tests aren't covered by the JVM agent
 only. Coverage measures what RAN, not correctness — the wheel-step and TYPE_ALL
 bugs passed a 95/80 gate because their tests assert "no crash", not real
 behavior.
+
+### [2026-08-08] Campaign 3 execution run — review-driven fixes
+
+Executed full-auto (user: "go full auto mode"). One commit per item, full gate
+(`scripts/gate.ps1`) before each push, `--no-gpg-sign`. Closing CI run
+`31271190323` fully green (build 1m26s + instrumented 4m1s; the new publish job
+shows `-`/skipped on non-master, as designed).
+
+**P0 — correctness (landed `e621f95`, `8eb6c3e`, `314b910`):**
+
+- Wheel-step setting applied `Integer.getInteger(prefValue, default)` which reads
+  a **JVM system property** named by the pref string — the setting NEVER applied.
+  Fixed to `getString(...)?.toIntOrNull() ?: default`, clamped `[1..100]`;
+  regression tests (stored "42" → step 42; garbage → default; over-range → 100).
+- `Sensor.TYPE_ALL` is a **mask**, not a sensor type — `getDefaultSensor(TYPE_ALL)`
+  usually returns null → NPE on `registerListener`; and `onSensorChanged` logged
+  every other sensor at `Log.i`. → `TYPE_ACCELEROMETER`, dropped the else-log
+  (also removed the now-unused `Log` import).
+- `setKeepaliveTimeout` restarted the timer BEFORE assigning the new value (restart
+  used the old timeout). Assignment moved before `restart()`.
+- `getSenderService()` did `mSender!!` → crash if a stray callback fires after
+  onDestroy. Later superseded by the ViewModel hoist (P2) making it non-null again.
+
+**P1 — MJPEG leak (`75e09ca`):** `stopPlayback()` joined a render thread blocked in a
+non-interruptible `InputStream.read` (join timed out at 3s, thread + HTTP connection
+lingered across pause/resume). Fix: `stopPlayback` closes the stream **from the
+calling thread** to unblock the read (documented unblock pattern) and sets a
+`stopping` flag so a deliberate stop does NOT fire `onStreamErrorListener` (which
+would wrongly trigger reconnect). Test: real `ServerSocket(0)` + client socket pair
+(surfaces run on the JVM under Robolectric) — asserts the stream is closed so the
+blocked read unblocks, and the error listener is not fired on a deliberate stop.
+
+**P2 — architecture (`cccb05b`, `10a63bf`, `15550df`):**
+
+- `SenderViewModel` (Activity-scoped, `by viewModels()`) owns the `SenderService`;
+  `onCleared()` closes the socket. `lifecycle-runtime-ktx` + `activity-ktx` were
+  already on the compile classpath transitively (no new deps).
+- `ConnectionState` sealed interface + `StateFlow` fed from the service's
+  connect/disconnect paths; MainActivity collects with
+  `repeatOnLifecycle(STARTED)` for the disconnect toast.
+  **Lint trap: `repeatOnLifecycle` must be called from `onCreate`, NOT a lifecycle
+  callback like `onStart`** — the `RepeatOnLifecycleWrongUsage` check fails the
+  build (`5994128` fixed the original onStart placement).
+- Pref-listener `register`/`unregister` made idempotent + listener made `private`
+  (was public API — a leak footgun).
+
+**P3 — hygiene (`4b7b869`, `b382774`):**
+
+- `usesCleartextTraffic="true"` → `res/xml/network_security_config.xml` scoping
+  cleartext to the default robot hotspot `192.168.77.1` (base-config off).
+  **Lint trap: `networkSecurityConfig` needs API 24+ → `tools:targetApi="n"`
+  on the `<application>` tag** (was `"m"`/23) or `UnusedAttribute` fails CI
+  (`5994128`). Note: a user-configured non-default HTTP host must be added to the
+  NSC domain-config.
+- `MjpegInputStream` header parse: `java.util.Properties.load` → plain CRLF
+  line-scanner (`parseContentLength`). More faithful to multipart/x-mixed-replace
+  (no backslash/whitespace quirks).
+- Dropped `@JvmOverloads` (VideoStreamLoader — 0 Java files), Java-interop
+  comments, and `Locale.US` → `Locale.ROOT` everywhere.
+
+**Bonus (user decisions during the run):**
+
+- **minSdk 21 → 23** (`4753c45`): "forget obsolete". Aligns with Robolectric 4.16
+  dropping API 21/22 and the AndroidX floor; `OLDEST_SDK` now == declared min.
+  `versionNameSuffix` auto became `-API23`.
+- **CI publish job** (`a4a39b8`): on **master**-only green runs (needs both build +
+  instrumented), `assembleReleaseDebug` (debug-signed → installable) uploaded as a
+  `trik-gamepad-releaseDebug` Actions artifact for early adopters. Release keystore
+  still never enters CI (R4). Dormant during single-branch no-PR; activates when a
+  master merge lands.
+- **Deferred:** core-ktx 1.16.0 → 1.19.0 is **blocked** — 1.19.0 requires
+  **compileSdk 37** but R7 locks compileSdk 36; would need a deliberate toolchain
+  bump. detekt 2.0.0 (until stable), version catalogs, AGP 9.3 lint report-DSL.
+
+**Process lessons:**
+
+- The two CI lint failures (repeatOnLifecycle placement, NSC min-API) were found by
+  actually reading the failed CI runs — intermediate runs got superseded/cancelled
+  by the next push (concurrency guard), so only the closing head run is meaningful.
+- pre-commit's `spotlessApply` hook reformats Kotlin files AFTER staging; the commit
+  silently fails on the first attempt ("files were modified by this hook") — the
+  fix is re-`git add` + re-commit. Hit on ~every commit this campaign.

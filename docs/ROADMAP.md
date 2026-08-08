@@ -44,25 +44,43 @@ B2 → B4 → C → B3 → A → D → E → F. Full detail + execution record:
   DummyServer note already in TESTING.md) + MEMORY retrospective added.
   **Campaign 2 complete.**
 
-## Campaign 3 — strict full-project review (planned 2026-08-08)
+## Campaign 3 — strict full-project review (DONE 2026-08-08)
 
 Full code audit + web best-practice research; findings and durable reference in
 MEMORY.md "Domain review". Priorities: **P0 correctness → P1 leak fix → P2
 architecture → P3 hygiene** (each item one commit, gate, push; detailed plan:
 `.PLAN.md` "Campaign 3").
 
-- **P0** Fix `Integer.getInteger` wheel-step bug (setting never applies);
-  `Sensor.TYPE_ALL` → `TYPE_ACCELEROMETER` (NPE risk + log spam); keepalive
-  timer ordering; `mSender!!` guard.
-- **P1** MJPEG render-thread/socket leak on pause/resume — unblock the blocking
-  read by closing the connection from another thread.
-- **P2** Hoist `SenderService` into an Activity-scoped ViewModel; expose
-  `StateFlow<ConnectionState>` + `repeatOnLifecycle(STARTED)`; remove the
-  `OnSharedPreferenceChangeListener` leak footgun.
-- **P3** Network Security Config for cleartext (scope to robot host); MJPEG
-  header line-scanner (drop `Properties.load`); Kotlin idiom cleanup
-  (`@JvmOverloads`, `Locale.ROOT`); detekt 2.0.0 when stable; version catalogs;
-  AGP 9.3 lint report-DSL migration.
+- **P0** ✅ `Integer.getInteger` wheel-step bug (setting never applies),
+  `Sensor.TYPE_ALL` → `TYPE_ACCELEROMETER`, keepalive timer ordering,
+  `mSender!!` guard. `e621f95`, `8eb6c3e`, `314b910`.
+- **P1** ✅ MJPEG render-thread/socket leak — `stopPlayback` closes the stream
+  to unblock the blocking read; structural test on a real socket pair.
+  `75e09ca`.
+- **P2** ✅ `SenderViewModel` hoist (`cccb05b`); `StateFlow<ConnectionState>` +
+  `repeatOnLifecycle(STARTED)` (`10a63bf`); idempotent pref-listener pairing
+  (`15550df`).
+- **P3** ✅ NSC cleartext scoped to the robot host + CRLF header line-scanner
+  (`4b7b869`); Kotlin idiom cleanup — `@JvmOverloads`, interop comments,
+  `Locale.ROOT` (`b382774`). **Deferred:** detekt 2.0.0 until stable, version
+  catalogs, AGP 9.3 lint report-DSL migration (not code-urgent).
+- **Bonus** ✅ **minSdk 21 → 23** ("forget obsolete"; `4753c45`) and a
+  **CI publish job** (`a4a39b8`) that uploads a debug-signed `releaseDebug`
+  APK artifact on green **master** runs (dormant in the single-branch no-PR
+  workflow). Two CI lint errors found mid-run and fixed (`5994128`):
+  `repeatOnLifecycle` belongs in `onCreate` (not `onStart`), and the NSC
+  attribute needs `tools:targetApi="n"` (API 24). Closing CI run `31271190323`
+  fully green.
+- **Next (Campaign 4):** synthetic MJPEG server test — see below.
+
+## Campaign 4 — synthetic MJPEG server test (planned 2026-08-08)
+
+A real HTTP MJPEG server (test source) streams JPEG frames to the app pipeline
+to verify **decoder correctness**, **decode performance**, and **connection
+drop + restore** (R12 reconnect-on-error). User decisions: **Robolectric NATIVE
+venue** (real `BitmapFactory` via `@GraphicsMode(NATIVE)`), **full app reconnect
+path**, **cycle a few images** (solid color + gradient + second color).
+Design + execution record: `.PLAN.md` "Campaign 4".
 
 ## Phase 1 — Instrumented CI without macOS
 
