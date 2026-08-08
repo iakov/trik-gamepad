@@ -148,8 +148,11 @@ Every batch of changes touching `SenderService` or the tests should consider:
   logic lives in the covered `MjpegFrameRenderer`).
 - Instrumented tests exercise only what runs on the emulator; real TRIK robot
   interaction is never in CI.
-- Espresso tests note "idling resources would be the recommended way" — the
-  tests currently rely on `ActivityTestRule` + sleeps; be aware of flakiness
-  potential on slow emulators.
+- Espresso tests drive the settings UI through extracted helpers
+  (`openSettings()`/`editPreference()`) with no `Thread.sleep` — Espresso's
+  `onView(...).perform()` idles until views are shown (de-slept in Phase 4-I;
+  previously the suite was ~2 minutes of fixed sleeps). Keepalive negative
+  assertions use `DummyServer.anyMessageWithin()` bounded windows, never
+  `Thread.sleep`.
 - `MainActivity` forces landscape + immersive; instrumented tests run against
   that configuration only.
