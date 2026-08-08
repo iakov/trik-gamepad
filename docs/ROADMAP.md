@@ -4,7 +4,7 @@
 
 Scope: maintainability and quality improvements after the pure-Kotlin
 migration. Baseline (verified 2026-08-08): `app/` is 0 `.java`; coverage gate
-92% line / 71% branch (measured 93% / 72%); CI **fully green** (build + all 9
+95% line / 80% branch (measured 97.3% / 81.9%); CI **fully green** (build + all 9
 instrumented on `aosp_atd`).
 
 Each item: commit-per-concern, gated by the full local suite (test lint
