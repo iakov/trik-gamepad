@@ -65,7 +65,7 @@ class SettingsTests {
   @Test
   fun keepAliveTimeoutLowerThanMinimalShouldNotBeStored() {
     val initialKeepaliveTimeout =
-        requireNotNull(mActivityTestRule.activity.getSenderService()).getKeepaliveTimeout()
+        mActivityTestRule.activity.getSenderService().getKeepaliveTimeout()
 
     openSettings()
     editPreference(4, "500") // keepalive below MINIMAL_KEEPALIVE
@@ -74,7 +74,7 @@ class SettingsTests {
 
     assertEquals(
         initialKeepaliveTimeout,
-        requireNotNull(mActivityTestRule.activity.getSenderService()).getKeepaliveTimeout(),
+        mActivityTestRule.activity.getSenderService().getKeepaliveTimeout(),
     )
   }
 

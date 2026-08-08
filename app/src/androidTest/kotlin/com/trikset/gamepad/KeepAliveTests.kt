@@ -21,7 +21,7 @@ class KeepAliveTests {
   fun keepAliveShouldBeReceivedAfterGivenTimePeriod() {
     val timeout = 1000
     val server = DummyServer()
-    val client = requireNotNull(mActivityTestRule.activity.getSenderService())
+    val client = mActivityTestRule.activity.getSenderService()
     client.setTarget(DummyServer.IP, DummyServer.DEFAULT_PORT)
     client.setKeepaliveTimeout(timeout)
     // In order to set connection up
@@ -42,7 +42,7 @@ class KeepAliveTests {
   @Throws(InterruptedException::class)
   fun keepaliveMessagesShouldNotBeSentAfterDisconnect() {
     val server = DummyServer()
-    val client = requireNotNull(mActivityTestRule.activity.getSenderService())
+    val client = mActivityTestRule.activity.getSenderService()
     client.setTarget(DummyServer.IP, DummyServer.DEFAULT_PORT)
     client.setKeepaliveTimeout(2000)
 

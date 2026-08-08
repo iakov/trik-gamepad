@@ -16,6 +16,7 @@ import android.view.animation.AlphaAnimation
 import android.widget.Button
 import android.widget.CheckBox
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.MenuItemCompat
 import androidx.core.view.WindowCompat
@@ -33,12 +34,12 @@ class MainActivity :
   private var mAngle = 0 // -100% .. +100%
   private var mWheelEnabled = false
   private var mWheelStep = WHEEL_STEP_DEFAULT
-  private var mSender: SenderService? = null
   private var mVideo: MjpegView? = null
   private var mVideoURL: URL? = null
   private var mSettingsController: MainActivitySettingsController? = null
+  private val senderViewModel: SenderViewModel by viewModels()
   private val wheelController = WheelController()
-  private val magicButtons = MagicButtonPanel(this) { getSenderService()?.send(it) }
+  private val magicButtons = MagicButtonPanel(this) { getSenderService().send(it) }
   // Lazy: `window` is only assigned during Activity.attach(), which runs after
   // construction — a field initializer touching it would NPE/throw in Robolectric.
   private val systemUiController: SystemUiController by lazy {
@@ -78,7 +79,6 @@ class MainActivity :
       actionBar.setDisplayShowTitleEnabled(true)
     }
 
-    mSender = SenderService()
     mSensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
     mVideo = findViewById(R.id.video)
@@ -88,8 +88,8 @@ class MainActivity :
       magicButtons.populate(buttonsView, MAGIC_BUTTON_COUNT)
     }
 
-    getSenderService()?.setOnDisconnectedListener { toast("Disconnected." + it) }
-    getSenderService()?.setShowTextCallback { toast(it) }
+    getSenderService().setOnDisconnectedListener { toast("Disconnected." + it) }
+    getSenderService().setShowTextCallback { toast(it) }
 
     val btnSettings = findViewById<Button>(R.id.btnSettings)
     if (btnSettings != null) {
@@ -109,8 +109,7 @@ class MainActivity :
     createPad(R.id.leftPad, "1")
     createPad(R.id.rightPad, "2")
 
-    mSettingsController =
-        MainActivitySettingsController(this, requireNotNull(getSenderService()), this)
+    mSettingsController = MainActivitySettingsController(this, getSenderService(), this)
     mSettingsController?.register()
   }
 
@@ -137,7 +136,7 @@ class MainActivity :
 
   override fun onPause() {
     mSensorManager?.unregisterListener(this)
-    getSenderService()?.disconnect("Inactive gamepad")
+    getSenderService().disconnect("Inactive gamepad")
     val video = mVideo
     if (video != null) {
       video.stopPlayback()
@@ -184,7 +183,7 @@ class MainActivity :
     val angle =
         wheelController.nextAngle(values[0], values[1], mAngle, mWheelStep, mWheelEnabled) ?: return
     mAngle = angle
-    getSenderService()?.send("wheel $mAngle")
+    getSenderService().send("wheel $mAngle")
   }
 
   override fun setActionBarTitle(title: String): Boolean {
@@ -219,12 +218,14 @@ class MainActivity :
     mWheelStep = step
   }
 
-  fun getSenderService(): SenderService? = mSender
+  fun getSenderService(): SenderService = senderViewModel.sender
 
   fun getSettingsController(): MainActivitySettingsController? = mSettingsController
 
   fun setSenderService(sender: SenderService?) {
-    mSender = sender
+    if (sender != null) {
+      senderViewModel.sender = sender
+    }
   }
 
   override fun onDestroy() {
@@ -245,9 +246,8 @@ class MainActivity :
     findViewById<SquareTouchPadLayout>(R.id.rightPad)?.setSender(null)
     mSettingsController?.unregister()
     mSettingsController = null
-    getSenderService()?.setOnDisconnectedListener(null)
-    getSenderService()?.setShowTextCallback(null)
-    mSender = null
+    getSenderService().setOnDisconnectedListener(null)
+    getSenderService().setShowTextCallback(null)
     super.onDestroy()
   }
 
