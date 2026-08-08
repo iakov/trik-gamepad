@@ -41,6 +41,29 @@ class DummyServer {
     }
   }
 
+  /**
+   * Negative-await: polls for the [quietMillis] window and reports whether any message arrived
+   * within it. Callers assert `false` to prove nothing was sent (e.g. no keepalive after
+   * disconnect), so a genuinely-idle window is the success case.
+   */
+  @Throws(InterruptedException::class)
+  fun anyMessageWithin(quietMillis: Long): Boolean {
+    val baseline = receivedMessages.size
+    val deadline = System.currentTimeMillis() + quietMillis
+    synchronized(lock) {
+      while (System.currentTimeMillis() < deadline) {
+        if (receivedMessages.size > baseline) {
+          return true
+        }
+        val remaining = deadline - System.currentTimeMillis()
+        if (remaining > 0) {
+          lock.wait(remaining)
+        }
+      }
+      return receivedMessages.size > baseline
+    }
+  }
+
   init {
     try {
       // Bind synchronously in the constructor so the port is guaranteed

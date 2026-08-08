@@ -51,8 +51,9 @@ class KeepAliveTests {
     assertTrue(server.awaitMessage("testtest", 30000))
     client.disconnect("testtest")
 
-    // Give any (incorrectly scheduled) keepalive a chance to appear.
-    Thread.sleep(2000)
+    // Give any (incorrectly scheduled) keepalive a chance to appear within a
+    // bounded window, then prove none did (keepalive period is 2000ms).
+    assertFalse(server.anyMessageWithin(2500))
     server.stopListening()
 
     val messages = server.receivedMessages.iterator()
