@@ -13,22 +13,27 @@ spotlessCheck) before each push, `git status --short` clean before push.
 
 ## Campaign 2 (post-ROADMAP — in progress 2026-08-08)
 
-Scope set by user decision. Execution order B/C → A/D → E. Full detail +
-in-flight crash-safety state: `.PLAN.md` "Campaign 2".
+Scope set by user decision (2026-08-08). **Strategy: coverage-first** — increase
+test coverage before refactoring, maintain it through refactoring (B4 is the one
+granted exception: it reduces test-writing complexity). Revised order
+B2 → B4 → C → B3 → A → D → E → F. Full detail + in-flight crash-safety state:
+`.PLAN.md` "Campaign 2".
 
 - **B1** ✅ `MagicButtonPanel` extracted (buttons + haptic; direct tests). `ee4a91b`.
 - **B2** 🔶 `SystemUiController` extracted (immersive toggle + auto-hide);
-  in flight, spotless-pending.
-- **B3** ⬜ SenderService inner classes → separate files.
-- **B4** ⬜ SquareTouchPadLayout pure touch-math.
-- **C** ⬜ Coverage → ~95 line / ~80 branch (targets: MjpegFrameRendererKt 0%,
-  VideoStreamLoader 88%, MjpegInputStream 91.5%, SenderService 93.1%,
-  MainActivitySettingsController 96.4%); ratchet gate as measured.
+  in flight, spotless-pending; show-then-auto-hide UX confirmed by user.
+- **B4** ⬜ `TouchPadController` pure touch-math (BEFORE C — reduces test complexity).
+- **C** ⬜ Coverage → **95 line / 80 branch floor** (LINE already 96.9%;
+  the work is BRANCH 72.6 → 80); targets: MainActivity 39/68, MjpegInputStream
+  20/26, SettingsFragment 6/10, MainActivitySettingsController 8/12, MjpegView
+  7/10, SenderService 21/24, MjpegFrameRendererKt 0%; ratchet gate as measured.
+- **B3** ⬜ SenderService inner classes → separate files (after C — no test
+  benefit, keep the coverage net green).
 - **A** ⬜ CI hardening (concurrency guard; aosp_atd flake-rate probe ×3;
   batch-split if flaky).
 - **D** ⬜ CI cache tuning (measure; parallel/jvmargs/CC-strict; one CI run each).
-- **E** ⬜ AGP9/Gradle9 (research → settings.gradle restructure → plugins DSL →
-  upgrade; full gate each step).
+- **E** ⬜ AGP-9 PREP ONLY (settings.gradle + buildscript → plugins DSL; stay
+  on AGP 8.13.2 / Gradle 8.14.5; no version bump).
 - **F** ⬜ Cleanup (emulator snapshot discrepancy, DummyServer note) +
   final retrospective.
 
