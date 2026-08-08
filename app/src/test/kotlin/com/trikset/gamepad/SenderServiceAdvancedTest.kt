@@ -10,10 +10,8 @@ import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
-import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -33,41 +31,10 @@ import org.robolectric.annotation.LooperMode.Mode.PAUSED
 class SenderServiceAdvancedTest {
   private val mExecutor = PausedExecutorService()
 
-  // SenderService keeps keepaliveTimeout and mConnectTask as STATIC fields and
-  // each connected client starts a keepalive Timer that runs on a real thread.
-  // Reset the static timeout and clear the static connect task before and
-  // after each test, and always disconnect connected clients to stop their
-  // timers, or leaked timers / stale static state pollute later tests (the
-  // SDK-23 variant is most exposed).
-  @Before
-  fun resetStaticState() {
-    clearConnectTask()
-    val reset = SenderService()
-    reset.setExecutor(mExecutor)
-    reset.setKeepaliveTimeout(SenderService.DEFAULT_KEEPALIVE)
-    reset.disconnect("reset")
-  }
-
-  @After
-  fun tearDown() {
-    clearConnectTask()
-    val reset = SenderService()
-    reset.setExecutor(mExecutor)
-    reset.setKeepaliveTimeout(SenderService.DEFAULT_KEEPALIVE)
-    reset.disconnect("teardown")
-  }
-
-  private fun clearConnectTask() {
-    val f = SenderService::class.java.getDeclaredField("mConnectTask")
-    f.isAccessible = true
-    f.set(null, null)
-  }
-
   @Test
   fun disconnectShouldInvokeOnDisconnectedListener() {
     ReadUntilStopServer().use { server ->
-      val client = SenderService()
-      client.setExecutor(mExecutor)
+      val client = SenderService(mExecutor)
       val reason = AtomicReference<String>()
       client.setOnDisconnectedListener { reason.set(it) }
 
@@ -87,8 +54,7 @@ class SenderServiceAdvancedTest {
   @Test
   fun setTargetShouldDisconnectWhenChanged() {
     ReadUntilStopServer().use { first ->
-      val client = SenderService()
-      client.setExecutor(mExecutor)
+      val client = SenderService(mExecutor)
       val reason = AtomicReference<String>()
       client.setOnDisconnectedListener { reason.set(it) }
 
@@ -107,8 +73,7 @@ class SenderServiceAdvancedTest {
   @Test
   fun sendFailureShouldDisconnectAndReport() {
     ReadUntilStopServer().use { server ->
-      val client = SenderService()
-      client.setExecutor(mExecutor)
+      val client = SenderService(mExecutor)
       client.setTarget("localhost", server.getPort())
       client.send("first")
       mExecutor.runAll()
@@ -130,8 +95,7 @@ class SenderServiceAdvancedTest {
   fun keepaliveShouldBeSentWhileConnected() {
     val timeout = 1300 // real period = timeout - 300 = 1000ms
     ReadUntilStopServer().use { server ->
-      val client = SenderService()
-      client.setExecutor(mExecutor)
+      val client = SenderService(mExecutor)
       client.setTarget("localhost", server.getPort())
       client.setKeepaliveTimeout(timeout)
       client.send("bootstrap")
@@ -158,8 +122,7 @@ class SenderServiceAdvancedTest {
   @Test
   fun showTextCallbackShouldReceiveConnectionResult() {
     ReadUntilStopServer().use { server ->
-      val client = SenderService()
-      client.setExecutor(mExecutor)
+      val client = SenderService(mExecutor)
       val text = AtomicReference<String>()
       client.setShowTextCallback { text.set(it) }
 
@@ -178,8 +141,7 @@ class SenderServiceAdvancedTest {
 
   @Test
   fun sendToUnreachablePortShouldNotThrow() {
-    val client = SenderService()
-    client.setExecutor(mExecutor)
+    val client = SenderService(mExecutor)
     // Port 1: nothing listens on it, so the connect is refused and connectToTRIK
     // swallows the IOException.
     client.setTarget("localhost", 1)
@@ -190,8 +152,7 @@ class SenderServiceAdvancedTest {
 
   @Test
   fun keepaliveTimeoutBelowMinimumIsStoredUnchanged() {
-    val client = SenderService()
-    client.setExecutor(mExecutor)
+    val client = SenderService(mExecutor)
     val before = client.getKeepaliveTimeout()
     // The service does not clamp; the caller (MainActivity) enforces the
     // minimum. This just verifies the setter round-trips.

@@ -9,27 +9,39 @@ import java.io.PrintWriter
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.charset.StandardCharsets
-import java.util.Timer
-import java.util.TimerTask
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 
 /**
  * Maintains one TCP connection to the robot and sends newline-terminated plain-text commands (`pad1
  * x y`, `btn N down`, `wheel <angle>`, `keepalive <ms>`).
  *
- * The two network fields [mExecutor] and [mConnectTask] stay STATIC (as in the Java) so all
- * instances share one network thread; tests inject a
- * [PausedExecutorService][org.robolectric.android.util.concurrent.PausedExecutorService] via
- * [setExecutor] and reset the statics via reflection.
+ * All network/keepalive collaborators are injected via the constructor (defaults preserved) so
+ * tests substitute a
+ * [PausedExecutorService][org.robolectric.android.util.concurrent.PausedExecutorService] for
+ * [executor] without touching static state (ROADMAP Phase 3; the former `@JvmField` statics
+ * `mExecutor`/`keepaliveTimeout`/`mConnectTask` are gone).
  */
-class SenderService {
+class SenderService(
+    executor: Executor = Executors.newSingleThreadExecutor(),
+    initialKeepaliveTimeout: Int = DEFAULT_KEEPALIVE,
+    keepAliveScheduler: ScheduledExecutorService =
+        Executors.newSingleThreadScheduledExecutor { runnable ->
+          Thread(runnable, "SenderServiceKeepAlive").apply { isDaemon = true }
+        },
+) {
 
   fun interface OnEventListener<ArgT> {
     fun onEvent(arg: ArgT)
   }
 
   private val syncFlag = Any()
+  private var executor: Executor = executor
+  private var keepaliveTimeout: Int = initialKeepaliveTimeout
+  private var mConnectTask: Runnable? = null
   // internal (not private) so the inner network/keepalive classes reach them
   // without synthetic accessors (lint SyntheticAccessor, previously baselined
   // on the Java source).
@@ -39,13 +51,7 @@ class SenderService {
   internal var mOut: PrintWriter? = null
   private var mHostAddr: String? = null
   private var mHostPort = 0
-  private val keepAliveTimer = KeepAliveTimer()
-
-  fun setExecutor(executor: Executor?) {
-    if (executor != null) {
-      mExecutor = executor
-    }
-  }
+  private val keepAliveTimer = KeepAliveTimer(keepAliveScheduler)
 
   fun setShowTextCallback(showTextCallback: OnEventListener<String>?) {
     this.showTextCallback = showTextCallback
@@ -62,7 +68,7 @@ class SenderService {
       }
       val task = ConnectRunnable()
       mConnectTask = task
-      mExecutor?.execute(task)
+      executor.execute(task)
     }
   }
 
@@ -96,7 +102,7 @@ class SenderService {
   }
 
   internal fun postCommand(command: String) {
-    mExecutor?.execute {
+    executor.execute {
       synchronized(syncFlag) {
         mOut?.println(command)
       }
@@ -165,34 +171,37 @@ class SenderService {
     }
   }
 
-  private inner class KeepAliveTimer : Timer() {
-    private var task = KeepAliveTimerTask()
+  private inner class KeepAliveTimer(private val scheduler: ScheduledExecutorService) {
+    private var task: ScheduledFuture<*>? = null
 
     fun restartKeepAliveTimer() {
       stopKeepAliveTimer()
-      task = KeepAliveTimerTask()
       // '300' compensates ping
       val realTimeout = keepaliveTimeout - KEEPALIVE_COMPENSATION_MS
-      schedule(task, realTimeout.toLong(), realTimeout.toLong())
+      task =
+          scheduler.scheduleWithFixedDelay(
+              { tick() },
+              realTimeout.toLong(),
+              realTimeout.toLong(),
+              TimeUnit.MILLISECONDS,
+          )
     }
 
     fun stopKeepAliveTimer() {
-      task.cancel()
-      purge()
+      task?.cancel(false)
+      task = null
     }
 
-    private inner class KeepAliveTimerTask : TimerTask() {
-      override fun run() {
-        val out = mOut
-        if (out != null) {
-          val command = "keepalive $keepaliveTimeout"
-          if (Log.isLoggable(TCP_TAG, Log.DEBUG)) {
-            Log.d(TCP_TAG, "Sending $command message")
-          }
-          postCommand(command)
-        } else {
-          stopKeepAliveTimer()
+    private fun tick() {
+      val out = mOut
+      if (out != null) {
+        val command = "keepalive $keepaliveTimeout"
+        if (Log.isLoggable(TCP_TAG, Log.DEBUG)) {
+          Log.d(TCP_TAG, "Sending $command message")
         }
+        postCommand(command)
+      } else {
+        stopKeepAliveTimer()
       }
     }
   }
@@ -205,9 +214,5 @@ class SenderService {
     private const val TRAFFIC_CLASS = 0x0F
     private const val KEEPALIVE_COMPENSATION_MS = 300
     private const val TCP_TAG = "TCP"
-
-    @JvmField var mExecutor: Executor? = Executors.newSingleThreadExecutor()
-    @JvmField var keepaliveTimeout: Int = DEFAULT_KEEPALIVE
-    @JvmField var mConnectTask: Runnable? = null
   }
 }

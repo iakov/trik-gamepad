@@ -23,28 +23,12 @@ class SquareTouchPadLayoutTest {
   private lateinit var sender: SenderService
   private lateinit var pad: SquareTouchPadLayout
 
-  // SenderService keeps keepaliveTimeout and mConnectTask STATIC; tests that
-  // run before this class may have left them dirty, which would make
-  // connectAsync() a no-op and every awaitConnection() time out. Reset before
-  // each test (same discipline as SenderServiceAdvancedTest).
-  @Before
-  fun resetSenderServiceStaticState() {
-    val f = SenderService::class.java.getDeclaredField("mConnectTask")
-    f.isAccessible = true
-    f.set(null, null)
-    val reset = SenderService()
-    reset.setExecutor(mExecutor)
-    reset.setKeepaliveTimeout(SenderService.DEFAULT_KEEPALIVE)
-    reset.disconnect("reset")
-  }
-
   private fun eventAt(x: Float, y: Float, action: Int): MotionEvent =
       MotionEvent.obtain(0L, 0L, action, x, y, 0)
 
   @Before
   fun setUp() {
-    sender = SenderService()
-    sender.setExecutor(mExecutor)
+    sender = SenderService(mExecutor)
     sender.setKeepaliveTimeout(10000000) // disable keepalive noise
     sender.setTarget("localhost", 12345) // connect attempt is queued, not awaited
 

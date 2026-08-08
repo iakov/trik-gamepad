@@ -27,10 +27,8 @@ class SenderServiceTest {
   private val mExecutor = PausedExecutorService()
   private var client: SenderService? = null
 
-  // A connected client keeps a real keepalive Timer thread alive that fires
-  // into the STATIC SenderService.mExecutor (set to this test's executor by
-  // setExecutor). Disconnecting every client in @After stops the Timer, so no
-  // leaked keepalive task can land on a later test's executor.
+  // A connected client keeps a real keepalive scheduler thread alive. Disconnect
+  // every client in @After so no keepalive task can land on a later test.
   @After
   fun tearDown() {
     client?.disconnect("tearDown")
@@ -39,7 +37,7 @@ class SenderServiceTest {
   @Test
   fun senderServiceShouldConnectToServerSuccessfullyAfterSendingCommand() {
     DummyServer(1).use { server ->
-      client = SenderService().also { it.setExecutor(mExecutor) }
+      client = SenderService(mExecutor)
       client!!.setTarget(DummyServer.IP, server.getPort())
       client!!.send("")
       mExecutor.runAll()
@@ -52,7 +50,7 @@ class SenderServiceTest {
   @Test
   fun senderServiceShouldSendSingleCommandCorrectly() {
     DummyServer(1).use { server ->
-      client = SenderService().also { it.setExecutor(mExecutor) }
+      client = SenderService(mExecutor)
       client!!.setTarget(DummyServer.IP, server.getPort())
       client!!.setKeepaliveTimeout(10000000) // to disable keep-alive messages
       client!!.send("Test; check")
@@ -66,7 +64,7 @@ class SenderServiceTest {
   @Test
   fun senderServiceShouldSendMultipleCommandsCorrectly() {
     DummyServer(5).use { server ->
-      client = SenderService().also { it.setExecutor(mExecutor) }
+      client = SenderService(mExecutor)
       client!!.setTarget(DummyServer.IP, server.getPort())
       client!!.setKeepaliveTimeout(10000000) // to disable keep-alive messages
 
@@ -82,14 +80,14 @@ class SenderServiceTest {
 
   @Test
   fun setTargetShouldSetServerSuccessfully() {
-    client = SenderService().also { it.setExecutor(mExecutor) }
+    client = SenderService(mExecutor)
     client!!.setTarget("someaddr-test", 0)
     assertEquals("someaddr-test", client!!.getHostAddr())
   }
 
   @Test
   fun senderServiceShouldReturnCorrectKeepaliveTimeout() {
-    client = SenderService().also { it.setExecutor(mExecutor) }
+    client = SenderService(mExecutor)
     client!!.setKeepaliveTimeout(3453)
     assertEquals(3453, client!!.getKeepaliveTimeout())
     client!!.setKeepaliveTimeout(1234)
