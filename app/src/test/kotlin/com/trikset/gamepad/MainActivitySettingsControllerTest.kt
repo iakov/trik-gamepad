@@ -142,4 +142,25 @@ class MainActivitySettingsControllerTest {
       controller.unregister()
     }
   }
+
+  @Test
+  fun onPreferenceChangedShouldApplyStoredWheelStep() {
+    prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "42").commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals(42, ui.step)
+  }
+
+  @Test
+  fun onPreferenceChangedWithGarbageWheelStepShouldKeepDefault() {
+    prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "not-a-number").commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals(7, ui.step)
+  }
+
+  @Test
+  fun onPreferenceChangedShouldClampWheelStepToMax() {
+    prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "500").commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals(100, ui.step)
+  }
 }

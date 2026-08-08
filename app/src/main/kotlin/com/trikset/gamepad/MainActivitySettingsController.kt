@@ -110,13 +110,9 @@ class MainActivitySettingsController(
     }
 
     val wheelStep =
-        Integer.getInteger(
-            sharedPreferences.getString(
-                SettingsFragment.SK_WHEEL_STEP,
-                ui.getWheelStep().toString(),
-            ),
-            ui.getWheelStep(),
-        ) ?: ui.getWheelStep()
+        sharedPreferences
+            .getString(SettingsFragment.SK_WHEEL_STEP, ui.getWheelStep().toString())
+            ?.toIntOrNull() ?: ui.getWheelStep()
     ui.setWheelStep(Math.max(WHEEL_STEP_MIN, Math.min(WHEEL_STEP_MAX, wheelStep)))
 
     try {
