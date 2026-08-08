@@ -3,7 +3,7 @@
     <issue id="MissingTranslation" severity="warning" />
     <!-- OldTargetApi is environment-dependent: it fires only when the lint
          environment knows a newer stable API than targetSdk 36. That decision
-         is locked (plan R7, minSdk 21 compatibility), and whether the check
+         is locked (plan R7, targetSdk 36), and whether the check
          trips depends on which SDK platforms are installed, so a lint baseline
          cannot pin it. Downgrade to ignore; the version is deliberate. -->
     <issue id="OldTargetApi" severity="ignore" />

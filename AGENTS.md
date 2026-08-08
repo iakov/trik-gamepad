@@ -36,7 +36,7 @@ Improvement roadmap: `docs/ROADMAP.md`.
   is built in; `kotlinOptions {}` is gone, `jvmTarget` defaults to
   `compileOptions.targetCompatibility`), Java 11 source/target — Gradle runs
   under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`,
-  `targetSdk 36`, `minSdk 21`, `maxSdk 36` — single main flavor, no product
+  `targetSdk 36`, `minSdk 23`, `maxSdk 36` — single main flavor, no product
   flavors. AGP 9's new DSL is on (no `android.newDsl=false` opt-out).
 - `org.gradle.configuration-cache=true` — **re-enabled under AGP 9**: the AGP
   `https.proxyHost` sys-prop read that defeated it on AGP 8 was fixed, so the

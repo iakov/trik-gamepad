@@ -39,7 +39,7 @@ keystore is present, so release builds sign normally. Key alias is `gamepad`.
 `appMajorVersion`/`appMinorVersion` are hand-set at the top of `app/build.gradle`
 (currently 1.41; the 1.41 bump landed with the SDK 36 toolchain upgrade).
 `versionCode = minSdk*10000 + abiCode*1000 + major*100 + minor`
-(never set by hand), `versionName = "1.41"`, `versionNameSuffix = "-API21"`.
+(never set by hand), `versionName = "1.41"`, `versionNameSuffix = "-API23"`.
 Bump `appMinorVersion` per release; semantic 1.x is kept intentionally
 (Play Store requires a strictly increasing versionCode per app — date-based
 versions risk collisions with the `minSdk*10000 + ...` formula).
@@ -324,13 +324,16 @@ freedom to upgrade tooling/deps. Constraints: backward-compatible with 99% of
 Androids; tests-first (TDD) so features keep working; keep Java sources this
 release (pure-Kotlin later); single main flavor — a legacy flavor is postponed.
 
-**Decision (D14–D19, full rationale in `.PLAN.md`):** minSdk 21 stays
+**Decision (D14–D19, full rationale in `.PLAN.md`):** minSdk 21 was initially kept
 (AndroidX floor for libs released before June 2025; 99.8% coverage vs 98.0% at
-minSdk 23). Toolchain goes to Gradle 8.14.5 + AGP 8.13.2 + Kotlin 2.x (NOT AGP
-9 — needs settings.gradle/plugins-DSL migration on this legacy single-module
-`apply plugin:` layout). `compileSdk/targetSdk/maxSdk 36` (Play requires
-targetSdk 36 from 2026-08-31). Deps pinned to minSdk-21-compatible freshest:
-core 1.16.0 / appcompat 1.7.1 (core 1.17+ raises minSdk to 23). Version 1.41.
+minSdk 23) — **REVERSED 2026-08-08 to minSdk 23** ("forget obsolete", `4753c45`):
+Robolectric 4.16 already drops API 21/22 (OLDEST_SDK = 23), so the app's declared
+min never matched what tests ran; the new AndroidX floor is minSdk 23. Toolchain
+went to AGP 9.3.1 + Gradle 9.5.0 + Kotlin 2.x (built-in Kotlin, `78aace4`).
+`compileSdk/targetSdk/maxSdk 36` (Play requires targetSdk 36 from 2026-08-31).
+Deps pinned to minSdk-23-compatible freshest: core 1.16.0 / appcompat 1.7.1
+(core 1.17+ needs minSdk 23; 1.19.0 additionally needs compileSdk 37, locked at
+36 — see "Campaign 3"). Version 1.41.
 
 **Consequences:** `.PLAN.md` rewritten with a six-commit sequence (docs →
 gates → format sweep → test fix → toolchain/deps/version → docs
@@ -345,7 +348,7 @@ fullscreen gamepad UI — needs an API 36 emulator smoke test.
 **Data (cumulative coverage):** minSdk 16=99.9%, 19=99.9%, 21=99.8%,
 23=98.0%, 26=96.1%, 28=93.5%, 30=86.9%, 34=54.5%, 36=22.3%. Play requires
 targetSdk 36+ after 2026-08-31. AndroidX libs released after June 2025 require
-minSdk 23.
+minSdk 23 (adopted as the app's minSdk in Campaign 3, `4753c45`).
 
 **Freshest stable (2026-08-05):** Gradle 8.14.5 (9.6.1 pairs with AGP 9); AGP
 8.13.2 (9.3.1 is freshest stable but breaking); Kotlin 2.4.10; appcompat 1.7.1,
@@ -503,7 +506,7 @@ quality gates, coverage to 85%, then pure-Kotlin migration; no release, no PR.
 `app/` module at repo root; delete `xamarin/`, `as/import-summary.txt`,
 Eclipse junk, `.local_development.db`; `imgs/` → `docs/img/`; retire CircleCI
 → GitHub Actions; conditional signing (keystore stays outside the workdir);
-toolchain Gradle 8.14.5 / AGP 8.13.2 / Kotlin 2.x / SDK 36 / minSdk 21;
+toolchain Gradle 9.5.0 / AGP 9.3.1 / built-in Kotlin / SDK 36 / minSdk 23;
 coverage gate starts 60% and ratchets to 85% before Kotlin migration;
 MJPEG reconnect-on-error replaces the 30 s forced restart.
 
@@ -1153,8 +1156,10 @@ version-lock entries that are recorded, intentional decisions.
   logo was resized to 192×192 to satisfy `IconExpectedSize` for xxxhdpi.
 
 **Kept baselined (recorded decisions):** `AndroidGradlePluginVersion` (AGP 9
-deferred, R7/ROADMAP Phase 7) and `GradleDependency core-ktx 1.19.0` (minSdk 21
-lock). No relaxation in `lint.xml` was needed; the baseline is the ratchet.
+deferred, R7/ROADMAP Phase 7) and `GradleDependency core-ktx 1.19.0` (needs
+compileSdk 37; compileSdk is locked at 36 — core-ktx 1.19.0 would bump it, so
+the pin + baseline stay; minSdk is no longer the blocker after `4753c45`).
+No relaxation in `lint.xml` was needed; the baseline is the ratchet.
 
 **Update (2026-08-08, AGP 9 migration):** under AGP 9.3.1, `AndroidGradlePluginVersion`
 now fires on the **Gradle wrapper version** (9.5.0 < 9.7.0 available) — and its
@@ -1716,11 +1721,10 @@ the docs.
 Threads/executors are NOT under the shadow scheduler — stop every
 ExecutorService explicitly and gate on latches/timeouts. Plain
 `java.net.Socket` works on the JVM. **Robolectric 4.16 dropped API 21/22 (min
-now 23)** — the app's minSdk is 21, so `Config.OLDEST_SDK` resolves to 23;
-verify that's intended. `@Config(sdk = [OLDEST, TARGET, NEWEST])` triples run
-time (each SDK downloads its own android-all jar). Known AGP-9 issue: built-in
-Kotlin breaks kapt-based custom-shadow registration (workaround
-`com.android.legacy-kapt`; fix = KSP).
+now 23)** — the app's minSdk was raised to 23 in Campaign 3 (`4753c45`), so
+`Config.OLDEST_SDK` now equals the declared min (intended). `@Config(sdk = [OLDEST, TARGET, NEWEST])` triples run time (each SDK downloads its own
+android-all jar). Known AGP-9 issue: built-in Kotlin breaks kapt-based custom-shadow
+registration (workaround `com.android.legacy-kapt`; fix = KSP).
 
 **Espresso on headless CI:** `RootViewWithoutFocusException` causes are system
 overlays/dialogs, animations mid-flight, keyguard, keyboard, immersive
