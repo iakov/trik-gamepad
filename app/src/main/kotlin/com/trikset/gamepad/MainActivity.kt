@@ -114,6 +114,19 @@ class MainActivity :
 
     mSettingsController = MainActivitySettingsController(this, getSenderService(), this)
     mSettingsController?.register()
+
+    // Observe the TCP connection state for the activity's lifetime; repeatOnLifecycle
+    // (not the deprecated launchWhenX) stops the collection on STOP and restarts it
+    // fresh on each START, so no stale emissions are collected across pauses.
+    lifecycleScope.launch {
+      repeatOnLifecycle(Lifecycle.State.STARTED) {
+        senderViewModel.connectionState.collect { state ->
+          if (state is ConnectionState.Disconnected && state.reason.isNotEmpty()) {
+            toast("Disconnected." + state.reason)
+          }
+        }
+      }
+    }
   }
 
   override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -136,22 +149,6 @@ class MainActivity :
         }
         else -> super.onOptionsItemSelected(item)
       }
-
-  override fun onStart() {
-    super.onStart()
-    // Observe the TCP connection state for its lifetime; repeatOnLifecycle
-    // (not the deprecated launchWhenX) so the collection stops on STOP and
-    // restarts fresh on each START (no stale emissions across pauses).
-    lifecycleScope.launch {
-      repeatOnLifecycle(Lifecycle.State.STARTED) {
-        senderViewModel.connectionState.collect { state ->
-          if (state is ConnectionState.Disconnected && state.reason.isNotEmpty()) {
-            toast("Disconnected." + state.reason)
-          }
-        }
-      }
-    }
-  }
 
   override fun onPause() {
     mSensorManager?.unregisterListener(this)

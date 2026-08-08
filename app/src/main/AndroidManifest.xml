@@ -14,7 +14,7 @@
         android:label="@string/appLabel"
         android:theme="@style/AppTheme"
         android:networkSecurityConfig="@xml/network_security_config"
-        tools:targetApi="m">
+        tools:targetApi="n">
        <!--  <service android:name=".SenderService" />  -->
 
        <activity
