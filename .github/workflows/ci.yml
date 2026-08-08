@@ -87,13 +87,14 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
           api-level: 36
-          # default image + swiftshader is the mainstream CI combo (used by
-          # coil/retrofit/sqldelight). aosp_atd + swiftshader was verified to
-          # NEVER grant the app window focus (8/8 RootViewWithoutFocusException);
-          # aosp_atd only works with a host GPU, which ubuntu-latest lacks.
-          target: default
+          # aosp_atd retry (Phase 1 experiment 2): the original "aosp_atd +
+          # swiftshader NEVER grants focus" finding predates the immersive
+          # pre-empt + focus-wait fixes (ci.yml pre-empt, FocusAwareActivityTestRule),
+          # so re-test aosp_atd now that focus handling exists. aosp_atd is the
+          # headless-optimized image (smaller boot + less render load than
+          # pixel_5 default), which also probes the swiftshader render-load theory.
+          target: aosp_atd
           arch: x86_64
-          profile: pixel_5
           cores: 4
           ram-size: 4096M
           emulator-options: -no-window -no-snapshot -noaudio -no-boot-anim -gpu swiftshader_indirect
