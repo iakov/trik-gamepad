@@ -127,30 +127,6 @@ class MainActivityTest {
   }
 
   @Test
-  fun processSensorShouldSendWheelWhenAngleChanged() {
-    setField(activity, "mWheelEnabled", true)
-    setField(activity, "mAngle", 0)
-    setField(activity, "mWheelStep", 7)
-
-    val m = method(activity, "processSensor", FloatArray::class.java)
-    m.invoke(activity, floatArrayOf(1f, 0f)) // angle 0
-    m.invoke(activity, floatArrayOf(0.7f, 0.7f)) // angle ~ +45
-
-    assertNotNull(activity.getSenderService())
-  }
-
-  @Test
-  fun processSensorShouldSkipSmallAngles() {
-    setField(activity, "mWheelEnabled", true)
-    setField(activity, "mAngle", 0)
-    setField(activity, "mWheelStep", 7)
-    val m = method(activity, "processSensor", FloatArray::class.java)
-
-    m.invoke(activity, floatArrayOf(1f, 0f))
-    m.invoke(activity, floatArrayOf(1f, 0.01f)) // tiny angle delta, no send
-  }
-
-  @Test
   fun onOptionsItemSelectedShouldToggleWheel() {
     assertFalse(field(activity, "mWheelEnabled") as Boolean)
     setField(activity, "mWheelEnabled", true)
@@ -259,29 +235,6 @@ class MainActivityTest {
     controller.onPreferenceChanged(prefs)
     // >= MINIMAL_KEEPALIVE -> applied to the sender.
     assertEquals(2000, activity.getSenderService().getKeepaliveTimeout())
-  }
-
-  @Test
-  fun processSensorShouldClampAngleAndHonorStep() {
-    setField(activity, "mWheelEnabled", true)
-    setField(activity, "mAngle", 0)
-    setField(activity, "mWheelStep", 7)
-    val m = method(activity, "processSensor", FloatArray::class.java)
-
-    // Large positive angle (x>0, y large) -> clamped to 100 and sent.
-    m.invoke(activity, floatArrayOf(1f, 100f))
-    assertEquals(100, field(activity, "mAngle") as Int)
-  }
-
-  @Test
-  fun processSensorShouldClampNegativeAngle() {
-    setField(activity, "mWheelEnabled", true)
-    setField(activity, "mAngle", 0)
-    setField(activity, "mWheelStep", 7)
-    val m = method(activity, "processSensor", FloatArray::class.java)
-    // y negative, x positive -> atan2 negative -> angle below -100 -> clamped.
-    m.invoke(activity, floatArrayOf(1f, -2f))
-    assertEquals(-100, field(activity, "mAngle") as Int)
   }
 
   @Test

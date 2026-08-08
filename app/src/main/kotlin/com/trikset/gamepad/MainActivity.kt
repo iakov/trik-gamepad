@@ -39,11 +39,12 @@ class MainActivity :
   private var mSensorManager: SensorManager? = null
   private var mAngle = 0 // -100% .. +100%
   private var mWheelEnabled = false
-  private var mSender: SenderService? = null
   private var mWheelStep = WHEEL_STEP_DEFAULT
+  private var mSender: SenderService? = null
   private var mVideo: MjpegView? = null
   private var mVideoURL: URL? = null
   private var mSettingsController: MainActivitySettingsController? = null
+  private val wheelController = WheelController()
 
   private fun createPad(id: Int, strId: String) {
     val pad = findViewById<SquareTouchPadLayout>(id)
@@ -168,9 +169,6 @@ class MainActivity :
 
   override fun onSensorChanged(event: SensorEvent) {
     if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
-      if (!mWheelEnabled) {
-        return
-      }
       processSensor(event.values)
     } else {
       Log.i("Sensor", event.sensor.type.toString())
@@ -178,25 +176,8 @@ class MainActivity :
   }
 
   private fun processSensor(values: FloatArray) {
-    val x = values[0]
-    val y = values[1]
-    if (x < MIN_ACCELERATION_X) {
-      return
-    }
-    var angle =
-        (WHEEL_ANGLE_SCALE * WHEEL_BOOSTER_MULTIPLIER * Math.atan2(y.toDouble(), x.toDouble()) /
-                Math.PI)
-            .toInt()
-    if (Math.abs(angle) < ANGLE_DEAD_ZONE) {
-      angle = 0
-    } else if (angle > ANGLE_CLAMP) {
-      angle = ANGLE_CLAMP
-    } else if (angle < -ANGLE_CLAMP) {
-      angle = -ANGLE_CLAMP
-    }
-    if (Math.abs(mAngle - angle) < mWheelStep) {
-      return
-    }
+    val angle =
+        wheelController.nextAngle(values[0], values[1], mAngle, mWheelStep, mWheelEnabled) ?: return
     mAngle = angle
     getSenderService().send("wheel $mAngle")
   }
@@ -332,10 +313,5 @@ class MainActivity :
     const val HIDE_DELAY_MS = 3000L
     const val ALPHA_ANIMATION_MS = 2000L
     const val WHEEL_STEP_DEFAULT = 7
-    const val MIN_ACCELERATION_X = 1e-6
-    const val WHEEL_ANGLE_SCALE = 200
-    const val WHEEL_BOOSTER_MULTIPLIER = 1.5
-    const val ANGLE_DEAD_ZONE = 10
-    const val ANGLE_CLAMP = 100
   }
 }
