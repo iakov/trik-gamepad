@@ -164,8 +164,18 @@ class SenderServiceAdvancedTest {
       client.send("two")
       mExecutor.runAll()
       shadowOf(getMainLooper()).idle()
-      // No crash; the second command was sent over the live socket.
-      assertTrue(server.receivedContains("two"))
+      // The server reads asynchronously; poll for the second command instead
+      // of asserting immediately (bounded await, never a bare assert).
+      var seen = false
+      var attempts = 0
+      while (!seen && attempts < 20) {
+        attempts++
+        Thread.sleep(50)
+        mExecutor.runAll()
+        shadowOf(getMainLooper()).idle()
+        seen = server.receivedContains("two")
+      }
+      assertTrue("expected 'two' over the live socket", seen)
       client.disconnect("done")
     }
   }
