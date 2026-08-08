@@ -73,14 +73,15 @@ architecture → P3 hygiene** (each item one commit, gate, push; detailed plan:
   fully green.
 - **Next (Campaign 4):** synthetic MJPEG server test — see below.
 
-## Campaign 4 — synthetic MJPEG server test (planned 2026-08-08)
+## Campaign 4 — synthetic MJPEG server test (DONE 2026-08-08)
 
 A real HTTP MJPEG server (test source) streams JPEG frames to the app pipeline
 to verify **decoder correctness**, **decode performance**, and **connection
 drop + restore** (R12 reconnect-on-error). User decisions: **Robolectric NATIVE
 venue** (real `BitmapFactory` via `@GraphicsMode(NATIVE)`), **full app reconnect
-path**, **cycle a few images** (solid color + gradient + second color).
-Design + execution record: `.PLAN.md` "Campaign 4".
+path**, **cycle a few images** (solid color + gradient + second color). Landed
+`e0dcc18`; execution record: `.PLAN.md` "Campaign 4" + MEMORY "Campaign 4
+execution run".
 
 ## Phase 1 — Instrumented CI without macOS
 

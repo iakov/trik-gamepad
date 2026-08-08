@@ -1831,3 +1831,35 @@ blocked read unblocks, and the error listener is not fired on a deliberate stop.
 - pre-commit's `spotlessApply` hook reformats Kotlin files AFTER staging; the commit
   silently fails on the first attempt ("files were modified by this hook") — the
   fix is re-`git add` + re-commit. Hit on ~every commit this campaign.
+
+### [2026-08-08] Campaign 4 execution run — synthetic MJPEG server tests
+
+Landed `e0dcc18`. A real HTTP `SyntheticMjpegServer` (test source) streams
+multipart/x-mixed-replace JPEG frames to the app's real `VideoStreamLoader` +
+`MjpegInputStream` + `BitmapFactory` decode path. Files:
+`app/src/test/kotlin/com/trikset/gamepad/mjpeg/`.
+
+**Server (`SyntheticMjpegServer.kt`):** `ServerSocket(0)` ephemeral port (3
+parallel JVMs), cycles 3 seeded JPEGs (red-stripe / gradient / blue-stripe,
+comparable encoded sizes), drops the socket after N frames then resumes the
+accept loop (R12 drop/restore). Exposes `servedFrames`/`acceptedConnections`.
+
+**Tests (`SyntheticMjpegServerTest.kt`, `@GraphicsMode(NATIVE)`):**
+
+- Correctness: parser honors Content-Length exactly — each returned frame's bytes
+  are byte-identical to a seeded JPEG; ≥2 distinct seeded colors surface (cycle
+  advances). Runs at `@Config(sdk=[TARGET_SDK])` only (see quirk below).
+- Drop/restore: server closes after 4 frames → parser surfaces IOException (drop
+  detected) → a fresh `VideoStreamLoader.openStream` (same flow as
+  `restartVideoStream`) reconnects and decodes again; `acceptedConnections ≥ 2`.
+- Performance: 30 frames decoded ≥10 within a generous window (CI-flake-safe).
+
+**Robolectric quirk (cost debugging — documented):** under `@GraphicsMode(NATIVE)`,
+`BitmapFactory` decodes correctly on the default SDK (TARGET_SDK 36) but on **API 23
+(`OLDEST_SDK`) pixels decode near-black** (e.g. red → r=1,g=0,b=0). Not an app bug —
+byte-identical frames on all SDKs prove correctness; only *pixel color* is off on
+API 23. Hence the color-cycling test is pinned to TARGET_SDK; byte-equality,
+drop/restore and perf tests run on the full `[OLDEST, TARGET, NEWEST]` triple.
+Also: the `MjpegInputStream` `available() < 2*contentLength` frame-drop gate is
+size-sensitive — small frames are dropped first when the client lags, so seeded
+frames should have comparable JPEG sizes, and clients should be paced (~50ms).
