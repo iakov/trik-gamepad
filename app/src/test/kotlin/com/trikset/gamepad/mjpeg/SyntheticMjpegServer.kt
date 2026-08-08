@@ -52,7 +52,7 @@ class SyntheticMjpegServer(
                   val client = socket.accept()
                   acceptedConnections.incrementAndGet()
                   Thread { serveConnection(client) }.start()
-                } catch (e: IOException) {
+                } catch (_: IOException) {
                   // socket closed on stop(); loop exits below.
                 }
               }
@@ -66,7 +66,7 @@ class SyntheticMjpegServer(
     running = false
     try {
       serverSocket?.close()
-    } catch (e: IOException) {
+    } catch (_: IOException) {
       // already closed
     }
     acceptThread?.interrupt()
@@ -76,6 +76,8 @@ class SyntheticMjpegServer(
     stop()
   }
 
+  // Client-disconnect is the expected way this loop ends; the exception carries nothing actionable.
+  @Suppress("SwallowedException")
   private fun serveConnection(client: Socket) {
     try {
       client.use {

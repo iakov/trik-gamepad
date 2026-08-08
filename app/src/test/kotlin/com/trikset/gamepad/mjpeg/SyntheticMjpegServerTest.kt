@@ -30,111 +30,107 @@ class SyntheticMjpegServerTest {
   @Config(sdk = [Config.TARGET_SDK])
   fun framesShouldDecodeToExpectedSizesAndColors() {
     val images = SyntheticMjpegServer.defaultFrameImages()
-    SyntheticMjpegServer(frameImages = images, framesPerConnection = 10, frameIntervalMs = 50)
-        .use { server ->
-          val port = server.start()
-          try {
-            val stream = openStream(URL("http://127.0.0.1:$port/?action=stream"))
-            try {
-              // The parser drops frames when the socket buffer holds >2x a frame
-              // (available() gate), so read until we have a few successfully-parsed
-              // frames and assert on those. A 50ms server pacing lets the client drain
-              // the socket between frames so every frame survives the gate on every SDK
-              // (API 23 is slow enough that the server gets ahead with faster pacing and
-              // the small solid frames are the first to be dropped).
-              val decoded = readFrames(stream, expected = 3)
-              // Strongest correctness check, density-independent: the parser must have
-              // honored Content-Length exactly, so every frame's bytes equal one of the
-              // seeded JPEGs byte-for-byte.
-              decoded.forEach { bytes -> assertTrue(images.any { it.contentEquals(bytes) }) }
-              // Cycling: solid red -> gradient -> solid blue. Every sampled frame must
-              // be one of the three seeded images, and at least two distinct ones must
-              // appear (proves the cycle advanced past the first frame).
-              val colors =
-                  decoded.map { classify(BitmapFactory.decodeByteArray(it, 0, it.size)) }.toSet()
-              assertTrue("expected >=2 distinct seeded colors, got $colors", colors.size >= 2)
-            } finally {
-              stream.close()
-            }
-          } finally {
-            server.stop()
-          }
-        }
+    withServer(
+        SyntheticMjpegServer(frameImages = images, framesPerConnection = 10, frameIntervalMs = 50)
+    ) { port ->
+      withStream(url(port)) { stream ->
+        // The parser drops frames when the socket buffer holds >2x a frame
+        // (available() gate), so read until we have a few successfully-parsed
+        // frames and assert on those. A 50ms server pacing lets the client drain
+        // the socket between frames so every frame survives the gate on every SDK
+        // (API 23 is slow enough that the server gets ahead with faster pacing and
+        // the small solid frames are the first to be dropped).
+        val decoded = readFrames(stream, expected = 3)
+        // Strongest correctness check, density-independent: the parser must have
+        // honored Content-Length exactly, so every frame's bytes equal one of the
+        // seeded JPEGs byte-for-byte.
+        decoded.forEach { bytes -> assertTrue(images.any { it.contentEquals(bytes) }) }
+        // Cycling: solid red -> gradient -> solid blue. Every sampled frame must
+        // be one of the three seeded images, and at least two distinct ones must
+        // appear (proves the cycle advanced past the first frame).
+        val colors = decoded.map { classify(BitmapFactory.decodeByteArray(it, 0, it.size)) }.toSet()
+        assertTrue("expected >=2 distinct seeded colors, got $colors", colors.size >= 2)
+      }
+    }
   }
 
   @Test
   fun droppedConnectionShouldThrowThenReconnectAndDecode() {
-    SyntheticMjpegServer(framesPerConnection = 4).use { server ->
-      val port = server.start()
-      try {
-        val url = URL("http://127.0.0.1:$port/?action=stream")
-        var stream = openStream(url)
+    val server = SyntheticMjpegServer(framesPerConnection = 4)
+    withServer(server) { port ->
+      val url = url(port)
+      // Server closes abruptly after 4 frames -> the parser must surface an
+      // IOException (drop detected), the precondition for R12 reconnect.
+      var sawDrop = false
+      withStream(url) { stream ->
+        val deadline = System.currentTimeMillis() + 15000
         try {
-          // Server closes abruptly after 4 frames -> the parser must surface an
-          // IOException (drop detected), the precondition for R12 reconnect.
-          var sawDrop = false
-          val deadline = System.currentTimeMillis() + 15000
-          try {
-            while (System.currentTimeMillis() < deadline) {
-              readFrames(stream, expected = 1)
-            }
-          } catch (e: IOException) {
-            sawDrop = true
+          while (System.currentTimeMillis() < deadline) {
+            readFrames(stream, expected = 1)
           }
-          assertTrue("connection drop must surface as IOException", sawDrop)
-        } finally {
-          stream.close()
+        } catch (_: IOException) {
+          sawDrop = true
         }
-
-        // Restore: the app's reconnect path (VideoStreamLoader.openStream, same flow
-        // as restartVideoStream) re-opens and decodes again.
-        stream = openStream(url)
-        try {
-          val restored = readFrames(stream, expected = 1)
-          assertTrue(restored[0].isNotEmpty())
-          assertTrue(server.acceptedConnections.get() >= 2)
-        } finally {
-          stream.close()
-        }
-      } finally {
-        server.stop()
       }
+      assertTrue("connection drop must surface as IOException", sawDrop)
+
+      // Restore: the app's reconnect path (VideoStreamLoader.openStream, same flow
+      // as restartVideoStream) re-opens and decodes again.
+      withStream(url) { stream ->
+        val restored = readFrames(stream, expected = 1)
+        assertTrue(restored[0].isNotEmpty())
+      }
+      assertTrue(server.acceptedConnections.get() >= 2)
     }
   }
 
   @Test
   fun shouldDecodeFramesWithinPerformanceWindow() {
-    SyntheticMjpegServer(framesPerConnection = 30, frameIntervalMs = 5).use { server ->
-      val port = server.start()
-      try {
-        val stream = openStream(URL("http://127.0.0.1:$port/?action=stream"))
+    withServer(SyntheticMjpegServer(framesPerConnection = 30, frameIntervalMs = 5)) { port ->
+      withStream(url(port)) { stream ->
+        val start = System.currentTimeMillis()
+        var decoded = 0
         try {
-          val start = System.currentTimeMillis()
-          var decoded = 0
-          try {
-            // Loop (tolerating dropped frames) until the server's 30 frames are
-            // consumed or the window elapses.
-            while (decoded < 30 && System.currentTimeMillis() - start < 30000) {
-              val frame = stream.readMjpegFrame() ?: continue
-              val bitmap = decode(frame)
-              frame.close()
-              if (bitmap != null) decoded++
-            }
-          } catch (e: IOException) {
-            // server closed after its frames; fine
+          // Loop (tolerating dropped frames) until the server's 30 frames are
+          // consumed or the window elapses.
+          while (decoded < 30 && System.currentTimeMillis() - start < 30000) {
+            val frame = stream.readMjpegFrame() ?: continue
+            val bitmap = decode(frame)
+            frame.close()
+            if (bitmap != null) decoded++
           }
-          val elapsedMs = System.currentTimeMillis() - start
-          // A generous floor: real JPEG decode of 64x48 frames must comfortably
-          // exceed this; the bound protects CI from pathological slowness.
-          assertTrue("decoded $decoded/30 in ${elapsedMs}ms", decoded >= 10)
-        } finally {
-          stream.close()
+        } catch (_: IOException) {
+          // server closed after its frames; fine
         }
-      } finally {
-        server.stop()
+        val elapsedMs = System.currentTimeMillis() - start
+        // A generous floor: real JPEG decode of 64x48 frames must comfortably
+        // exceed this; the bound protects CI from pathological slowness.
+        assertTrue("decoded $decoded/30 in ${elapsedMs}ms", decoded >= 10)
       }
     }
   }
+
+  /** Starts [server], runs [block] with the bound port, then always stops it. */
+  private fun <T> withServer(server: SyntheticMjpegServer, block: (Int) -> T): T {
+    val port = server.start()
+    return try {
+      block(port)
+    } finally {
+      server.stop()
+    }
+  }
+
+  /** Opens a stream to [url], runs [block], then always closes it. */
+  private fun <T> withStream(url: URL, block: (MjpegInputStream) -> T): T {
+    val stream = openStream(url)
+    return try {
+      block(stream)
+    } finally {
+      stream.close()
+    }
+  }
+
+  private fun url(port: Int): URL = URL("http://127.0.0.1:$port/?action=stream")
 
   /** Reads until [expected] non-null frames are parsed, returning their raw bytes. */
   private fun readFrames(stream: MjpegInputStream, expected: Int): List<ByteArray> {
@@ -164,7 +160,6 @@ class SyntheticMjpegServerTest {
   private fun classify(bitmap: Bitmap): String {
     val pixel = bitmap.getPixel(bitmap.width / 4, bitmap.height / 4)
     val r = (pixel shr 16) and 0xFF
-    val g = (pixel shr 8) and 0xFF
     val b = pixel and 0xFF
     return when {
       r - b > 40 -> "red"
