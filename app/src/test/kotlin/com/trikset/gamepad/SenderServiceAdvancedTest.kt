@@ -105,16 +105,17 @@ class SenderServiceAdvancedTest {
 
       // The keepalive Timer runs on a real thread; poll for the message instead
       // of a single fixed sleep so a busy CI JVM cannot starve the timer.
-      var seen = false
-      var attempts = 0
-      while (!seen && attempts < 20) {
-        attempts++
-        Thread.sleep(500)
-        mExecutor.runAll()
-        shadowOf(getMainLooper()).idle()
-        seen = server.receivedContains("keepalive $timeout")
-      }
-      assertTrue("expected a keepalive message", seen)
+      assertTrue(
+          "expected a keepalive message",
+          server.awaitReceived(
+              "keepalive $timeout",
+              drain = {
+                mExecutor.runAll()
+                shadowOf(getMainLooper()).idle()
+              },
+              sleepMs = 500,
+          ),
+      )
       client.disconnect("done")
     }
   }
@@ -166,16 +167,16 @@ class SenderServiceAdvancedTest {
       shadowOf(getMainLooper()).idle()
       // The server reads asynchronously; poll for the second command instead
       // of asserting immediately (bounded await, never a bare assert).
-      var seen = false
-      var attempts = 0
-      while (!seen && attempts < 20) {
-        attempts++
-        Thread.sleep(50)
-        mExecutor.runAll()
-        shadowOf(getMainLooper()).idle()
-        seen = server.receivedContains("two")
-      }
-      assertTrue("expected 'two' over the live socket", seen)
+      assertTrue(
+          "expected 'two' over the live socket",
+          server.awaitReceived(
+              "two",
+              drain = {
+                mExecutor.runAll()
+                shadowOf(getMainLooper()).idle()
+              },
+          ),
+      )
       client.disconnect("done")
     }
   }
@@ -207,6 +208,28 @@ class SenderServiceAdvancedTest {
       synchronized(mMessages) {
         return mMessages.any { it != null && it.contains(fragment) }
       }
+    }
+
+    /**
+     * Bounded poll for [fragment] to appear on the socket. The caller supplies a [drain] that
+     * advances the executor/looper (e.g. `{ mExecutor.runAll(); shadowOf(getMainLooper()).idle()
+     * }`); the server only owns the read side, so it cannot know the test's scheduling.
+     */
+    fun awaitReceived(
+        fragment: String,
+        drain: () -> Unit,
+        sleepMs: Long = 50,
+        attempts: Int = 20,
+    ): Boolean {
+      var seen = false
+      var count = 0
+      while (!seen && count < attempts) {
+        count++
+        Thread.sleep(sleepMs)
+        drain()
+        seen = receivedContains(fragment)
+      }
+      return seen
     }
 
     fun closeSocket() {
