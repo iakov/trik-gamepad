@@ -65,4 +65,29 @@ class SettingsActivityTest {
     host!!.onPreferenceChangeListener!!.onPreferenceChange(host, "10.0.0.9")
     assertTrue((host.summary ?: "").toString().contains("10.0.0.9"))
   }
+
+  @Test
+  fun hostPortAndKeepaliveSummariesShouldUpdateOnChange() {
+    val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
+    val fragment =
+        activity.supportFragmentManager.findFragmentById(android.R.id.content) as SettingsFragment
+    assertNotNull(fragment)
+
+    for (key in arrayOf(SettingsFragment.SK_HOST_PORT, SettingsFragment.SK_KEEPALIVE)) {
+      val pref = fragment.findPreference<Preference>(key)
+      assertNotNull(pref)
+      pref!!.onPreferenceChangeListener!!.onPreferenceChange(pref, "7777")
+      assertTrue((pref.summary ?: "").toString().contains("7777"))
+    }
+  }
+
+  @Test
+  fun aboutSystemClickWithoutActivityShouldBeSafe() {
+    // A fragment never attached to an activity -> initializeAboutSystemField
+    // returns early via the `activity ?: return` guard.
+    val fragment = SettingsFragment()
+    val method = fragment.javaClass.getDeclaredMethod("initializeAboutSystemField")
+    method.isAccessible = true
+    method.invoke(fragment)
+  }
 }

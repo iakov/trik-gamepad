@@ -222,6 +222,31 @@ class MainActivityTest {
   }
 
   @Test
+  fun onPauseWithNullFieldsShouldBeSafe() {
+    // Null out both collaborators so the null branches in onPause run.
+    setField(activity, "mSensorManager", null)
+    setField(activity, "mVideo", null)
+    method(activity, "onPause").invoke(activity)
+  }
+
+  @Test
+  fun onResumeWithNullFieldsShouldBeSafe() {
+    // Null out both collaborators so the null branches in onResume run.
+    setField(activity, "mVideo", null)
+    setField(activity, "mSensorManager", null)
+    method(activity, "onResume").invoke(activity)
+    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+  }
+
+  @Test
+  fun restartVideoStreamShouldLoadWhenVideoPresent() {
+    val video = MjpegView(activity)
+    setField(activity, "mVideo", video)
+    method(activity, "restartVideoStream").invoke(activity)
+    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+  }
+
+  @Test
   fun onCreateOptionsMenuShouldInflateMenu() {
     val menu = androidx.appcompat.view.menu.MenuBuilder(activity)
     assertTrue(activity.onCreateOptionsMenu(menu))
@@ -310,11 +335,46 @@ class MainActivityTest {
   }
 
   @Test
+  fun onSensorChangedWithNonAccelerometerShouldLogOnly() {
+    val event =
+        org.robolectric.shadows.ShadowSensorManager.createSensorEvent(
+            3,
+            android.hardware.Sensor.TYPE_GRAVITY,
+        )
+    event.values[0] = 0.7f
+    event.values[1] = 0.7f
+    activity.onSensorChanged(event)
+    // Non-accelerometer sensors hit the else branch; no wheel command.
+    assertEquals(0, field(activity, "mAngle") as Int)
+  }
+
+  @Test
+  fun createPadWithUnknownIdShouldBeSafe() {
+    val m = method(activity, "createPad", Int::class.javaPrimitiveType!!, String::class.java)
+    m.invoke(activity, 999999, "1")
+    // No pad with that id -> the null branch is safe.
+  }
+
+  @Test
   fun btnSettingsClickShouldToggleActionBar() {
     val btnSettings = activity.findViewById<android.widget.Button>(R.id.btnSettings)
     assertNotNull(btnSettings)
     btnSettings!!.performClick()
     org.robolectric.Robolectric.flushForegroundThreadScheduler()
+  }
+
+  @Test
+  fun btnSettingsClickWhenActionBarHiddenShouldShowIt() {
+    // Hide the action bar first; the settings button then calls
+    // setVisibility(true), exercising the actionBarProvider()?.show() path.
+    activity.supportActionBar?.hide()
+    val btnSettings = activity.findViewById<android.widget.Button>(R.id.btnSettings)
+    assertNotNull(btnSettings)
+    btnSettings!!.performClick()
+    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    // No assertion on the final visibility: the 3s auto-hide runnable fires
+    // during the flush and re-hides the bar. The click already exercised the
+    // show path (branch coverage).
   }
 
   @Test

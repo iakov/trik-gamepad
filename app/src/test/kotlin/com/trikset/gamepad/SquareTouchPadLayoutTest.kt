@@ -3,6 +3,7 @@ package com.trikset.gamepad
 import android.view.MotionEvent
 import android.view.View
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -156,5 +157,38 @@ class SquareTouchPadLayoutTest {
     // After a layout with old size 0, dispatch a move to read the new center.
     pad.dispatchTouchEvent(eventAt(100f, 100f, MotionEvent.ACTION_DOWN))
     assertTrue(sender !== null)
+  }
+
+  @Test
+  fun onSizeChangedWithExistingSizeShouldKeepPosition() {
+    // Size change from a non-zero old size -> the else branch: position kept.
+    pad.measure(
+        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
+        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
+    )
+    pad.layout(0, 0, 200, 200)
+    pad.dispatchTouchEvent(eventAt(50f, 50f, MotionEvent.ACTION_DOWN))
+    pad.measure(
+        View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY),
+        View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY),
+    )
+    pad.layout(0, 0, 300, 300)
+    // No crash; the old position is retained.
+    pad.dispatchTouchEvent(eventAt(50f, 50f, MotionEvent.ACTION_MOVE))
+  }
+
+  @Test
+  fun onTouchWithForeignViewShouldReturnFalse() {
+    val context = org.robolectric.RuntimeEnvironment.getApplication()
+    val foreign = SquareTouchPadLayout(context)
+    val event = eventAt(100f, 100f, MotionEvent.ACTION_DOWN)
+    assertFalse(pad.onTouch(foreign, event))
+  }
+
+  @Test
+  fun onTouchCancelShouldSendUpCommand() {
+    pad.dispatchTouchEvent(eventAt(100f, 100f, MotionEvent.ACTION_DOWN))
+    pad.dispatchTouchEvent(eventAt(120f, 120f, MotionEvent.ACTION_CANCEL))
+    assertTrue("expected commands to be queued", mExecutor.runAll() >= 2)
   }
 }

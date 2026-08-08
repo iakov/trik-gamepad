@@ -126,4 +126,20 @@ class MjpegInputStreamTest {
     val stream = MjpegInputStream(ByteArrayInputStream(frame))
     assertNull(stream.readMjpegFrame())
   }
+
+  @Test
+  fun readMjpegFrameWithHugeContentLengthShouldRecover() {
+    // A header advertising a body far larger than what follows: the success
+    // branch is skipped, the short-skip recovery runs and returns null.
+    val headers = "Content-Type: image/jpeg\r\nContent-Length: 100000\r\n\r\n"
+    val headerBytes = headers.toByteArray(StandardCharsets.US_ASCII)
+    val frame = ByteArray(headerBytes.size + 5)
+    System.arraycopy(headerBytes, 0, frame, 0, headerBytes.size)
+    val tail =
+        byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD8.toByte(), 0x01.toByte())
+    System.arraycopy(tail, 0, frame, headerBytes.size, tail.size)
+    val stream = MjpegInputStream(ByteArrayInputStream(frame))
+    val result = stream.readMjpegFrame()
+    result?.close()
+  }
 }

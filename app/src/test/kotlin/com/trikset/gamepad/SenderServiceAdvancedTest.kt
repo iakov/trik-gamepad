@@ -151,6 +151,26 @@ class SenderServiceAdvancedTest {
   }
 
   @Test
+  fun sendWhileConnectedShouldSkipReconnect() {
+    ReadUntilStopServer().use { server ->
+      val client = SenderService(mExecutor)
+      client.setTarget("localhost", server.getPort())
+      client.send("one")
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+      assertTrue(server.awaitConnection())
+
+      // Already connected -> send() must not queue another connect task.
+      client.send("two")
+      mExecutor.runAll()
+      shadowOf(getMainLooper()).idle()
+      // No crash; the second command was sent over the live socket.
+      assertTrue(server.receivedContains("two"))
+      client.disconnect("done")
+    }
+  }
+
+  @Test
   fun keepaliveTimeoutBelowMinimumIsStoredUnchanged() {
     val client = SenderService(mExecutor)
     val before = client.getKeepaliveTimeout()

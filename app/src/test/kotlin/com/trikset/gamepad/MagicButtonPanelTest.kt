@@ -40,6 +40,13 @@ class MagicButtonPanelTest {
   }
 
   @Test
+  fun populateWithZeroCountShouldCreateNoButtons() {
+    val container = FrameLayout(context)
+    panel.populate(container, 0)
+    assertEquals(0, container.childCount)
+  }
+
+  @Test
   fun clickShouldSendBtnDownCommand() {
     val container = FrameLayout(context)
     panel.populate(container, 3)

@@ -88,6 +88,16 @@ class MjpegFrameRendererTest {
   }
 
   @Test
+  fun extractFrameSkipsRecycleWhenBitmapIsReused() {
+    // The decoder returns the same bitmap instance both times -> the renderer
+    // reuses it and skips the recycle branch.
+    val reused = bitmap(100, 100)
+    val renderer = MjpegFrameRenderer(decoder = { _, _ -> reused })
+    assertNotNull(renderer.extractFrame(emptyFrame(), 320, 240))
+    assertNotNull(renderer.extractFrame(emptyFrame(), 320, 240))
+  }
+
+  @Test
   fun drawFrameDrawsBitmapAndFpsOverlay() {
     val renderer = MjpegFrameRenderer(decoder = stubDecoder(bitmap(100, 100)))
     // Force the FPS window to elapse so the fps string is computed.
@@ -106,6 +116,17 @@ class MjpegFrameRendererTest {
     val dest = renderer.extractFrame(emptyFrame(), 320, 240)
     assertNotNull(dest)
     val fps = renderer.drawFrame(Canvas(bitmap(320, 240)), dest!!, 320, Paint())
+    assertEquals("", fps)
+  }
+
+  @Test
+  fun drawFrameWithoutBitmapSkipsDrawing() {
+    // Never extract a frame -> bitmap is null; drawFrame must only draw the
+    // FPS text and not touch a null bitmap.
+    val renderer = MjpegFrameRenderer(decoder = stubDecoder(bitmap(100, 100)))
+    renderer.onRenderStarted(System.currentTimeMillis())
+    val rect = renderer.destRect(100, 100, 320, 240)
+    val fps = renderer.drawFrame(Canvas(bitmap(320, 240)), rect, 320, Paint())
     assertEquals("", fps)
   }
 }
