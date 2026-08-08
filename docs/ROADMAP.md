@@ -33,15 +33,15 @@ B2 → B4 → C → B3 → A → D → E → F. Full detail + execution record:
   not cleanly reachable under Robolectric.
 - **B3** ✅ SenderService inner classes (`ConnectRunnable`, `KeepAliveTimer`)
   → own files. `13a6ad8`.
-- **A** 🔶 Concurrency guard landed (`8fe0d03`); aosp_atd flake probe 1/1 green
-  on the final head; batch-split only if the ×3 probe shows flakes.
-- **D** 🔶 Cache write-back + `org.gradle.parallel=true` landed (`55e32ba`,
-  one green run); further jvmargs/CC-strict tuning optional.
+- **A** ✅ Concurrency guard landed (`8fe0d03`); aosp_atd flake probe **3/3
+  green** on the final head — no batch-split needed.
+- **D** ✅ Cache write-back + `org.gradle.parallel=true` landed (`55e32ba`);
+  build gate measured **4m27s → 1m05s** (≈4×). Instrumented 3m10-3m33s.
 - **E** ✅ AGP-9 PREP ONLY (settings.gradle + buildscript → plugins DSL; still
   AGP 8.13.2 / Gradle 8.14.5; lint baseline trimmed to core-ktx entry). `44ba0b7`.
-- **F** 🔶 Cleanup (emulator snapshot discrepancy **closed as cosmetic**;
-  DummyServer note already in TESTING.md) + MEMORY retrospective added; final
-  retrospective wrap-up next.
+- **F** ✅ Cleanup (emulator snapshot discrepancy **closed as cosmetic**;
+  DummyServer note already in TESTING.md) + MEMORY retrospective added.
+  **Campaign 2 complete.**
 
 ## Phase 1 — Instrumented CI without macOS
 
