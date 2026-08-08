@@ -14,18 +14,23 @@ build:
 
 complexity:
   NestedBlockDepth:
-    # Byte-parsing loops (read markers, match sequences) nest try/for/if/if
-    # naturally; a faithful port keeps the recovery structure.
+    # Byte-parsing loops (MjpegInputStream.getEndOfSequence, MjpegView.renderNextFrame
+    # read markers / match sequences and nest try/for/if/if naturally); a
+    # faithful port keeps the recovery structure. Detekt's default is 4; this
+    # stays 5 because those two parser/render functions cannot flatten without
+    # a rewrite (Phase 2-J reverted the 5->4 tightening on that evidence).
     threshold: 5
   CyclomaticComplexMethod:
     # Legacy Android lifecycle methods (MainActivity.onCreate wires pads, menu,
     # settings listeners and the sensor/video paths) are inherently complex; the
-    # Java equivalents passed checkstyle/pmd with the same shapes.
-    threshold: 25
+    # Java equivalents passed checkstyle/pmd with the same shapes. Tightened
+    # from 25 to 20 in Phase 2-J after the settings/wheel extraction moved the
+    # biggest branches into MainActivitySettingsController / WheelController.
+    threshold: 20
   LongMethod:
     # Same rationale as CyclomaticComplexMethod: faithful ports of large Android
-    # lifecycle wiring methods.
-    threshold: 200
+    # lifecycle wiring methods. Tightened from 200 to 150 in Phase 2-J.
+    threshold: 150
   TooManyFunctions:
     # Android protocol/activity classes legitimately expose a large method
     # surface (SenderService, MainActivity); the Java equivalents passed the
