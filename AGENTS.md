@@ -91,11 +91,14 @@ configurations, update this section and the referenced config files.
 - Capture every rule deviation/missing rule NOW — end with `AGENTS.md`/
   `MEMORY.md` updated or an explicit decision not to.
 - **Frequency-scan the session logs, not just failures**: `grep -c` the session
-  command logs for repeated diagnostics (e.g. "configuration cache cannot be
-  reused", "Deprecated Gradle features", "spotlessKotlinCheck FAILED"), sort by
+  command logs for repeated diagnostics (e.g. "Deprecated Gradle features",
+  "spotlessKotlinCheck FAILED", "configuration cache cannot be reused"), sort by
   count, and root-cause the top ones. Recurring messages in *every* run mean a
   systemic cause, not noise — this is how the config-cache invalidation and the
-  Gradle-9 deprecation warnings were missed (both in ~every log).
+  Gradle deprecation warnings were missed (both in ~every log). Both are now
+  resolved under the AGP 9.3.1 / Gradle 9.5.0 toolchain (config-cache reuses;
+  the Gradle-10 deprecations were fixed) — re-run the scan before trusting old
+  examples.
 
 ### After merge
 

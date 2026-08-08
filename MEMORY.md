@@ -1544,3 +1544,29 @@ after a green scratch-branch probe). What changed:
 **Verified:** `assembleDebug` + `assembleDebugAndroidTest` build; full gate green
 (test/lint/detekt/spotbugsDebug/jacoco/verification/spotlessCheck); JaCoCo LINE
 697/717 = 97.2%, BRANCH 176/215 = 81.9% — both above the 95/80 ratchet.
+
+**CI validated (run `31264372367`, 2026-08-08):** build gate 3m41s + all 9
+instrumented tests green on `aosp_atd` — the emulator/androidTest path is
+unaffected by the AGP 9 / built-in-Kotlin switch.
+
+**Huge-run retrospective (2026-08-08) — what this session proved:**
+
+- **The config-cache "disable" decision was short-lived by design.** The AGP-8
+  blocker (`https.proxyHost` sys-prop read) is gone in AGP 9, so config-cache
+  reuses again. Lesson: a toolchain migration can nullify a previously-correct
+  workaround — re-probe locked-inhibited features after a bump, don't assume the
+  old blocker persists.
+- **Scratch-branch probing de-risked the highest-uncertainty item.** The AGP-9
+  probe (`feat/agp9-probe`) ran the whole migration in isolation; green first
+  try, then fast-forwarded. Nothing leaked into `feat/global-refresh` until it
+  was proven. Repeat this pattern for any future toolchain bump.
+- **Built-in Kotlin migration was trivial here** (no kapt, no `kotlin.sourceSets`,
+  no custom compiler options) — just remove the plugin + drop `kotlinOptions`.
+- **Lint baseline location matching is exact.** An entry whose `location file`
+  is a machine-specific absolute path (wrapper properties outside the module)
+  silently stops matching on CI. Version-availability checks that fire on
+  non-module files belong in `lint.xml`, not the baseline.
+- **`gradlew wrapper` needs a buildable build** — it failed under the old
+  wrapper after the AGP-9 version bump (NoClassDefFoundError); editing
+  `gradle-wrapper.properties` directly, then re-running `wrapper` once 9.5 was
+  active, was the workable order.
