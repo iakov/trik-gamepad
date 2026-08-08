@@ -1363,6 +1363,13 @@ instrumented 3m33s, 9/9).
   meant the cache was NEVER written (single-branch no-PR never pushes
   master) — every CI run was cold. Set `cache-read-only: false` on both jobs.
 
+**CI cache tuning measured (D):** baseline build gate (pre-tune, cold cache)
+4m27s. After `cache-read-only: false` + parallel, the SECOND run on the same
+head dropped the build gate to **1m07s** (≈4× faster; the first post-tune run
+was 5m08s because config-cache was invalidated by the settings.gradle plugins
+DSL change). Instrumented 3m17-3m33s throughout. The cache write-back is the
+single biggest CI win this campaign — see .PLAN.md flake-probe data.
+
 **Traps hit / lessons:**
 
 1. **CI caught a race in a new test.** `sendWhileConnectedShouldSkipReconnect`
