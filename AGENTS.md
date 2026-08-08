@@ -104,7 +104,11 @@ configurations, update this section and the referenced config files.
 - **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green.
 - **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries); **run the full 3-variant `test` suite twice** before pushing test changes.
 - **Generate lint baselines with the aggregate `lint` task**, not `lintDebug`; env-dependent checks (e.g. `OldTargetApi`) go in `lint.xml`, not the baseline.
-- **CI `script:` blocks must be plain POSIX `sh`** — no `\` continuations or brace groups; validate with `sh -n` before pushing.
+- **CI `script:` blocks run per-line.** `reactivecircus/android-emulator-runner`
+  splits `script:` into individual lines and runs each as its own `sh -c`
+  (comments dropped). Multi-line `if/fi` blocks, `\` continuations, and
+  `while` loops never work — any conditional must be a single line
+  (`cmd || { ...; }`). Validate every line with `sh -n` before pushing.
 - **Distinguish infra from code failures** (adb boot flake, GHA action-download) — triage by job/step and boot-vs-tests; keep a note of the last known-good CI run id.
 - **When a CI "fix" doesn't hold, read the step timestamps, not just the failure**: if a setup/prerequisite step ran before its dependency was ready (e.g. `settings put` before the settings provider was up), the race is the bug — make the step wait for and verify its prerequisite.
 - **A focus failure after a targetSdk bump is usually an OS overlay, not app code** — check `dumpsys window` `mCurrentFocus` for system windows before editing the app.

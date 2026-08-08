@@ -1137,6 +1137,34 @@ version-lock entries that are recorded, intentional decisions.
 deferred, R7/ROADMAP Phase 7) and `GradleDependency core-ktx 1.19.0` (minSdk 21
 lock). No relaxation in `lint.xml` was needed; the baseline is the ratchet.
 
+### [2026-08-08] Phase 1 experiment 2: aosp_atd + swiftshader PASSES instrumented
+
+**Context:** every CI instrumented run had failed (build gate green throughout).
+The original "aosp_atd + swiftshader NEVER grants focus (8/8)" finding (08-06)
+predated the immersive pre-empt (retry-until-confirmed) and the
+FocusAwareActivityTestRule focus-wait. ROADMAP Phase 1 experiment 2 retried
+`target: aosp_atd` with those fixes in place.
+
+**Result:** **all 9 instrumented tests PASSED** (`BUILD SUCCESSFUL`, 0 failed,
+suite ~3 min) on `aosp_atd` + `-gpu swiftshader_indirect`. The run still showed
+red because the retry block failed to parse — see the trap below. This means the
+08-06 "never grants focus" conclusion is obsolete; the focus-wait + pre-empt
+fixes now make the headless software-GPU combo work.
+
+**New trap (reactivcircus script parsing):** `android-emulator-runner` v2.38
+runs **each `script:` LINE as its own `sh -c`** (`parseScript` splits on
+newlines, drops comments). A multi-line `if [ $? -ne 0 ]; then ... fi` retry
+block therefore never worked — `sh -c "if ..."` alone fails with `end of file unexpected (expecting "fi")`, and the "retry once" path had been dead all along.
+Any conditional CI shell logic must be a **single line** (`cmd || { ...; }`),
+no `if/fi` blocks or backslash continuations. This also contradicts the old
+AGENTS.md "no brace groups" wording — brace groups are fine on one line; the
+constraint is per-line execution.
+
+**Decision:** keep `target: aosp_atd` (now validated green) as the CI
+instrumented config. `profile: pixel_5` is dropped for aosp_atd (atd needs no
+device profile). If instrumented goes green on this head, Phase 1 is DONE
+(experiment 2 wins) and the ROADMAP fallback is unnecessary.
+
 ### [2026-08-08] Session retrospective — ROADMAP Phases 2-E..6 landed, instrumented CI unresolved
 
 **Context:** full-auto execution of the .PLAN.md campaign in one session:
