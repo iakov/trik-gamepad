@@ -31,7 +31,16 @@ Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Build (from repo root)
 
-- Planned toolchain (locked in `.PLAN.md`): Gradle 8.14.5, AGP 8.13.2, Kotlin 2.x, Java 11 source/target — but Gradle runs under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`, `targetSdk 36`, `minSdk 21`, `maxSdk 36` — single main flavor, no product flavors. The **AGP-9 prep (plugins DSL) is done** (`settings.gradle` `plugins {}` block + no `buildscript`/`apply plugin:` left); do **not** bump to AGP 9 / Gradle 9 itself yet — deferred.
+- Toolchain (locked in `.PLAN.md`): **AGP 9.3.1, Gradle 9.5.0, built-in Kotlin**
+  (AGP 9 removed the `org.jetbrains.kotlin.android` plugin — Kotlin compilation
+  is built in; `kotlinOptions {}` is gone, `jvmTarget` defaults to
+  `compileOptions.targetCompatibility`), Java 11 source/target — Gradle runs
+  under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`,
+  `targetSdk 36`, `minSdk 21`, `maxSdk 36` — single main flavor, no product
+  flavors. AGP 9's new DSL is on (no `android.newDsl=false` opt-out).
+- `org.gradle.configuration-cache=true` — **re-enabled under AGP 9**: the AGP
+  `https.proxyHost` sys-prop read that defeated it on AGP 8 was fixed, so the
+  cache is now actually reused. Do not disable it again.
 - Three build types (`debug`/`release`/`releaseDebug`); `./gradlew test` runs
   Robolectric under all three in parallel JVMs — unit tests must use ephemeral
   ports and reset SharedPreferences per test (they persist across methods in a

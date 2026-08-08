@@ -37,8 +37,9 @@ B2 → B4 → C → B3 → A → D → E → F. Full detail + execution record:
   green** on the final head — no batch-split needed.
 - **D** ✅ Cache write-back + `org.gradle.parallel=true` landed (`55e32ba`);
   build gate measured **4m27s → 1m05s** (≈4×). Instrumented 3m10-3m33s.
-- **E** ✅ AGP-9 PREP ONLY (settings.gradle + buildscript → plugins DSL; still
-  AGP 8.13.2 / Gradle 8.14.5; lint baseline trimmed to core-ktx entry). `44ba0b7`.
+- **E** ✅ AGP-9 PREP (settings.gradle + buildscript → plugins DSL) then the
+  **actual AGP 9.3.1 / Gradle 9.5.0 migration landed** (built-in Kotlin, config-cache
+  re-enabled; `78aace4`). See `.PLAN.md` / MEMORY "AGP 9.3.1 / Gradle 9.5.0 migration LANDED".
 - **F** ✅ Cleanup (emulator snapshot discrepancy **closed as cosmetic**;
   DummyServer note already in TESTING.md) + MEMORY retrospective added.
   **Campaign 2 complete.**

@@ -50,8 +50,9 @@ versions risk collisions with the `minSdk*10000 + ...` formula).
   Android SDK via `sdk.dir=<path>`; the drive-letter colon MUST be escaped
   (e.g. `C\:/Users/<user>/Android/Sdk` style) or lint's `PropertyEscape` check
   fails the build.
-- JDK 21 (Microsoft OpenJDK) works with Gradle 8.14.5 + AGP 8.13.2 (planned
-  toolchain per `.PLAN.md`).
+- JDK 21 (Microsoft OpenJDK) works with Gradle 9.5.0 + AGP 9.3.1 (current
+  toolchain, locked in `.PLAN.md`; migrated from Gradle 8.14.5 + AGP 8.13.2
+  2026-08-08).
 - AEHD (Android Emulator Hypervisor Driver 2.2) is installed for local
   emulator acceleration; verify with `emulator -accel-check`. Installer lives
   in the SDK: `extras\google\Android_Emulator_Hypervisor_Driver\silent_install.bat`.
@@ -1155,6 +1156,18 @@ version-lock entries that are recorded, intentional decisions.
 deferred, R7/ROADMAP Phase 7) and `GradleDependency core-ktx 1.19.0` (minSdk 21
 lock). No relaxation in `lint.xml` was needed; the baseline is the ratchet.
 
+**Update (2026-08-08, AGP 9 migration):** under AGP 9.3.1, `AndroidGradlePluginVersion`
+now fires on the **Gradle wrapper version** (9.5.0 < 9.7.0 available) — and its
+baseline `location` records the **machine-specific absolute path** of
+`gradle/wrapper/gradle-wrapper.properties`. Lint matches baseline entries by
+location, so that entry would silently stop matching on CI (different checkout
+path). Per AGENTS.md (env-dependent checks → `lint.xml`, not baseline) the
+`AndroidGradlePluginVersion` check was **moved to `lint.xml` as `severity="ignore"`**
+and removed from the baseline. The baseline now carries two `GradleDependency`
+locks: `compileSdk 36` (R7 pin) + `core-ktx 1.16.0`. LESSON: version-availability
+checks whose baseline location is an absolute path (wrapper file outside the
+module) belong in `lint.xml`, not the baseline.
+
 **Update (2026-08-08, plugins-DSL migration):** the `AndroidGradlePluginVersion`
 entry pointed at the `classpath` line in `app/build.gradle`'s `buildscript`
 block. Migrating to the plugins DSL removed that line, so lint reported
@@ -1477,12 +1490,12 @@ Deferred to the AGP 9 migration (Gradle 9 makes config-cache the norm) — then
 re-evaluate. The keystore detection logic itself is unchanged (still
 `exists()`-gated, still local-only).
 
-**Implementation status: DONE (2026-08-08).** `org.gradle.configuration-cache=false`
-landed; two consecutive `gradlew help` runs printed no "configuration cache"
-message at all (verified), full gate green. Interim cleanup — **may be reversed
-by the AGP 9 / Gradle 9 migration** (Gradle 9 makes config-cache the norm), at
-which point the keystore `exists()` + `https.proxyHost` blockers are re-checked
-against AGP 9's own behavior.
+**Implementation status: DONE then REVERSED (2026-08-08).** The disable landed
+(two consecutive `gradlew help` runs printed no "configuration cache" message,
+gate green) — but the **AGP 9 migration later the same session re-enabled it**:
+AGP 9 fixed the `https.proxyHost` sys-prop read, so config-cache is now actually
+reused (see the "AGP 9.3.1 / Gradle 9.5.0 migration LANDED" entry). The
+`gradle.properties` flip stays at `true`.
 
 ### [2026-08-08] Deprecation audit — Gradle 9 prep input (Campaign-2 E-step follow-up)
 
@@ -1504,3 +1517,30 @@ as-is. Full gate green after the change.
 **Lesson for AGP 9:** this was the only Gradle-level deprecation our build
 triggers; the AGP-9 bump itself (Phase E) is the bigger risk surface (new DSL,
 built-in Kotlin).
+
+### [2026-08-08] AGP 9.3.1 / Gradle 9.5.0 migration LANDED
+
+Migrated from AGP 8.13.2 + Gradle 8.14.5 to **AGP 9.3.1 + Gradle 9.5.0** with
+**built-in Kotlin** (commit `78aace4`, fast-forwarded onto `feat/global-refresh`
+after a green scratch-branch probe). What changed:
+
+- **`org.jetbrains.kotlin.android` plugin removed** (settings.gradle + app/build.gradle
+  plugins blocks) — AGP 9 has built-in Kotlin. `kotlinOptions { jvmTarget }` block
+  removed; built-in Kotlin defaults `jvmTarget` to `compileOptions.targetCompatibility`
+  (Java 11 here). No kapt / kotlin.sourceSets used — migration was clean.
+- **`org.gradle.configuration-cache` re-enabled** (`=true`): the AGP `https.proxyHost`
+  sys-prop read that defeated config-cache on AGP 8 is gone — two consecutive
+  runs confirmed "Reusing configuration cache." This reverses the disable
+  decision from earlier this session (the keystore `exists()` alone was not the
+  blocker). Do not disable again.
+- **Wrapper regenerated** to 9.5.0 (jar + gradlew/gradlew.bat) via `gradlew wrapper`.
+- **Lint baseline re-scoped:** `AndroidGradlePluginVersion` now fires on the
+  wrapper Gradle version and its baseline location is a machine-specific absolute
+  path — moved to `lint.xml` ignore (see the lint-baseline entry). Two
+  `GradleDependency` locks remain baselined (`compileSdk 36`, `core-ktx 1.16.0`).
+- **Remaining deprecation (plugin-internal):** `ReportingExtension.file(String)`
+  from a third-party plugin (scheduled Gradle 10 removal) — not ours, not fixed.
+
+**Verified:** `assembleDebug` + `assembleDebugAndroidTest` build; full gate green
+(test/lint/detekt/spotbugsDebug/jacoco/verification/spotlessCheck); JaCoCo LINE
+697/717 = 97.2%, BRANCH 176/215 = 81.9% — both above the 95/80 ratchet.
