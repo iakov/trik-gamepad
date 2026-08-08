@@ -74,7 +74,7 @@ class MainActivityTest {
     prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7").commit()
     controller.onPreferenceChanged(prefs)
 
-    assertEquals("10.0.0.7", activity.getSenderService().getHostAddr())
+    assertEquals("10.0.0.7", activity.getSenderService()!!.getHostAddr())
   }
 
   @Test
@@ -86,7 +86,7 @@ class MainActivityTest {
     controller.onPreferenceChanged(prefs)
     // No crash; target still set with default 4444 because the parse failure is
     // caught and the port variable keeps its initial value.
-    assertNotNull(activity.getSenderService().getHostAddr())
+    assertNotNull(activity.getSenderService()!!.getHostAddr())
   }
 
   @Test
@@ -209,7 +209,7 @@ class MainActivityTest {
     prefs.edit().putString(SettingsFragment.SK_KEEPALIVE, "2000").commit()
     controller.onPreferenceChanged(prefs)
     // >= MINIMAL_KEEPALIVE -> applied to the sender.
-    assertEquals(2000, activity.getSenderService().getKeepaliveTimeout())
+    assertEquals(2000, activity.getSenderService()!!.getKeepaliveTimeout())
   }
 
   @Test
@@ -313,7 +313,7 @@ class MainActivityTest {
     event.values[2] = 0f
     activity.onSensorChanged(event)
     // Wheel enabled -> a "wheel N" command was sent.
-    assertTrue(activity.getSenderService().getHostAddr() != null)
+    assertTrue(activity.getSenderService()!!.getHostAddr() != null)
   }
 
   @Test
