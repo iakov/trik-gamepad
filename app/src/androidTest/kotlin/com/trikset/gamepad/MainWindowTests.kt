@@ -2,7 +2,6 @@ package com.trikset.gamepad
 
 import android.view.View
 import android.view.ViewGroup
-import androidx.preference.PreferenceManager
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
@@ -29,6 +28,10 @@ import org.junit.runners.Parameterized.Parameters
 @RunWith(Enclosed::class)
 class MainWindowTests {
 
+  private companion object {
+    val tapPrecision = floatArrayOf(1f, 1f)
+  }
+
   @LargeTest
   @RunWith(Parameterized::class)
   class SquareButtonTest {
@@ -40,13 +43,7 @@ class MainWindowTests {
 
     @Before
     fun initNetworkSettings() {
-      val preferences = PreferenceManager.getDefaultSharedPreferences(mActivityTestRule.activity)
-      val preferenceEditor = preferences.edit()
-      preferenceEditor.putString(SettingsFragment.SK_HOST_ADDRESS, DummyServer.IP)
-      preferenceEditor.putString(SettingsFragment.SK_HOST_PORT, DummyServer.DEFAULT_PORT.toString())
-      // In order not to receive keep-alive messages
-      preferenceEditor.putString(SettingsFragment.SK_KEEPALIVE, "100000000")
-      preferenceEditor.commit()
+      initNetworkSettings(mActivityTestRule.activity)
     }
 
     @Test
@@ -55,22 +52,9 @@ class MainWindowTests {
       onView(withId(currentPadId)).perform(movingTap())
       server.stopListening()
 
-      val messages = server.receivedMessages.iterator()
-      while (messages.hasNext()) {
-        val current = messages.next()
-        if (messages.hasNext()) {
-          assertNotEquals(String.format(Locale.ROOT, "pad %s up", currentPadName), current)
-          val splitCommand = current.split(" ")
-          assertEquals(4, splitCommand.size)
-          assertEquals("pad", splitCommand[0])
-          assertEquals(currentPadName, splitCommand[1])
-          val x = splitCommand[2].toInt()
-          val y = splitCommand[3].toInt()
-          val radius = Math.sqrt((x * x + y * y).toDouble())
-          assertTrue(radius > 40 && radius < 60)
-        } else {
-          assertEquals(String.format(Locale.ROOT, "pad %s up", currentPadName), current)
-        }
+      assertPadCommands(server.receivedMessages, currentPadName) { x, y ->
+        val radius = Math.sqrt((x * x + y * y).toDouble())
+        assertTrue(radius > 40 && radius < 60)
       }
     }
 
@@ -80,31 +64,43 @@ class MainWindowTests {
       onView(withId(currentPadId)).perform(diagonalTap())
       server.stopListening()
 
-      val messages = server.receivedMessages.iterator()
       var currentIndex = 0
-      while (messages.hasNext()) {
-        val current = messages.next()
-        if (!messages.hasNext()) {
-          assertEquals(String.format(Locale.ROOT, "pad %s up", currentPadName), current)
-          break
-        }
-        assertNotEquals(String.format(Locale.ROOT, "pad %s up", currentPadName), current)
-        val splitCommand = current.split(" ")
-        assertEquals(4, splitCommand.size)
-        assertEquals("pad", splitCommand[0])
-        assertEquals(currentPadName, splitCommand[1])
-        val x = splitCommand[2].toInt()
-        val y = splitCommand[3].toInt()
+      assertPadCommands(server.receivedMessages, currentPadName) { x, y ->
         assertTrue(Math.abs(-100 + currentIndex * 200 / 10 - x) <= 25)
         assertTrue(Math.abs(100 - currentIndex * 200 / 10 - y) <= 25)
         ++currentIndex
       }
     }
 
+    /**
+     * Asserts [messages] is a sequence of `pad <name> x y` moves (validated by [validateMove])
+     * ending with `pad <name> up`.
+     */
+    private fun assertPadCommands(
+        messages: List<String>,
+        padName: String,
+        validateMove: (x: Int, y: Int) -> Unit,
+    ) {
+      val iterator = messages.iterator()
+      while (iterator.hasNext()) {
+        val current = iterator.next()
+        val up = String.format(Locale.ROOT, "pad %s up", padName)
+        if (iterator.hasNext()) {
+          assertNotEquals(up, current)
+          val splitCommand = current.split(" ")
+          assertEquals(4, splitCommand.size)
+          assertEquals("pad", splitCommand[0])
+          assertEquals(padName, splitCommand[1])
+          validateMove(splitCommand[2].toInt(), splitCommand[3].toInt())
+        } else {
+          assertEquals(up, current)
+        }
+      }
+    }
+
     private fun diagonalTap(): ViewAction {
       return object : ViewAction {
         private val tapSegmentCount = 10
-        private val tapPrecision = floatArrayOf(1f, 1f)
 
         override fun getConstraints(): Matcher<View> = isDisplayed()
 
@@ -146,7 +142,6 @@ class MainWindowTests {
     private fun movingTap(): ViewAction {
       return object : ViewAction {
         private val tapSegmentCount = 10
-        private val tapPrecision = floatArrayOf(1f, 1f)
 
         override fun getConstraints(): Matcher<View> = isDisplayed()
 
@@ -198,13 +193,7 @@ class MainWindowTests {
 
     @Before
     fun initNetworkSettings() {
-      val preferences = PreferenceManager.getDefaultSharedPreferences(mActivityTestRule.activity)
-      val preferenceEditor = preferences.edit()
-      preferenceEditor.putString(SettingsFragment.SK_HOST_ADDRESS, DummyServer.IP)
-      preferenceEditor.putString(SettingsFragment.SK_HOST_PORT, DummyServer.DEFAULT_PORT.toString())
-      // In order not to receive keep-alive messages
-      preferenceEditor.putString(SettingsFragment.SK_KEEPALIVE, "100000000")
-      preferenceEditor.commit()
+      initNetworkSettings(mActivityTestRule.activity)
     }
 
     @Test
@@ -222,10 +211,15 @@ class MainWindowTests {
       assertFalse(messages.hasNext())
     }
 
+    /** Presses down and up at [at] (screen coords), dwelling [dwellMs] between. */
+    private fun tapAt(uiController: UiController, at: FloatArray, dwellMs: Long) {
+      val tap = MotionEvents.sendDown(uiController, at, tapPrecision).down
+      uiController.loopMainThreadForAtLeast(dwellMs)
+      MotionEvents.sendUp(uiController, tap)
+    }
+
     private fun pressButtons(): ViewAction {
       return object : ViewAction {
-        private val tapPrecision = floatArrayOf(1f, 1f)
-
         override fun getConstraints(): Matcher<View> = isDisplayed()
 
         override fun getDescription(): String = "Clicks on each of magic buttons"
@@ -241,9 +235,7 @@ class MainWindowTests {
                     buttonTopLeftCoords[0] + currentButton.width / 2f,
                     buttonTopLeftCoords[1] + currentButton.height / 2f,
                 )
-            val tap = MotionEvents.sendDown(uiController, clickCoords, tapPrecision).down
-            uiController.loopMainThreadForAtLeast(50)
-            MotionEvents.sendUp(uiController, tap)
+            tapAt(uiController, clickCoords, 50)
           }
         }
       }
