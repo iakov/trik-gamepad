@@ -54,7 +54,8 @@ versions risk collisions with the `minSdk*10000 + ...` formula).
   (e.g. `C\:/Users/<user>/Android/Sdk` style) or lint's `PropertyEscape` check
   fails the build.
 - JDK 21 (Microsoft OpenJDK) works with Gradle 9.5.0 + AGP 9.3.1 (current
-  toolchain, locked in `.PLAN.md`; migrated from Gradle 8.14.5 + AGP 8.13.2
+  toolchain, locked in `DECISIONS.md` "AGP 9.3.1 / Gradle 9.5.0 migration
+  LANDED"; migrated from Gradle 8.14.5 + AGP 8.13.2
   2026-08-08).
 - AEHD (Android Emulator Hypervisor Driver 2.2) is installed for local
   emulator acceleration; verify with `emulator -accel-check`. Installer lives
@@ -484,7 +485,7 @@ config files changed.
 
 - **Dormant PR hooks imported verbatim.** The lobe-server PR-workflow rules
   (PR-body freshness, after-merge fork-master CI check, squash-fix) assume a
-  PR workflow that gamepad's single-branch no-PR execution plan (`.PLAN.md`)
+  PR workflow that gamepad's single-branch no-PR execution plan
   doesn't use yet. Kept per explicit "take all" instruction, then marked
   dormant in AGENTS.md so they can't misdirect future agents.
 - **Blanket import, not mapped.** Lesson (now an AGENTS.md rule — "mark dormant
@@ -654,9 +655,9 @@ CI focus flake (pre-empt race), retired checkstyle/pmd, ratcheted coverage to
   "doesn't crash") and confirm the coverage needle moved.
 - *How to make build cycles fast and non-blocking?* → `--no-daemon`, short
   timeouts on probes, parallel independent tool calls.
-- *How to keep session knowledge durable?* → checkpoint `.PLAN.md` after each
+- *How to keep session knowledge durable?* → checkpoint the plan file after each
   milestone (this session did, but later than ideal — the uncommitted-fix state
-  was the kind of thing a mid-migration `.PLAN.md` entry would have caught).
+  was the kind of thing a mid-migration plan-file entry would have caught).
 
 **Extracted for the next session:** the improvement roadmap is committed at
 `docs/ROADMAP.md`. The `createSensorEvent` and CI-timestamp corrections are now
@@ -664,7 +665,7 @@ in TESTING.md/AGENTS.md above.
 
 ### [2026-08-08] Session retrospective — ROADMAP Phases 2-E..6 landed, instrumented CI unresolved
 
-**Context:** full-auto execution of the .PLAN.md campaign in one session:
+**Context:** full-auto execution of the campaign plan in one session:
 Phases 2-E, 2-F, 2-J, 3, 4-I, 5-H, 6 all landed and pushed; Phase 1
 (instrumented CI without macOS) experiment 2 in flight at close; the final
 retrospective is this entry.
@@ -690,8 +691,8 @@ retrospective is this entry.
 - **Stray experiment files not in the crash-safety copy.** The working tree
   contained an untracked root `build.gradle` (LSP generator plugin, AGP 8.5.0)
   and a `settings.gradle` restructure (`FAIL_ON_PROJECT_REPOS`) not mentioned in
-  .PLAN.md. Removed them to align the tree with the plan — always diff the
-  working tree against .PLAN.md's in-flight list before touching code.
+  the plan file. Removed them to align the tree with the plan — always diff the
+  working tree against the plan file's in-flight list before touching code.
 - **`$?` is unreliable after `*> file` redirects in PowerShell** — use
   `$LASTEXITCODE` (BUILD SUCCESSFUL logged but EXIT_FAIL reported).
 - **detekt config cache can mask a "green"**: after changing thresholds, force
@@ -714,7 +715,7 @@ retrospective is this entry.
 CI red on all (focus/render flakes — best-effort). Next: read `31231669287`
 (aosp_atd experiment); if still red, apply ROADMAP Phase 1 fallback (experiment
 6: keep instrumented best-effort, build gate authoritative) and close out with
-the .PLAN.md final retrospective.
+the plan-file final retrospective.
 
 ### [2026-08-08] Campaign 2 retrospective (strict — post-ROADMAP start)
 
@@ -723,7 +724,7 @@ fully green (4 consecutive runs, last-known-good `31233230621`). A new campaign
 was scoped by user decision: refactoring (B), coverage push (C), CI hardening
 (A), CI cache tuning (D), AGP9/Gradle9 (E, last), cleanup + retrospective (F).
 Execution order B/C → A/D → E. Release 1.42, dependabot auto-merge and GPG were
-explicitly deferred. Session stopped mid-B2 (in-flight work in .PLAN.md).
+explicitly deferred. Session stopped mid-B2 (in-flight work in the plan file).
 
 **What landed (Campaign 2):**
 
@@ -803,7 +804,7 @@ tests green; only spotless formatting remained at close.
   `MjpegInputStream` 91.5%, `SenderService` 93.1%, `MainActivitySettingsController`
   96.4% — per the JaCoCo XML), then A/D/E.
 - Next session: finish B2 (spotlessApply → gate → commit), then B3, B4, C,
-  A, D, E per .PLAN.md Campaign 2 table.
+  A, D, E per the Campaign 2 plan table.
 
 ### [2026-08-08] Campaign 2 execution run — B2..E landed, CI hardening + cache tuning
 
@@ -857,7 +858,7 @@ instrumented 3m33s, 9/9).
 head dropped the build gate to **1m07s** (≈4× faster; the first post-tune run
 was 5m08s because config-cache was invalidated by the settings.gradle plugins
 DSL change). Instrumented 3m17-3m33s throughout. The cache write-back is the
-single biggest CI win this campaign — see .PLAN.md flake-probe data.
+single biggest CI win this campaign — see the plan's flake-probe data.
 
 **Traps hit / lessons:**
 
@@ -882,8 +883,8 @@ single biggest CI win this campaign — see .PLAN.md flake-probe data.
 
 **State at close:** B2/B3/B4/C/E done; A has the concurrency guard +
 3+ observed runs; D has cache write-back + parallel (one green run
-measured). Remaining: F retrospective docs (this entry), final .PLAN.md /
-ROADMAP status update, and the CI flake-rate conclusion (see .PLAN.md).
+measured). Remaining: F retrospective docs (this entry), final ROADMAP status
+update, and the CI flake-rate conclusion (see the plan).
 
 ### [2026-08-08] Campaign 2 retrospective — reusable knowledge (F wrap-up)
 
@@ -895,7 +896,7 @@ Timeout". Never touch `git config` (Repo hygiene) — commit with
 
 **Coverage-report tooling.** The JaCoCo report is at
 `app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml` (note the
-extra `jacocoTestReport/` directory — `.PLAN.md` once referenced a path one
+extra `jacocoTestReport/` directory — the plan file once referenced a path one
 level shorter). The XML carries **method-level** `<counter type="BRANCH">`
 entries but **no line-level branch detail** — analyze per-method branch misses
 to plan tests. When reading totals, remember LINE and BRANCH differ hugely

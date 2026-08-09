@@ -166,7 +166,8 @@ class MainActivity :
     val video = mVideo
     if (video != null) {
       // Reconnect-on-error: the render thread reports a dead stream and we
-      // drop the HTTP connection and restart it (see .PLAN.md R12).
+      // drop the HTTP connection and restart it (R12; see DECISIONS.md
+      // "MJPEG: reconnect-on-error").
       video.setOnStreamErrorListener { restartVideoStream() }
       restartVideoStream()
     }

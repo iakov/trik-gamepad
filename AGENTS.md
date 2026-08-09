@@ -35,7 +35,7 @@ Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Build (from repo root)
 
-- Toolchain (locked in `.PLAN.md`): **AGP 9.3.1, Gradle 9.5.0, built-in Kotlin**
+- Toolchain (locked in `DECISIONS.md` "AGP 9.3.1 / Gradle 9.5.0 migration LANDED"): **AGP 9.3.1, Gradle 9.5.0, built-in Kotlin**
   (AGP 9 removed the `org.jetbrains.kotlin.android` plugin — Kotlin compilation
   is built in; `kotlinOptions {}` is gone, `jvmTarget` defaults to
   `compileOptions.targetCompatibility`), Java 11 source/target — Gradle runs
@@ -87,7 +87,7 @@ configurations, update this section and the referenced config files.
 - After pushing new commits, update the PR body (stale bodies mislead):
   `gh pr edit <N> --body-file .tmp/pr-body.md`; verify bodies with
   `gh pr view --json body` for mojibake. *Dormant during the current
-  single-branch no-PR execution plan (`.PLAN.md`) — applies once the within-fork
+  single-branch no-PR execution plan — applies once the within-fork
   PR workflow resumes.*
 - Re-validate from repo root: `./gradlew test` and `./gradlew lint`.
 - If `AGENTS.md` changed: `git diff HEAD -- AGENTS.md`, check every added/removed line against the boundary test (see Guardrails — Documenting decisions).
@@ -113,7 +113,7 @@ configurations, update this section and the referenced config files.
 - Check fork `master` CI after the squash-merge (`gh run list --branch master --limit 3`) — if it fails, fix immediately, don't move on.
 - Update local `master`: `git switch master && git pull`; delete the merged
   branch.
-- *Dormant during the current single-branch no-PR execution plan (`.PLAN.md`) —
+- *Dormant during the current single-branch no-PR execution plan —
   applies once the within-fork PR workflow resumes.*
 
 ### Before test / command
@@ -185,7 +185,7 @@ configurations, update this section and the referenced config files.
 - **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
 - **Verify toolchain/dependency-manager names against executable sources** (build files, lockfiles) before writing them into any doc.
 - **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`, pref/measure helpers, data-driven tables) instead of copy-pasting. The jscpd gate (in `gate.ps1` + CI) fails on new clones ≥ 50 tokens and `gate.ps1` prints the lizard token trend. **Dedup drives the token number, not table-ization**; a table row's expected value must not depend on an earlier row's state (reset the fixture per row). Rationale + details: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric" + TESTING.md "Test quality metrics".
-- **Mark dormant hooks**: a rule/hook that does not apply to the current phase must say so explicitly (e.g. PR-workflow hooks are dormant during the single-branch no-PR `.PLAN.md` execution plan) — otherwise it silently misdirects agents into workflow artifacts that don't exist yet.
+- **Mark dormant hooks**: a rule/hook that does not apply to the current phase must say so explicitly (e.g. PR-workflow hooks are dormant during the single-branch no-PR execution plan) — otherwise it silently misdirects agents into workflow artifacts that don't exist yet.
 
 ## Commands
 
@@ -238,7 +238,10 @@ demand:
 
 ## Current work
 
-- Execution plan + crash-safety session state: `.PLAN.md` (gitignored — never commit). Improvement roadmap: `docs/ROADMAP.md`.
+- Execution plan + crash-safety session state: `.PLAN.md` (gitignored — never
+  commit; holds ONLY unfinished tasks; read it on session init and after every
+  decision/step; completed work is trimmed from it). Why/what it is for:
+  `DECISIONS.md` "Why .PLAN.md exists". Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Conventions
 

@@ -16,7 +16,7 @@ spotlessCheck) before each push, `git status --short` clean before push.
 Scope and the **coverage-first strategy** (order B2 → B4 → C → B3 → A → D → E,
 with B4 as the one refactor-first exception) were set by user decision — see
 `DECISIONS.md` "Campaign 2 strategy: coverage-first". Full execution record:
-`.PLAN.md` "Campaign 2".
+`MEMORY.md` "Campaign 2 execution run".
 
 - **B1** ✅ `MagicButtonPanel` extracted (buttons + haptic; direct tests). `ee4a91b`.
 - **B2** ✅ `SystemUiController` extracted (immersive toggle + auto-hide;
@@ -38,7 +38,7 @@ with B4 as the one refactor-first exception) were set by user decision — see
   build gate measured **4m27s → 1m05s** (≈4×). Instrumented 3m10-3m33s.
 - **E** ✅ AGP-9 PREP (settings.gradle + buildscript → plugins DSL) then the
   **actual AGP 9.3.1 / Gradle 9.5.0 migration landed** (built-in Kotlin, config-cache
-  re-enabled; `78aace4`). See `.PLAN.md` / MEMORY "AGP 9.3.1 / Gradle 9.5.0 migration LANDED".
+  re-enabled; `78aace4`). See MEMORY "AGP 9.3.1 / Gradle 9.5.0 migration LANDED".
 - **F** ✅ Cleanup (emulator snapshot discrepancy **closed as cosmetic**;
   DummyServer note already in TESTING.md) + MEMORY retrospective added.
   **Campaign 2 complete.**
@@ -49,7 +49,7 @@ Full code audit + web best-practice research; durable reference in
 `docs/architecture.md` (domain knowledge + pitfalls), findings in the "Campaign
 3 execution run" MEMORY entry. Priorities: **P0 correctness → P1 leak fix → P2
 architecture → P3 hygiene** (each item one commit, gate, push; detailed plan:
-`.PLAN.md` "Campaign 3").
+`MEMORY.md` "Campaign 3 execution run").
 
 - **P0** ✅ `Integer.getInteger` wheel-step bug (setting never applies),
   `Sensor.TYPE_ALL` → `TYPE_ACCELEROMETER`, keepalive timer ordering,
@@ -80,7 +80,7 @@ to verify **decoder correctness**, **decode performance**, and **connection
 drop + restore** (R12 reconnect-on-error). User decisions: **Robolectric NATIVE
 venue** (real `BitmapFactory` via `@GraphicsMode(NATIVE)`), **full app reconnect
 path**, **cycle a few images** (solid color + gradient + second color). Landed
-`e0dcc18`; execution record: `.PLAN.md` "Campaign 4" + MEMORY "Campaign 4
+`e0dcc18`; execution record: MEMORY "Campaign 4
 execution run".
 
 ## Deferred from Campaign 3/4
@@ -214,5 +214,5 @@ via `SenderService(mExecutor)`; the `mConnectTask` reflection and the
 
 - **H.** ✅ Rename `com.demo.mjpeg` → `com.trikset.gamepad.mjpeg` (git mv +
   imports + layout + spotbugs `onlyAnalyze`). Landed `e56a9af`.
-- ✅ Final retrospective → AGENTS.md / MEMORY.md / TESTING.md / `.PLAN.md`;
+- ✅ Final retrospective → AGENTS.md / MEMORY.md / TESTING.md;
   last-known-good CI run id updated (`31232406163`, first fully-green run).

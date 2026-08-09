@@ -29,7 +29,7 @@ Each note follows the same shape:
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel | [2026-08-08] Campaign 5: raw-socket MJPEG HTTP client |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
-| Process | docs culture, auto-mode contract, operational rules | [2026-08-08] Auto mode contract |
+| Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-09] Why .PLAN.md exists |
 
 ______________________________________________________________________
 
@@ -76,7 +76,7 @@ ______________________________________________________________________
   (98.0% coverage, but Robolectric 4.16 already drops API 21/22 and the AndroidX
   floor moved to 23); toolchain AGP 8.13.2 + Gradle 8.14.5 vs AGP 9.3.1 +
   Gradle 9.5.0 (the latter breaking, so staged); a legacy flavor (postponed).
-- **Chosen solution (D14–D19, full rationale in `.PLAN.md`):** minSdk 21 kept
+- **Chosen solution (D14–D19):** minSdk 21 kept
   initially — **REVERSED 2026-08-08 to minSdk 23** ("forget obsolete",
   `4753c45`); toolchain went to AGP 9.3.1 + Gradle 9.5.0 + built-in Kotlin
   (`78aace4`); `compileSdk/targetSdk/maxSdk 36` (Play requires targetSdk 36 from
@@ -640,8 +640,9 @@ ______________________________________________________________________
 - **Why:** the split keeps the front door (AGENTS) small and points into the
   detail stores on demand (progressive disclosure); proven in the sibling repo.
 - **Out of scope / consequences:** quality gates and the toolchain upgrade were
-  initially postponed, then approved (see the Toolchain decision). `.PLAN.md`
-  holds the full execution plan and locked decisions D1–D19.
+  initially postponed, then approved (see the Toolchain decision). Decisions
+  live in this log; `.PLAN.md` (see AGENTS.md "Current work") holds only
+  unfinished session tasks by design (see "[2026-08-09] Why .PLAN.md exists").
 
 ### [2026-08-06] Gradle pipeline hang: daemon inherits pipe handles
 
@@ -690,7 +691,7 @@ ______________________________________________________________________
   quality gates, coverage to 85%, then pure-Kotlin migration; no release, no PR.
 - **Alternatives considered:** keep the legacy single-module `as/` layout
   (rejected); restructure to `settings.gradle` + `app/`.
-- **Chosen solution (R1–R15, full detail in `.PLAN.md`):** `settings.gradle` +
+- **Chosen solution (R1–R15):** `settings.gradle` +
   `app/` module at repo root; delete `xamarin/`, `as/import-summary.txt`,
   Eclipse junk, `.local_development.db`; `imgs/` → `docs/img/`; retire CircleCI
   → GitHub Actions; conditional signing (keystore stays outside the workdir);
@@ -769,3 +770,24 @@ ______________________________________________________________________
 - **Out of scope / consequences:** future "go full auto mode" instructions carry
   this contract without re-explaining it; rationale lives here, rule text lives
   in AGENTS.md.
+
+### [2026-08-09] Why .PLAN.md exists (by design)
+
+- **Problem:** session execution state (what is in flight, what is left) is
+  lost when a session crashes; committed docs (ROADMAP) hold *plans*, not
+  transient session state, and committing that churn pollutes git history.
+- **Alternatives considered:** commit session state to ROADMAP (history noise;
+  completed work would linger); rely on chat memory (ephemeral — see AGENTS.md
+  "Session context is ephemeral"); a gitignored working plan file.
+- **Chosen solution:** a gitignored `.PLAN.md` at the repo root that holds
+  **only unfinished/in-flight tasks** for crash-safety. Completed work is
+  trimmed from it by design — its durable homes are the MEMORY.md retrospectives
+  and git history. It stores no decisions and no rationale (those belong in
+  this log) and is never committed.
+- **Why:** a fresh session recovers from a short, accurate pending list instead
+  of wading through completed-work history; nothing transient pollutes the
+  committed docs; every completed item already has a durable home (MEMORY
+  retrospectives, DECISIONS entries, git log).
+- **Out of scope / consequences:** `.PLAN.md` is referenced only here (why/what
+  it is for) and in AGENTS.md "Current work" (what is in it / when to read it);
+  all other docs deliberately carry no `.PLAN.md` references.
