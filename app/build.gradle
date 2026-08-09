@@ -199,7 +199,12 @@ def coverageExcludes = [
 ]
 
 def debugClasses = fileTree(dir: "${buildDir}/intermediates/javac/debug/compileDebugJavaWithJavac/classes", excludes: coverageExcludes)
-def debugKotlinClasses = fileTree(dir: "${buildDir}/tmp/kotlin-classes/debug", excludes: coverageExcludes)
+// AGP 9's built-in Kotlin outputs to intermediates/built_in_kotlinc (the old
+// tmp/kotlin-classes/debug dir went stale under the migration — new classes
+// were invisible to the coverage gate). Verified against the compileDebugKotlin
+// output on AGP 9.3.1; if AGP relocates it, the report will show ~0% and the
+// gate will fail loudly (better than silently passing).
+def debugKotlinClasses = fileTree(dir: "${buildDir}/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes", excludes: coverageExcludes)
 
 tasks.register('jacocoTestReport', JacocoReport) {
     dependsOn 'testDebugUnitTest'
