@@ -230,6 +230,7 @@ rules.
 - **`.md` formatting + EOL trap (Windows checkout)**: pre-format with `uvx mdformat` before pre-commit (the first hook run reformats and fails); after committing `.md`, expect a dirty working tree — the hook rewrites to LF (vs CRLF) with a **content-identical** diff (`git diff --stat` empty, `git status` dirty). Verify content-identical, then `git checkout -- <md>`; never `git add` the EOL-only state. POSIX checkouts are LF already, so the symptom does not appear there.
 - **PS 5.1 `$ErrorActionPreference='Stop'` + native stderr is a terminating error**: `& npx ... *>> $log` under EAP=Stop silently kills the script the moment the tool prints to stderr (jscpd prints "Using config from ..."). Scope `$ErrorActionPreference='Continue'` around native calls and check `$LASTEXITCODE` — for ANY new native command in a PowerShell script with EAP=Stop. (The Python gate `scripts/gate.py` is immune — `subprocess` captures stderr.)
 - **`gh` run commands take the run **id**, not a PowerShell run object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
+- **`gh run view --json ... --jq "<expr>"` with embedded quotes breaks under PowerShell** ("accepts at most 1 arg(s), received N") — the quoted `--jq` expression gets mangled in argument passing. Use plain `--json status,conclusion` or route the expression through a `.tmp/` file.
 - **PowerShell escaping differs from bash** (backticks, `-1` in `git commit -m`); route complex arguments through a `.tmp/` file rather than inlining.
 
 ## Memory index

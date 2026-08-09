@@ -1264,3 +1264,72 @@ job gained a `Test duplication gate (jscpd)` step (`npx -y jscpd ... --config .j
   an external temp dir (`git show HEAD:<path>` → LF) and run the tool against
   that export. This reproduced the jscpd CI red in ~30s (see DECISIONS.md
   "jscpd import-ignore calibration").
+
+### [2026-08-09] Campaign 7 execution run — cross-platform dev readiness
+
+**Goal:** make the project ready for cross-platform development (dev machines
+Ubuntu → Arch → macOS) while keeping Windows working — replace the
+Windows-first tooling/docs with Python/uv everywhere. Decision + rationale:
+`DECISIONS.md` "[2026-08-09] Dev tooling is cross-platform via uv (Python
+gate)". Commits `7f5a17b` (build) + `a7d212b` (docs) + `db89f84` (doc note) +
+`0b6b967` (gitignore `__pycache__`) + the retrospective commit.
+
+**What landed:** `pyproject.toml` (`package = false`, `requires-python >= 3.9`,
+dev group: `lizard==1.23.0`, `mdformat==0.7.21`, `pre-commit`) + committed
+`uv.lock`; `scripts/gate.py` (stdlib `subprocess`, picks `gradlew.bat` vs
+`./gradlew` by OS) + `scripts/spotless_apply.py` + shared `scripts/_gradle.py`
+replace `gate.ps1` (deleted); pre-commit spotless hook → `language: system` +
+`python scripts/spotless_apply.py` (no more `cmd /c gradlew.bat`); AGENTS.md
+**"Windows/PowerShell quirks"** section consolidates the PS/Windows traps (not
+generalized — re-audit on the first POSIX box); TESTING.md emulator platform
+table (Windows AEHD / Linux KVM / macOS Hypervisor.framework, macOS unverified)
+
+- generic `~/.robolectric-download-lock`; MEMORY/DECISIONS/ROADMAP/architecture
+  updated. `ci.yml` deliberately unchanged (already Linux).
+
+**Verification (measured):**
+
+- `uv run python scripts/gate.py` → GATE PASSED; token trend 11,234 (A0
+  baseline 12,659) — identical to the old `gate.ps1` reading, so the port is
+  faithful.
+- `uv run pre-commit run --all-files` → all hooks green (incl. the new python
+  spotless hook).
+- CI runs `31335428603` + `31335779808` fully green. Last-known-good:
+  `31335779808`.
+
+**Probed facts (Windows, subject-level):**
+
+- **Python `subprocess` launches `.bat`/`.cmd` directly on Windows** — no
+  `cmd /c` needed (`subprocess.run(["gradlew.bat", ...])` works; CreateProcess
+  handles batch files). This is why the python pre-commit hook and `gate.py`
+  need no Windows shim. Probed with a trivial `.bat`.
+- **`uv sync` reconciles an existing venv and fixed a latent formatter drift:**
+  the pre-C7 venv held mdformat **1.0.0** (unpinned `uv pip install`, Campaign
+  6\) while the pre-commit hook pinned **0.7.21** — `uvx mdformat` could format
+  differently than the hook. Pinning dev deps in `pyproject.toml` makes local
+  == hook and keeps the lizard token trend comparable to the A0 baseline.
+  Lesson: pin any tool that feeds a metric or a formatter.
+
+**Tooling / process lessons:**
+
+- **The mdformat EOL trap fires on EVERY `.md` commit on Windows** (2× this
+  session + README.md via `--all-files`): the hook rewrites CRLF→LF during the
+  commit, leaving a content-identical dirty tree. The `git checkout -- <md>`
+  ritual is mandatory, not occasional (AGENTS.md quirks section).
+- **`gh run view --jq "<expr with embedded quotes>"` breaks under PowerShell**
+  ("accepts at most 1 arg(s), received 5") — the quoted `--jq` expression is
+  mangled in arg passing. Use plain `--json status,conclusion` (no `--jq`), or
+  route the expression through a `.tmp/` file.
+- **pre-commit auto-stashes unstaged files during commit** ("Stashing unstaged
+  files ... Restored changes") and restores them after — worked cleanly 2×;
+  expected behavior, not an error.
+- **Docs-only pushes still run the full CI** (build + instrumented, ~6-7 min);
+  the bounded 3-min cadence check held (run appeared, polled, green).
+- **`scripts/__pycache__/` regenerates on every Python-script run** (import of
+  `_gradle.py`) → gitignored in the C7 close-out (bytecode is garbage); a
+  `.gitignore` entry was the right fix, not a delete-before-staging ritual.
+- **Injected session-state summaries can diverge from reality:** the C7
+  "completed" artifacts claimed at session start did not exist in the tree (no
+  `pyproject.toml`/`gate.py`/commit). Verify against `git status`/filesystem
+  before trusting a state summary (existing "verify claims with a command"
+  rule confirmed by incident).
