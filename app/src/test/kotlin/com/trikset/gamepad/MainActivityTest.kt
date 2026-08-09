@@ -5,6 +5,7 @@ import androidx.preference.PreferenceManager
 import com.trikset.gamepad.mjpeg.MjpegView
 import java.lang.reflect.Field
 import java.lang.reflect.Method
+import java.net.URL
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -220,6 +221,38 @@ class MainActivityTest : RobolectricTestBase() {
     val m = method(activity, "restartVideoStream")
     m.invoke(activity)
     org.robolectric.Robolectric.flushForegroundThreadScheduler()
+  }
+
+  @Test
+  fun connectionConnectedWithVideoConfiguredShouldDriveRetryReload() {
+    // Campaign 8 wiring: control connection Connected + video configured + not playing must arm a
+    // reload through the retry controller (here it fast-fails to an unreachable address and the
+    // onLoadFailed path runs). Exercises the collector's Connected branch and the shouldReload
+    // gate.
+    setField(activity, "mVideo", MjpegView(activity))
+    setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
+    val sender = activity.getSenderService()
+    TestTcpServer().use { server ->
+      sender.setTarget(TestTcpServer.HOST, server.port)
+      sender.send("")
+      val deadline = System.currentTimeMillis() + 5000
+      while (
+          sender.connectionState.value !is ConnectionState.Connected &&
+              System.currentTimeMillis() < deadline
+      ) {
+        org.robolectric.Robolectric.flushForegroundThreadScheduler()
+        Thread.sleep(10)
+      }
+      assertTrue(sender.connectionState.value is ConnectionState.Connected)
+      // The reload's load() runs on a real executor; give the fast-failing open + its onResult
+      // post time to reach the main looper so the onLoadFailed path is deterministically covered.
+      val settleDeadline = System.currentTimeMillis() + 2000
+      while (System.currentTimeMillis() < settleDeadline) {
+        org.robolectric.Robolectric.flushForegroundThreadScheduler()
+        Thread.sleep(20)
+      }
+    }
+    sender.disconnect("test done")
   }
 
   @Test

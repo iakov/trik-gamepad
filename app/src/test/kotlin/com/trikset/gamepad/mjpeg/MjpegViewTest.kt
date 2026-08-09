@@ -5,6 +5,7 @@ import java.io.ByteArrayInputStream
 import java.net.ServerSocket
 import java.net.Socket
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -62,6 +63,17 @@ class MjpegViewTest : RobolectricTestBase() {
     assertNotNull(viaContext)
     assertNotNull(viaAttrs)
     assertNull(viaContext.tag)
+  }
+
+  @Test
+  fun isPlayingShouldReflectPlaybackState() {
+    val view = MjpegView(RuntimeEnvironment.getApplication())
+    assertFalse(view.isPlaying())
+    view.setSource(MjpegInputStream(ByteArrayInputStream(ByteArray(0))))
+    view.startPlayback()
+    assertTrue(view.isPlaying())
+    view.stopPlayback()
+    assertFalse(view.isPlaying())
   }
 
   /**
