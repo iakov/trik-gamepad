@@ -3,9 +3,13 @@
 <!-- encoding: utf-8 -->
 
 Scope: how the app is put together — module map, the TCP command protocol, the
-MJPEG video pipeline, and how the test layers map onto the code. Written for
-new contributors and future sessions; keep it code-accurate (it is reviewed
-against `app/src` whenever it is touched).
+MJPEG video pipeline, and how the test layers map onto the code. Also the home
+for **useful architecture notes and quirks** and the **domain knowledge /
+best-practice reference** (threading, ViewModel/StateFlow, SurfaceView, sensors,
+build tooling). Written for new contributors and future sessions; keep it
+code-accurate (it is reviewed against `app/src` whenever it is touched).
+Decisions (problem → alternatives → why → out-of-scope) live in
+`DECISIONS.md`, not here.
 
 ## Module map
 
@@ -102,7 +106,7 @@ HttpURLConnection (5 s connect/read timeouts)
   it stops and fires `OnStreamErrorListener`.
 - **Reconnect-on-error** (no forced periodic restart): `MainActivity` registers
   the listener in `onResume`; it marshals to the main thread and calls
-  `restartVideoStream()`, which re-runs `VideoStreamLoader`. See MEMORY.md
+  `restartVideoStream()`, which re-runs `VideoStreamLoader`. See `DECISIONS.md`
   "MJPEG: reconnect-on-error" for the rationale.
 - Default URI is `http://<host>:8080/?action=stream`; changing the host
   preference rewrites `SK_VIDEO_URI` to match. Cleartext HTTP is allowed via
@@ -150,3 +154,199 @@ immersive-mode confirmation overlay; the app runs edge-to-edge landscape.
 - Haptics on pads/buttons via `HapticFeedbackConstants`.
 - Resources are English-only; `MissingTranslation` is a lint warning, not an
   error.
+
+## Domain knowledge & best-practice reference
+
+Durable reference from the strict full-project review (Campaign 3). Each item
+is the "why" behind the code shape above; revisit the decision log in
+`DECISIONS.md` for the problem/alternatives context.
+
+### Raw TCP sockets in an Activity (gamepad pattern)
+
+Work that runs only while the user interacts belongs on a thread/executor
+created by the component, NOT a Service — a Service spawns its own thread
+anyway and a started Service is still killable. A **foreground Service** is
+only for surviving the user leaving the app, and needs a declared
+`android:foregroundServiceType` + permission on targetSdk 34+ and Play scrutiny
+(a gamepad connection has no natural FGS type). **The real problem is
+rotation**: an Activity-owned socket is closed/reopened on every config change.
+The recommended fix is a **ViewModel-owned** connection (survives rotation,
+`onCleared()` closes it) — which this app adopted in Campaign 3 P2. Process
+death still kills it, but settings live in SharedPreferences so re-derivation
+is free.
+
+### Threading model
+
+Coroutines are the modern recommendation, but the socket must be cancelled
+cooperatively — a blocking `read()` will NOT cancel; the only reliable unblock
+is closing the socket/connection from another thread. Keep the single dedicated
+connection thread + SurfaceView render thread if not migrating to coroutines;
+create the pool once, not per connection.
+
+### MJPEG-over-HTTP client
+
+`multipart/x-mixed-replace` — per-part `Content-Length` is often ABSENT, so
+byte-scan to the next boundary. Read/socket timeouts must exceed the
+inter-frame gap (else a paused robot causes a needless reconnect). On any
+IOException: tear down fully + reconnect (with backoff); validate HTTP 200 +
+Content-Type first. `InputStream.read` blocks and is not interruptible — unblock
+by disconnecting. Decode JPEGs off the network thread; reuse Bitmaps; always
+draw the LATEST complete frame.
+
+### SurfaceView vs TextureView
+
+SurfaceView is the recommended, higher-perf pattern for a render thread
+(`lockCanvas`); it punches a hole in the window so sibling overlays cost an
+alpha-blend per frame, and post-layout transforms of siblings glitch below
+API 24. TextureView behaves like a normal View (overlays "just work") but does
+an extra buffer copy per frame and has hardware-acceleration +
+single-producer constraints. This app draws its FPS text INTO the Surface canvas
+— keep it that way (fastest).
+
+### ViewModel / StateFlow
+
+ViewModel is the sanctioned "business logic state holder"; survives rotation,
+cleared on Activity finish via `onCleared()` (close the socket there).
+`viewModelScope` is hardcoded to `Dispatchers.Main` — background it with
+`withContext(Dispatchers.IO)` for socket work. Don't hold a Context in a
+ViewModel (use `AndroidViewModel` if you must). Expose connection state as an
+immutable `StateFlow<ConnectionState>` (sealed Connecting/Connected/
+Disconnected); collect with `repeatOnLifecycle(STARTED)` — NOT the deprecated
+`launchWhenX` (they suspend instead of cancel, wasting resources).
+`SavedStateHandle` survives process death; only primitives/small strings
+(never sockets/threads). UI-logic state → `onSaveInstanceState`.
+
+### Preferences in 2026
+
+androidx.preference is still the documented settings UI (the platform
+`android.preference` package is deprecated since API 29). Backend defaults to
+SharedPreferences; **DataStore** is the recommended storage layer (async,
+transactional, Flow reads, singleton per file) via `PreferenceDataStore`. The
+`OnSharedPreferenceChangeListener` is held strongly and process-global — an
+Activity that registers one and skips unregister LEAKS; the fragment-managed
+`setOnPreferenceChangeListener` or a DataStore Flow avoids manual lifetime
+entirely.
+
+### Sensors
+
+Register in `onResume`, unregister in `onPause` (hard best practice — the
+system doesn't disable sensors on screen-off; unregistered listeners drain
+battery). Use the slowest rate that works (`SENSOR_DELAY_NORMAL` = 200 ms,
+`UI` = 60 ms, `GAME` = 20 ms; capped at 200 Hz). For a gamepad wheel,
+`SENSOR_DELAY_GAME` is the sweet spot.
+
+### Edge-to-edge (targetSdk 35+/36)
+
+Enforced — the window draws behind the system bars automatically; you must
+handle insets. `WindowCompat.enableEdgeToEdge` for older devices. The
+options-menu + `onCreateOptionsMenu` pattern is still current; the
+modernization is hosting it in a `MaterialToolbar` rather than the legacy
+ActionBar.
+
+### Kotlin idioms
+
+Prefer string templates to `String.format` for pure interpolation (keep format
+only for locale-aware numeric padding); the current recommendation is
+**`Locale.ROOT`, not `Locale.US`** (detekt 2.0-alpha.6 ships a rule). Prefer
+`if` for binary conditions, `when` for 3+ options; `data class` for value
+holders (e.g. `TouchPadController.Command`); `@JvmField`/`@JvmOverloads`/
+`@JvmStatic` exist only for Java interop — this repo has 0 Java files, so they
+are dead weight to remove. Default to `private`, use `internal` only for
+cross-package test access.
+
+### AGP 9 / Gradle 9 build
+
+AGP 9 runtime-depends on KGP 2.2.10 (this repo's built-in Kotlin). Config cache
+is preferred and will be on by default in Gradle 10; when active it FORCES
+intra-project parallelism (the spotlessApply-vs-test race is inherent — the
+two-invocation `gate.ps1` is correct). Version catalogs
+(`gradle/libs.versions.toml`) are the documented centralization (Google's AGP-9
+migration docs assume TOML). Dependency locking optional at this size. **detekt
+1.23.8 predates AGP 9** (built vs AGP 8.8/Gradle 8.12) — 2.0.0-alpha.3+ adds
+real built-in-Kotlin support; upgrade when stable, don't disable config-cache
+if detekt flakes. ktfmt = deterministic zero-config formatter; ktlint = linter
+(de-facto standard, ships detekt integration). Lint 9.3.1: report-output DSL
+(`htmlReport`/`textReport`) is deprecated → `SingleArtifact.LINT_*_REPORT`;
+known lint bugs (SDK resolution not a task input → caching, "Could not clean up
+K2 caches"). Generate baselines with the aggregate `lint` task.
+
+### Robolectric
+
+PAUSED is the only recommended LooperMode (LEGACY deprecated). Threads/
+executors are NOT under the shadow scheduler — stop every ExecutorService
+explicitly and gate on latches/timeouts. Plain `java.net.Socket` works on the
+JVM. **Robolectric 4.16 dropped API 21/22 (min now 23)** — the app's minSdk
+was raised to 23 in Campaign 3, so `Config.OLDEST_SDK` now equals the declared
+min (intended). `@Config(sdk = [OLDEST, TARGET, NEWEST])` triples run time
+(each SDK downloads its own android-all jar). Known AGP-9 issue: built-in
+Kotlin breaks kapt-based custom-shadow registration (workaround
+`com.android.legacy-kapt`; fix = KSP).
+
+### Espresso on headless CI
+
+`RootViewWithoutFocusException` causes are system overlays/dialogs, animations
+mid-flight, keyguard, keyboard, immersive confirmation. Fixes: disable all 3
+animation scales, dismiss keyguard, request focus, `inRoot(...)`, verify with
+`dumpsys window mCurrentFocus`. Custom ViewActions: always send UP in `finally`
+(a missed UP hangs); coords must be within the view's visible bounds; known
+Espresso bugs to avoid replicating (TOOL_TYPE_UNKNOWN swipes, coordinate defect
+#1840).
+
+### CI emulator
+
+aosp_atd = less CPU/faster boot/no GMS but documented as less reliable for
+complex UI tests (this repo's 9 tests pass — fine). Use KVM on ubuntu-latest;
+`swiftshader_indirect` is the correct headless GPU. Orchestrator: per-test
+restarts (crash isolation + clean package data) vs runtime cost — for a 9-test
+suite it's a deliberate keep; re-weigh if it grows. Fixed `localhost:12345`
+DummyServer port collides if ever sharded.
+
+### JaCoCo
+
+Branch > line as a signal; a 95/80 gate matches the recommended shape.
+`includeNoLocationClasses` defaults false (Kotlin classes silently excluded →
+report can look better than reality). Verification task reports only the FIRST
+violated rule. Instrumented tests aren't covered by the JVM agent (offline
+instrumentation needed) — the 95/80 gate measures Robolectric + JVM only.
+Coverage measures what RAN, not correctness — the wheel-step and TYPE_ALL bugs
+passed a 95/80 gate because their tests assert "no crash", not real behavior.
+
+## Known pitfalls & quirks
+
+Bug classes and traps that cost real debugging time; the rule for each is in
+AGENTS.md / TESTING.md, the full story in the relevant decision/retrospective.
+
+- **"Setting parsed via the wrong API" bug class.** `Integer.getInteger(pref, default)` reads a **JVM system property**, not the pref; `Sensor.TYPE_ALL` is
+  a **mask**, not a sensor type. Both passed the coverage gate because the
+  tests asserted "no crash". Assert real behavior, not just the absence of an
+  exception.
+- **Static-analysis UP-TO-DATE false-green.** detekt (and other analyzers) can
+  stay `UP-TO-DATE` when new source files arrive via an untracked path — the
+  local gate "passes" while CI fails. After adding/renaming sources, force one
+  real pass: `./gradlew detekt --rerun-tasks` (AGENTS.md "Exit 0 ≠ tool ran").
+- **pre-commit re-format dance.** The local `spotlessApply` hook reformats
+  Kotlin files AFTER staging, so the first commit attempt silently fails with
+  "files were modified by this hook". Fix: re-`git add` + re-commit.
+- **Robolectric `@GraphicsMode(NATIVE)` API-23 quirk.** Under native graphics,
+  `BitmapFactory` decodes correctly on the default SDK but **API 23 pixels
+  decode near-black** (e.g. solid red → r=1,g=0,b=0). Not an app bug —
+  byte-identical frames still prove parser/decode correctness. Color-asserting
+  tests must pin `@Config(sdk=[TARGET_SDK])`.
+- **MJPEG parser pacing rule.** `MjpegInputStream.readMjpegFrame()` returns a
+  frame only when `available() < 2*contentLength`; small frames are dropped
+  first when the client lags. Synthetic MJPEG servers should emit
+  **comparable-JPEG-size** frames at ~50 ms pacing.
+- **MJPEG leak fix pattern.** A render thread blocked in a non-interruptible
+  `InputStream.read` cannot be unblocked by `join(timeout)` — close the stream
+  **from another thread** (the documented unblock pattern) and suppress the
+  error-listener on deliberate stops via a `stopping` flag, or the close
+  spuriously triggers a reconnect.
+- **`window`/activity-scoped state in a field initializer.** `Activity.window`
+  is only assigned during `attach()` (after the constructor) — a field
+  initializer touching it throws in Robolectric ("Window creation failed!") and
+  NPEs on device. Use `by lazy` or a provider lambda.
+- **Lint-baseline location matching is exact.** An entry whose `location file`
+  is a machine-specific absolute path (e.g. the wrapper properties outside the
+  module) silently stops matching on CI. Env-dependent checks
+  (`OldTargetApi`, `AndroidGradlePluginVersion`) belong in `lint.xml`, not the
+  baseline; prune stale baseline entries by hand after a build-file refactor.
