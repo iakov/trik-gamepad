@@ -23,13 +23,20 @@ constructor(
     private val mainHandler: Handler = Handler(Looper.getMainLooper()),
 ) {
 
-  fun load(url: URL?) {
+  /**
+   * Opens the stream and wires it into the view. [onResult] is invoked on the main thread once the
+   * attempt settles: `true` when a stream was opened and playback started, `false` when the URL was
+   * null or the stream could not be opened (the Campaign 8 retry loop keys off this — today a
+   * failed open was silent, so the video never recovered after the robot came back into range).
+   */
+  fun load(url: URL?, onResult: (Boolean) -> Unit = {}) {
     executor.execute {
       val stream = openStream(url)
       mainHandler.post {
         view.stopPlayback()
         view.setSource(stream)
         view.startPlayback()
+        onResult(stream != null)
       }
     }
   }

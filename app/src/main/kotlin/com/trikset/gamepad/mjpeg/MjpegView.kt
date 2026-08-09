@@ -57,6 +57,9 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
     input = source
   }
 
+  /** True while the render thread is consuming frames (started and not stopped). */
+  fun isPlaying(): Boolean = running
+
   @Synchronized
   fun startPlayback() {
     if (input != null) {

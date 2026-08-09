@@ -41,6 +41,7 @@ class MainActivity :
   private var mVideo: MjpegView? = null
   private var mVideoURL: URL? = null
   private var mSettingsController: MainActivitySettingsController? = null
+  private var videoRetryController: VideoRetryController? = null
   private val senderViewModel: SenderViewModel by viewModels()
   private val wheelController = WheelController()
   private val magicButtons = MagicButtonPanel(this) { getSenderService().send(it) }
@@ -115,6 +116,21 @@ class MainActivity :
     mSettingsController = MainActivitySettingsController(this, getSenderService(), this)
     mSettingsController?.register()
 
+    // Campaign 8: bounded video-stream retry, gated on the control connection's keepalive
+    // (connectionState is Connected == the same robot is reachable). Reloads only while the view is
+    // not playing, so a healthy stream is never disturbed; a failed open / silent stall / foldable
+    // surface recreation all leave the view not-playing and are recovered by the 5 s tick or by the
+    // control-Connected edge (see VideoRetryController).
+    videoRetryController =
+        VideoRetryController(
+            shouldReload = {
+              senderViewModel.connectionState.value is ConnectionState.Connected &&
+                  mVideoURL != null &&
+                  mVideo?.isPlaying() == false
+            },
+            reload = { restartVideoStream() },
+        )
+
     // Observe the TCP connection state for the activity's lifetime; repeatOnLifecycle
     // (not the deprecated launchWhenX) stops the collection on STOP and restarts it
     // fresh on each START, so no stale emissions are collected across pauses.
@@ -123,6 +139,10 @@ class MainActivity :
         senderViewModel.connectionState.collect { state ->
           if (state is ConnectionState.Disconnected && state.reason.isNotEmpty()) {
             toast("Disconnected." + state.reason)
+          }
+          if (state is ConnectionState.Connected) {
+            // Edge trigger: robot reachable again -> reload the video right away if it is dead.
+            videoRetryController?.onControlConnected()
           }
         }
       }
@@ -153,6 +173,7 @@ class MainActivity :
   override fun onPause() {
     mSensorManager?.unregisterListener(this)
     getSenderService().disconnect("Inactive gamepad")
+    videoRetryController?.onPause()
     val video = mVideo
     if (video != null) {
       video.stopPlayback()
@@ -163,12 +184,13 @@ class MainActivity :
 
   override fun onResume() {
     super.onResume()
+    videoRetryController?.onResume()
     val video = mVideo
     if (video != null) {
       // Reconnect-on-error: the render thread reports a dead stream and we
       // drop the HTTP connection and restart it (R12; see DECISIONS.md
       // "MJPEG: reconnect-on-error").
-      video.setOnStreamErrorListener { restartVideoStream() }
+      video.setOnStreamErrorListener { videoRetryController?.onStreamError() }
       restartVideoStream()
     }
     val sensorManager = mSensorManager
@@ -186,7 +208,11 @@ class MainActivity :
     // main thread before touching the view hierarchy / opening the stream.
     runOnUiThread {
       val video = mVideo ?: return@runOnUiThread
-      VideoStreamLoader(video).load(mVideoURL)
+      // Feed the load outcome back into the retry controller (Campaign 8): a failed open arms
+      // the bounded retry loop, a success disarms it.
+      VideoStreamLoader(video).load(mVideoURL) { ok ->
+        if (ok) videoRetryController?.onLoadSuccess() else videoRetryController?.onLoadFailed()
+      }
     }
   }
 
