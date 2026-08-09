@@ -1,26 +1,4 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <issues format="6" by="lint 9.3.1" type="baseline" client="gradle" dependencies="false" name="AGP (9.3.1)" variant="all" version="9.3.1">
 
-    <issue
-        id="GradleDependency"
-        message="A newer version of `compileSdk` than 36 is available: 37"
-        errorLine1="    compileSdk 36"
-        errorLine2="    ~~~~~~~~~~~~~">
-        <location
-            file="build.gradle"
-            line="27"
-            column="5"/>
-    </issue>
-
-    <issue
-        id="GradleDependency"
-        message="A newer version of androidx.core:core-ktx than 1.16.0 is available: 1.19.0"
-        errorLine1="    implementation &apos;androidx.core:core-ktx:1.16.0&apos;"
-        errorLine2="                   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
-        <location
-            file="build.gradle"
-            line="239"
-            column="20"/>
-    </issue>
-
 </issues>
