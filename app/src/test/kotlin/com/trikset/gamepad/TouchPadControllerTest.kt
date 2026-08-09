@@ -10,45 +10,25 @@ class TouchPadControllerTest {
   private fun controller(): TouchPadController = TouchPadController()
 
   @Test
-  fun centerShouldReturnNull() {
-    // Center maps to (0,0); no movement from (0,0) -> no command.
-    assertNull(controller().nextCoordinates(100f, 100f, 200f, 200f))
-  }
+  fun nextCoordinatesShouldMapAndClamp() {
+    data class Case(val x: Float, val y: Float, val expected: TouchPadController.Command?)
 
-  @Test
-  fun movedRightShouldSendPositiveX() {
-    // x at the right edge -> rX = 230*(1-0.5) = 115 -> clamped to 100.
-    assertEquals(
-        TouchPadController.Command(100, 0),
-        controller().nextCoordinates(200f, 100f, 200f, 200f),
-    )
-  }
-
-  @Test
-  fun movedLeftShouldSendNegativeX() {
-    // x at the left edge -> rX = 230*(0-0.5) = -115 -> clamped to -100.
-    assertEquals(
-        TouchPadController.Command(-100, 0),
-        controller().nextCoordinates(0f, 100f, 200f, 200f),
-    )
-  }
-
-  @Test
-  fun movedTopShouldSendPositiveY() {
-    // y at the top edge -> rY = -(-115) = 115 -> clamped to 100.
-    assertEquals(
-        TouchPadController.Command(0, 100),
-        controller().nextCoordinates(100f, 0f, 200f, 200f),
-    )
-  }
-
-  @Test
-  fun movedBottomShouldSendNegativeY() {
-    // y at the bottom edge -> rY = -115 -> clamped to -100.
-    assertEquals(
-        TouchPadController.Command(0, -100),
-        controller().nextCoordinates(100f, 200f, 200f, 200f),
-    )
+    val cases =
+        listOf(
+            Case(100f, 100f, null), // center maps to (0,0) -> no movement -> no command
+            Case(200f, 100f, TouchPadController.Command(100, 0)), // right edge -> clamped to 100
+            Case(0f, 100f, TouchPadController.Command(-100, 0)), // left edge -> clamped to -100
+            Case(100f, 0f, TouchPadController.Command(0, 100)), // top edge -> clamped to 100
+            Case(100f, 200f, TouchPadController.Command(0, -100)), // bottom edge -> clamped to -100
+        )
+    for (case in cases) {
+      val actual = controller().nextCoordinates(case.x, case.y, 200f, 200f)
+      if (case.expected == null) {
+        assertNull("case $case", actual)
+      } else {
+        assertEquals("case $case", case.expected, actual)
+      }
+    }
   }
 
   @Test
