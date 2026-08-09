@@ -259,7 +259,7 @@ cross-package test access.
 AGP 9 runtime-depends on KGP 2.2.10 (this repo's built-in Kotlin). Config cache
 is preferred and will be on by default in Gradle 10; when active it FORCES
 intra-project parallelism (the spotlessApply-vs-test race is inherent — the
-two-invocation `gate.ps1` is correct). Version catalogs
+two-invocation gate `scripts/gate.py` is correct). Version catalogs
 (`gradle/libs.versions.toml`) are the documented centralization (Google's AGP-9
 migration docs assume TOML). Dependency locking optional at this size. **detekt
 1.23.8 predates AGP 9** (built vs AGP 8.8/Gradle 8.12) — 2.0.0-alpha.3+ adds

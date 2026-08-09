@@ -31,7 +31,7 @@ Improvement roadmap: `docs/ROADMAP.md`.
 - `.opencode/skills/` — opencode skills (e.g. release-notes).
 - `docs/architecture.md` — module map, TCP protocol, MJPEG pipeline, test layering.
 - `docs/img/` — screenshots/logos.
-- `.venv/` — repo-local uv virtualenv (pre-commit, mdformat); gitignored.
+- `.venv/` — repo-local uv virtualenv (dev deps from `pyproject.toml`); gitignored. `uv.lock` is committed.
 
 ## Build (from repo root)
 
@@ -55,9 +55,10 @@ Improvement roadmap: `docs/ROADMAP.md`.
   DECISIONS.md). After any toolchain migration, add a new app class and confirm
   it appears in the JaCoCo report.
 - `settings.gradle` at repo root: `rootProject.name = 'trik-gamepad'`, `include ':app'`.
-- `local.properties` (gitignored): `sdk.dir` must escape the drive-colon (`C\:/...`) or lint's `PropertyEscape` check fails the build.
+- `local.properties` (gitignored): on Windows, `sdk.dir` must escape the drive-colon (`C\:/...`) or lint's `PropertyEscape` check fails the build (POSIX paths need no escaping).
 - Signing: `app/build.gradle` applies a release signing config conditionally — only when `file('../android-keystorage.jks')` exists. Debug builds fall back to the auto-generated debug keystore in CI. See MEMORY.md "Build & layout" for gitignore status and how the path resolves.
 - Version is hand-set at the top of `app/build.gradle` (`appMajorVersion`/`appMinorVersion`, currently 1.41). `versionCode` is computed (`minSdk*10000 + major*100 + minor`), `versionNameSuffix` is `-API<minSdk>`. Bump `appMinorVersion` for a release; never set versionCode by hand.
+- Dev tooling is cross-platform (Windows/Linux/macOS), managed by uv: `pyproject.toml` declares the dev deps (lizard, pre-commit, mdformat) and `uv sync` (re)creates `.venv` + the committed `uv.lock`. Run tools as `uv run ...` (venv-agnostic — resolves `.venv/bin` on POSIX, `.venv/Scripts` on Windows).
 
 ## Hooks
 
@@ -71,7 +72,7 @@ configurations, update this section and the referenced config files.
 
 ### Before commit
 
-- When pre-commit is installed, run `.venv/Scripts/pre-commit run --all-files`; otherwise at least `uvx mdformat` on changed `.md` files.
+- When pre-commit is installed, run `uv run pre-commit run --all-files`; otherwise at least `uvx mdformat` on changed `.md` files.
 - Commit with `git commit --no-gpg-sign`: `commit.gpgsign=true` is set locally but gpg has no interactive agent here, so a plain `git commit` hangs until timeout. Never change git config (Repo hygiene); pass the flag per commit instead. Rationale: MEMORY.md.
 - New tool/config → update this section and `MEMORY.md`.
 - Editing `AGENTS.md`: review `git diff HEAD -- AGENTS.md`, merge old content
@@ -119,7 +120,7 @@ configurations, update this section and the referenced config files.
 ### Before test / command
 
 - From repo root: `./gradlew test` (Robolectric, no device needed); a single test via `./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.<method>"`.
-- Instrumented tests need a running emulator/device (AEHD hypervisor required — verify with `emulator -accel-check`); boot with `-gpu host` (never `swiftshader_indirect`) and pre-empt the immersive-mode confirmation (`adb shell settings put secure immersive_mode_confirmations confirmed`). Full recipe: TESTING.md.
+- Instrumented tests need a running emulator/device (hypervisor: Windows AEHD / Linux KVM / macOS Hypervisor.framework — verify with `emulator -accel-check`); boot with `-gpu host` (never `swiftshader_indirect`) and pre-empt the immersive-mode confirmation (`adb shell settings put secure immersive_mode_confirmations confirmed`). Full recipe + per-platform table: TESTING.md.
 
 ### Operational rules (command hygiene)
 
@@ -132,7 +133,7 @@ configurations, update this section and the referenced config files.
 - **Never pipe long-lived children (gradle/emulator) through Tee/Select** — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) and use `--no-daemon`/`--stop` for probes.
 - **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green. Concrete trigger: a static-analysis task that shows `UP-TO-DATE` right after you added/renamed source files (e.g. detekt can stay UP-TO-DATE when new files arrive via an untracked path) — force one `./gradlew detekt --rerun-tasks` pass before trusting the gate.
 - **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries); **run the full 3-variant `test` suite twice** before pushing test changes.
-- **Format before you gate — automate, don't remember.** `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`; run them before the gate or `spotlessCheck` fails. Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` (it rewrites `.kt` while `test` compiles them — a race). Formatting is automated: pre-commit hooks (spotless-apply on `.kt`, `cmd /c gradlew.bat` required on Windows; mdformat on `.md`) + `scripts/gate.ps1` (two invocations — see Commands).
+- **Format before you gate — automate, don't remember.** `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`; run them before the gate or `spotlessCheck` fails. Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` (it rewrites `.kt` while `test` compiles them — a race). Formatting is automated: pre-commit hooks (spotless-apply on `.kt` via `scripts/spotless_apply.py` — cross-platform; mdformat on `.md`) + `scripts/gate.py` (two invocations — see Commands).
 - **Generate lint baselines with the aggregate `lint` task**, not `lintDebug`; env-dependent checks (e.g. `OldTargetApi`) go in `lint.xml`, not the baseline.
 - **CI `script:` blocks run per-line.** `reactivecircus/android-emulator-runner`
   splits `script:` into individual lines and runs each as its own `sh -c`
@@ -145,9 +146,6 @@ configurations, update this section and the referenced config files.
 - **Gaps escalate** (1st: document · 2nd: automate · 3rd+: tool config); **verify "runs automatically" claims with a command**; **measure, don't estimate**.
 - **3 identical failures → stop and read the shadow/API source**, don't tweak-and-rerun. This applies to **any repeated tooling signal, not just test assertions**: the same message appearing N≥3 times across commands (e.g. `spotlessKotlinCheck FAILED`, "configuration cache cannot be reused") means a systemic cause — find and fix it, don't absorb it.
 - **Never read `window`/activity-scoped state in a field initializer** — `Activity.window` is only assigned during `attach()` (after the constructor), so a field initializer referencing it throws in Robolectric ("Window creation failed!") and NPEs on device. Use `by lazy` or a provider lambda; declare such fields with a default that defers the access.
-- **`.md` formatting + EOL trap**: pre-format with `uvx mdformat` before pre-commit (the first hook run reformats and fails); after committing `.md`, expect a dirty working tree — the hook rewrites to LF (vs CRLF) with a **content-identical** diff (`git diff --stat` empty, `git status` dirty). Verify content-identical, then `git checkout -- <md>`; never `git add` the EOL-only state.
-- **PS 5.1 `$ErrorActionPreference='Stop'` + native stderr is a terminating error**: `& npx ... *>> $log` under EAP=Stop silently kills the script the moment the tool prints to stderr (jscpd prints "Using config from ..."). Scope `$ErrorActionPreference='Continue'` around native calls (as gate.ps1 does) and check `$LASTEXITCODE` — for ANY new native command in a script with EAP=Stop.
-- **`gh` run commands take the run **id**, not a PowerShell object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
 - **Push gates**: the full local gate list is run and logged, and **`git status --short` must be clean** before every push (local gates validate the working tree, not the commits).
 - **CI cadence**: one bounded run check (~3 min) after each push; if no run appears, document it and re-check at the next push rather than blocking.
 
@@ -174,7 +172,7 @@ configurations, update this section and the referenced config files.
 - **PR description**: Root cause (traced to the actual reason) / Profit (measurable) / Trade-offs (alternatives rejected) / Verification (proof not visible in the diff). Never list changed files or CI status. Add `Closes #N`.
 - **Repo hygiene**: use repo-root `.tmp/` (gitignored) for all temporary files; never touch `git config`; never modify `.gitignore` without user acceptance; feature branches only.
 - **Suppressions**: every `@Suppress*` / `//noinspection` / `lint.xml` relaxation carries a reasoning comment or a recorded rationale in `MEMORY.md`.
-- **Tooling assumptions**: never assume tooling behaves intuitively — verify options against `--help`/docs/schema with a read-only probe. PowerShell escaping differs from bash (backticks, `-1` in `git commit -m`); route complex arguments through a `.tmp/` file rather than inlining.
+- **Tooling assumptions**: never assume tooling behaves intuitively — verify options against `--help`/docs/schema with a read-only probe; route complex arguments through a `.tmp/` file rather than inlining. (Shell-escaping differences, e.g. PowerShell vs bash: "Windows/PowerShell quirks".)
 - **Re-read `.md` diffs after mdformat**: line-start `+`/`-`/`*` mid-paragraph get reflowed into lists — never start a wrapped line with a list character.
 - **Documenting decisions**: `AGENTS.md` stores rules/constraints only — never rationale. A *decision* (problem → alternatives → why → out-of-scope) belongs in `DECISIONS.md`; a fact/quirk/retrospective belongs in `MEMORY.md`. Removing a documented rule changes agent behavior — only delete if provably wrong; relocate rationale, never drop it.
 - **Safe-updates mirror** (when removing content): would removing this change agent behavior? → keep it. Is the claim provably wrong? → only then delete/correct, verified against executable sources (config, workflow, code). Does it enforce a docs/structure contract? → keep structural-convention rules even when the wording looks generic.
@@ -184,7 +182,7 @@ configurations, update this section and the referenced config files.
 - **Session context is ephemeral**: persist decisions to `AGENTS.md`/`DECISIONS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
 - **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
 - **Verify toolchain/dependency-manager names against executable sources** (build files, lockfiles) before writing them into any doc.
-- **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`, pref/measure helpers, data-driven tables) instead of copy-pasting. The jscpd gate (in `gate.ps1` + CI) fails on new clones ≥ 50 tokens and `gate.ps1` prints the lizard token trend. **Dedup drives the token number, not table-ization**; a table row's expected value must not depend on an earlier row's state (reset the fixture per row). Rationale + details: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric" + TESTING.md "Test quality metrics".
+- **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`, pref/measure helpers, data-driven tables) instead of copy-pasting. The jscpd gate (in `scripts/gate.py` + CI) fails on new clones ≥ 50 tokens and `gate.py` prints the lizard token trend. **Dedup drives the token number, not table-ization**; a table row's expected value must not depend on an earlier row's state (reset the fixture per row). Rationale + details: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric" + TESTING.md "Test quality metrics".
 - **Mark dormant hooks**: a rule/hook that does not apply to the current phase must say so explicitly (e.g. PR-workflow hooks are dormant during the single-branch no-PR execution plan) — otherwise it silently misdirects agents into workflow artifacts that don't exist yet.
 
 ## Commands
@@ -194,31 +192,44 @@ configurations, update this section and the referenced config files.
 ./gradlew assembleDebugAndroidTest
 ./gradlew test                               # Robolectric unit tests, no device needed
 ./gradlew lint                               # lint.xml downgrades MissingTranslation to warning
-./gradlew connectedDebugAndroidTest          # needs running emulator/device (AEHD)
-./scripts/gate.ps1                           # canonical local gate: spotlessApply THEN the
-                                             # full quality suite + jscpd duplication gate +
-                                             # lizard token trend, each --no-daemon, tee'd to .tmp/gate.log
+./gradlew connectedDebugAndroidTest          # needs running emulator/device (per-platform prereqs: TESTING.md)
+uv run python scripts/gate.py                # canonical local gate (cross-platform, Windows + Linux/macOS):
+                                             # spotlessApply THEN the full quality suite + jscpd
+                                             # duplication gate + lizard token trend, each --no-daemon,
+                                             # tee'd to .tmp/gate.log
 ./gradlew detekt spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck   # quality gates (also run in CI; checkstyle/pmd retired after the pure-Kotlin migration)
 ```
 
 Test-quality tooling (Campaign 6 — see TESTING.md "Test quality metrics"):
 
 ```sh
-uv pip install --python .venv lizard           # logical-SLOC token counter (Kotlin)
+uv sync                                       # (re)create .venv from pyproject.toml + uv.lock (dev deps: lizard, pre-commit, mdformat)
 npx -y jscpd app/src/test app/src/androidTest --config .jscpd.json   # hard duplication gate (fails on new clones >= 50 tokens; `paths` config key is ignored, positional dirs required)
-.venv/Scripts/lizard -l kotlin app/src/test app/src/androidTest --csv   # per-function token counts (summed = logical SLOC trend)
+uv run lizard -l kotlin app/src/test app/src/androidTest --csv   # per-function token counts (summed = logical SLOC trend)
 ```
 
 ```sh
-uv venv                                      # create repo-local .venv (gitignored)
-uv pip install --python .venv pre-commit mdformat
-.venv/Scripts/pre-commit run --all-files     # or uvx pre-commit run --all-files
+uv sync                                      # one command: creates/refreshes repo-local .venv (gitignored) from pyproject.toml + uv.lock (dev deps: lizard, pre-commit, mdformat)
+uv run pre-commit run --all-files            # venv-agnostic (resolves .venv/bin on POSIX, .venv/Scripts on Windows)
 uvx mdformat <file>.md
 ```
 
 ## App protocol (quick reference)
 
 TCP protocol, keepalive, MJPEG reconnect, settings keys: MEMORY.md "App protocol".
+
+## Windows/PowerShell quirks
+
+Consolidated Windows/PowerShell-specific traps (Campaign 7). Each entry may be
+about the *subject* (Gradle daemons, UTF/BOM, EOL) or about the *environment*
+(pwsh, win). Re-audit each on the first POSIX dev box: subject-related entries
+stay universal, environment-related ones stay here — they are not universal
+rules.
+
+- **`.md` formatting + EOL trap (Windows checkout)**: pre-format with `uvx mdformat` before pre-commit (the first hook run reformats and fails); after committing `.md`, expect a dirty working tree — the hook rewrites to LF (vs CRLF) with a **content-identical** diff (`git diff --stat` empty, `git status` dirty). Verify content-identical, then `git checkout -- <md>`; never `git add` the EOL-only state. POSIX checkouts are LF already, so the symptom does not appear there.
+- **PS 5.1 `$ErrorActionPreference='Stop'` + native stderr is a terminating error**: `& npx ... *>> $log` under EAP=Stop silently kills the script the moment the tool prints to stderr (jscpd prints "Using config from ..."). Scope `$ErrorActionPreference='Continue'` around native calls and check `$LASTEXITCODE` — for ANY new native command in a PowerShell script with EAP=Stop. (The Python gate `scripts/gate.py` is immune — `subprocess` captures stderr.)
+- **`gh` run commands take the run **id**, not a PowerShell run object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
+- **PowerShell escaping differs from bash** (backticks, `-1` in `git commit -m`); route complex arguments through a `.tmp/` file rather than inlining.
 
 ## Memory index
 

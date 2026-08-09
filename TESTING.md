@@ -32,14 +32,20 @@ Two layers:
 > **Known local flake: Robolectric download lock.** `./gradlew test` runs the
 > three variants in parallel JVMs, which race for the user-level
 > `~/.robolectric-download-lock` file. One variant can fail its whole class
-> with `Couldn't create lock file C:\Users\...\.robolectric-download-lock`
+> with `Couldn't create lock file ...` pointing at `~/.robolectric-download-lock`
 > (`IllegalStateException` at `MavenDependencyResolver`). Transient infra —
 > re-run the failed variant (e.g. `testReleaseUnitTest`) and it passes. Never
 > treat this as a code regression.
 
-Local instrumented run:
+Local instrumented run (per-platform acceleration prerequisites):
 
-1. Verify acceleration: `emulator -accel-check` (needs AEHD → returns `0`).
+| OS | Hypervisor | Verify |
+|----|-----------|--------|
+| Windows | AEHD (Android Emulator Hypervisor Driver) — installer: SDK `extras\google\Android_Emulator_Hypervisor_Driver\silent_install.bat` | `emulator -accel-check` → `0` |
+| Linux | KVM (`/dev/kvm`, KVM group/mode 0666) | `emulator -accel-check` → `0` |
+| macOS | Hypervisor.framework (macOS 11+, Intel & Apple Silicon) | `emulator -accel-check` → `0` (unverified — re-check on the first macOS box) |
+
+1. Verify acceleration: `emulator -accel-check` (must return `0`).
 1. Boot the **`aosp_atd` image** AVD `Atd_API36` — the lightweight, headless,
    CI-oriented image (adopted after it passed 9/9 locally with `-gpu host`;
    lighter/faster boot than the `default` image; rationale + alternatives:
@@ -202,7 +208,8 @@ SLOC metric"):
   restrict the scan, so the two source dirs are always positional args.
   Import lines are excluded (`ignorePattern: ["import.*"]`); the residual
   import-header clones (52–76 tokens) are language boilerplate, not logic
-  duplication. Wired into `scripts/gate.ps1` + the CI build job (Campaign 6 D1).
+  duplication. Wired into `scripts/gate.py` + the CI build job (Campaign 6 D1;
+  `scripts/gate.ps1` replaced by `gate.py` in Campaign 7).
 
 A0 baseline (2026-08-09; `main` sources excluded):
 

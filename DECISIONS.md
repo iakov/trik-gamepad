@@ -24,7 +24,7 @@ Each note follows the same shape:
 
 | Area | Covers | Newest decision |
 |------|--------|-----------------|
-| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate | [2026-08-09] JaCoCo class dir for AGP 9 built-in Kotlin |
+| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-09] Dev tooling is cross-platform via uv (Python gate) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-06] Coverage drive to 85% |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel | [2026-08-08] Campaign 5: raw-socket MJPEG HTTP client |
@@ -220,6 +220,34 @@ ______________________________________________________________________
   corrected measurement. Any future toolchain move should re-verify the jacoco
   class-dir path.
 
+### [2026-08-09] Dev tooling is cross-platform via uv (Python gate)
+
+- **Problem:** the dev scripts and docs were Windows-first (PowerShell
+  `scripts/gate.ps1`, pre-commit hook `cmd /c gradlew.bat`, `.venv\Scripts\...`
+  paths, AEHD-only emulator notes), which blocks switching dev machines to
+  Linux (Ubuntu → Arch) and macOS. After Campaign 7 the project must be ready
+  for cross-platform development.
+- **Alternatives considered:** keep PowerShell + add a bash twin (double
+  maintenance, drift-prone); a Makefile (poor Windows story); Python/uv
+  (already the dev-tooling manager, present on all three platforms).
+- **Chosen solution:** dev tooling is declared in `pyproject.toml`
+  (`dependency-groups`: lizard, pre-commit, mdformat) and locked in the
+  committed `uv.lock`; `uv sync` (re)creates `.venv` on any platform.
+  `scripts/gate.py` + `scripts/spotless_apply.py` (stdlib, subprocess) replace
+  `gate.ps1`, and the pre-commit entry is now `language: system` +
+  `python scripts/spotless_apply.py` (cross-platform; subprocess runs
+  `gradlew.bat` directly on Windows — probed). PowerShell-specific rules were
+  consolidated into AGENTS.md "Windows/PowerShell quirks" (not generalized —
+  re-audited on the first POSIX box). Emulator docs now carry a platform table
+  (Windows AEHD / Linux KVM / macOS Hypervisor.framework, macOS unverified).
+- **Why:** uv is already in use and runs unchanged on Windows/Linux/macOS;
+  stdlib Python runs wherever Python 3.9+ does; CI needs no change (already
+  Linux), so the Linux/macOS paths are exercised by the first POSIX dev box.
+- **Out of scope / consequences:** no generalization of the PowerShell quirks
+  into universal rules (deferred to a POSIX-box re-audit); `ci.yml` untouched
+  (gate.py Linux validation deferred); macOS emulator verification pending a
+  macOS machine; `scripts/gate.ps1` deleted (git history retains it).
+
 ______________________________________________________________________
 
 ## Testing
@@ -257,7 +285,8 @@ ______________________________________________________________________
 - **Why:** HypervisorPresent=False, VBS off — no conflict with AEHD; it is the
   current supported hypervisor driver for Windows.
 - **Out of scope / consequences:** local acceleration only; CI uses KVM on
-  ubuntu-latest.
+  ubuntu-latest. Windows-specific: Linux uses KVM, macOS uses
+  Hypervisor.framework (Campaign 7 — per-platform table in TESTING.md).
 
 ### [2026-08-06] Emulator: AVD config is the source of truth (slow-boot lesson)
 

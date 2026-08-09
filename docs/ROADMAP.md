@@ -169,6 +169,41 @@ per-class branch diff, `spotlessApply` as a separate invocation, `detekt --rerun
 Out of scope: JUnit 5, AGP `testFixtures`, androidTest `DummyServer`
 consolidation, comment removal, per-function token caps.
 
+## Campaign 7 — Cross-platform dev readiness
+
+User decision 2026-08-09: after this campaign the project must be **ready for
+cross-platform development** (dev machines switching Ubuntu → Arch → macOS),
+keeping Windows working. Approach: Python/uv (already present) everywhere the
+docs/tooling were Windows-first. Rationale + alternatives: `DECISIONS.md`
+"[2026-08-09] Dev tooling is cross-platform via uv (Python gate)".
+
+- **A** ✅ uv tooling baseline: `pyproject.toml` (`package = false`,
+  `requires-python >= 3.9`, dev group: `lizard==1.23.0`, `mdformat==0.7.21`,
+  `pre-commit`) + `uv sync` → committed `uv.lock`; `.venv` now
+  platform-agnostic (`uv run` resolves `.venv/bin` on POSIX,
+  `.venv/Scripts` on Windows).
+- **B** ✅ Python gate: `scripts/gate.py` (stdlib `subprocess`; picks
+  `gradlew.bat` vs `./gradlew` by OS) replaces `scripts/gate.ps1`; same
+  spotlessApply-first two-invocation order + jscpd hard gate + lizard token
+  trend (A0 baseline 12,659); `scripts/spotless_apply.py` + shared
+  `scripts/_gradle.py`. `gate.py` runs `gradlew.bat` via subprocess directly
+  on Windows (probed — no `cmd /c` needed).
+- **C** ✅ pre-commit cross-platform: spotless-apply hook →
+  `language: system` + `entry: python scripts/spotless_apply.py` (no more
+  `cmd /c gradlew.bat`).
+- **D** ✅ Docs sweep: AGENTS.md uv-sync bullet + `uv run ...` commands +
+  `gate.py` refs + Windows-only marks; **new "Windows/PowerShell quirks"
+  section** consolidates the PowerShell/Windows traps (not generalized —
+  re-audited on the first POSIX box); TESTING.md generic
+  `~/.robolectric-download-lock` + emulator platform table (Windows AEHD /
+  Linux KVM / macOS Hypervisor.framework, macOS unverified); MEMORY.md Python
+  tooling → uv sync flow + platform-aware emulator/SDK notes; DECISIONS.md
+  cross-platform entry; docs/architecture.md `gate.py` ref.
+- **E** ✅ Cleanup: `scripts/gate.ps1` deleted (git history retains it).
+
+`ci.yml` deliberately unchanged (already Linux); the Linux/macOS paths of the
+new tooling are validated on the first POSIX dev box, not in CI.
+
 ## Phase 1 — Instrumented CI without macOS
 
 Decision: **no macOS/GPU runner** — rationale and alternatives in `DECISIONS.md`

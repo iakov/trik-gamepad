@@ -50,16 +50,19 @@ versions risk collisions with the `minSdk*10000 + ...` formula).
 ### SDK/local setup
 
 - `local.properties` (gitignored, at repo root) points at the user-local
-  Android SDK via `sdk.dir=<path>`; the drive-letter colon MUST be escaped
-  (e.g. `C\:/Users/<user>/Android/Sdk` style) or lint's `PropertyEscape` check
-  fails the build.
+  Android SDK via `sdk.dir=<path>`; on Windows the drive-letter colon MUST be
+  escaped (e.g. `C\:/Users/<user>/Android/Sdk` style) or lint's
+  `PropertyEscape` check fails the build (POSIX paths need no escaping).
 - JDK 21 (Microsoft OpenJDK) works with Gradle 9.5.0 + AGP 9.3.1 (current
   toolchain, locked in `DECISIONS.md` "AGP 9.3.1 / Gradle 9.5.0 migration
   LANDED"; migrated from Gradle 8.14.5 + AGP 8.13.2
   2026-08-08).
-- AEHD (Android Emulator Hypervisor Driver 2.2) is installed for local
-  emulator acceleration; verify with `emulator -accel-check`. Installer lives
-  in the SDK: `extras\google\Android_Emulator_Hypervisor_Driver\silent_install.bat`.
+- Local emulator acceleration (Windows): AEHD (Android Emulator Hypervisor
+  Driver 2.2) is installed; verify with `emulator -accel-check`. Installer
+  lives in the SDK:
+  `extras\google\Android_Emulator_Hypervisor_Driver\silent_install.bat`.
+  Linux uses KVM; macOS uses Hypervisor.framework (see TESTING.md platform
+  table).
 - SDK platforms installed: 23, 30, 35, 36, 36.1. `compileSdk/targetSdk 36`
   needs `platforms;android-36` — installed via
   `sdkmanager "platforms;android-36"` (or the newer `android sdk install ...`
@@ -89,11 +92,14 @@ has platforms 23/30/35/36/36.1.
 
 ### Python tooling (uv + repo-local venv)
 
-All Python tools run through uv with a **repo-local `.venv`** (gitignored):
-`uv venv` then `uv pip install --python .venv pre-commit mdformat`. Run them as
-`.venv/Scripts/pre-commit.exe` / `.venv/Scripts/mdformat.exe` or `uvx`. Do NOT
-use `uv tool install` (global, machine-level) or system pip. The git pre-commit
-hook (`.git/hooks/pre-commit`) points at the venv Python via `INSTALL_PYTHON`.
+All Python tools run through uv with a **repo-local `.venv`** (gitignored).
+Dev deps (lizard, pre-commit, mdformat) are declared in `pyproject.toml` and
+locked in `uv.lock` (committed); `uv sync` (re)creates `.venv` on any platform
+(Windows / Linux / macOS). Run the tools as `uv run <tool> ...` — venv-agnostic
+(`uv run` resolves `.venv/bin` on POSIX, `.venv/Scripts` on Windows) — or via
+`uvx`. Do NOT use `uv tool install` (global, machine-level) or system pip. The
+git pre-commit hook (`.git/hooks/pre-commit`) points at the venv Python via
+`INSTALL_PYTHON`.
 
 ## Testing
 
@@ -151,11 +157,13 @@ not tweak-and-rerun.**
 
 Instrumented tests (`KeepAliveTests`, `MainWindowTests`, `SettingsTests`) are
 Espresso + AndroidX Test Orchestrator (`testOptions.execution ANDROIDX_TEST_ORCHESTRATOR`, `animationsDisabled`). They need a running
-emulator/device; without AEHD the x86_64 images are unusable. Local run: boot
-the **aosp_atd** AVD `Atd_API36` with `-no-window -no-audio -no-boot-anim -gpu host` (never `swiftshader_indirect` — window focus is never granted under the
-software GPU), wait for `sys.boot_completed=1`, pre-empt the immersive
-confirmation (`adb shell settings put secure immersive_mode_confirmations confirmed`), then `./gradlew connectedDebugAndroidTest`. See TESTING.md for the
-full recipe.
+emulator/device; without a hypervisor the x86_64 images are unusable (Windows
+AEHD / Linux KVM / macOS Hypervisor.framework — per-platform table in
+TESTING.md). Local run: boot the **aosp_atd** AVD `Atd_API36` with
+`-no-window -no-audio -no-boot-anim -gpu host` (never `swiftshader_indirect` —
+window focus is never granted under the software GPU), wait for
+`sys.boot_completed=1`, pre-empt the immersive confirmation (`adb shell settings put secure immersive_mode_confirmations confirmed`), then
+`./gradlew connectedDebugAndroidTest`. See TESTING.md for the full recipe.
 
 ## App protocol
 
