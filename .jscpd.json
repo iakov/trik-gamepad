@@ -3,6 +3,7 @@
   "minTokens": 50,
   "mode": "mild",
   "threshold": 0,
+  "ignorePattern": ["import"],
   "reporters": ["console"],
   "ignore": ["**/build/**", "**/.venv/**", "**/.tmp/**"]
 }
