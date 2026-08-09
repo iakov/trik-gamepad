@@ -1,0 +1,689 @@
+# DECISIONS.md — trik-gamepad decision log
+
+<!-- encoding: utf-8 -->
+
+Scope: every "what problem arose → what alternatives were considered → why this
+solution was chosen → what is out of scope" decision made in this repo.
+AGENTS.md rules and other docs point here for the rationale behind a decision.
+Structure: Index → decisions grouped by area → dated entries, newest first.
+
+This file holds *decisions only*. Architecture facts and quirks live in
+`docs/architecture.md`; project facts, CI details and retrospectives live in
+`MEMORY.md`; test strategy lives in `TESTING.md`.
+
+Each note follows the same shape:
+
+- **Problem:** what arose / what needed deciding.
+- **Alternatives considered:** the other options (and what was rejected).
+- **Chosen solution:** what was decided.
+- **Why:** the rationale (measured/observed where possible).
+- **Out of scope / consequences:** what was explicitly not done, and what the
+  decision affected.
+
+## Index
+
+| Area | Covers | Newest decision |
+|------|--------|-----------------|
+| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline | [2026-08-08] AGP 9.3.1 / Gradle 9.5.0 migration LANDED |
+| Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-06] Coverage drive to 85% |
+| CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel | [2026-08-08] Campaign 5: raw-socket MJPEG HTTP client |
+| Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
+| Process | docs culture, auto-mode contract, operational rules | [2026-08-08] Auto mode contract |
+
+______________________________________________________________________
+
+## Build & toolchain
+
+### [2026-08-05] local.properties lint escape
+
+- **Problem:** `sdk.dir=C:/Users/...` (and `C\:\\...`) made `./gradlew lint`
+  fail with `PropertyEscape` (3 errors → 2 errors). The detector wants only the
+  drive-letter colon escaped.
+- **Alternatives considered:** backslash-escaping the whole path (still fails);
+  `C\:/...` with only the drive-letter colon escaped.
+- **Chosen solution:** `sdk.dir=C\:/Users/<user>/Android/Sdk` (generic pattern;
+  never commit a concrete machine path).
+- **Why:** the `PropertyEscape` detector is satisfied by escaping only the
+  drive-letter colon.
+- **Out of scope / consequences:** lint green (0 errors). The file is
+  gitignored; only this machine is affected.
+
+### [2026-08-05] Keystore path correction
+
+- **Problem:** AGENTS.md claimed the keystore lives at "repo root". The
+  relative path `../android-keystorage.jks` from `app/` resolves one level
+  **above** the repo root.
+- **Alternatives considered:** naming the concrete machine path (rejected —
+  machine-specific, and the keystore must never leak); documenting the
+  resolution generically.
+- **Chosen solution:** document that the keystore resolves to the parent of
+  the repo root, without naming a concrete machine path; AGENTS.md now just
+  says "see MEMORY.md".
+- **Why:** the keystore deliberately lives *outside* the workdir (no secrets
+  in the repo); only the *relative resolution* matters, not the absolute path.
+- **Out of scope / consequences:** no code change — a docs correction. The
+  gitignore keeps `**/*.jks` out of the repo.
+
+### [2026-08-05] Toolchain + quality gates approved (single main flavor)
+
+- **Problem:** the maintainer reviewed the lobe-style plan again and granted
+  freedom to upgrade tooling/deps. Constraints: backward-compatible with 99% of
+  Androids; tests-first (TDD) so features keep working; keep Java sources this
+  release (pure-Kotlin later); single main flavor.
+- **Alternatives considered:** minSdk 21 (initially kept — AndroidX floor for
+  libs released before June 2025, 99.8% device coverage) vs **minSdk 23**
+  (98.0% coverage, but Robolectric 4.16 already drops API 21/22 and the AndroidX
+  floor moved to 23); toolchain AGP 8.13.2 + Gradle 8.14.5 vs AGP 9.3.1 +
+  Gradle 9.5.0 (the latter breaking, so staged); a legacy flavor (postponed).
+- **Chosen solution (D14–D19, full rationale in `.PLAN.md`):** minSdk 21 kept
+  initially — **REVERSED 2026-08-08 to minSdk 23** ("forget obsolete",
+  `4753c45`); toolchain went to AGP 9.3.1 + Gradle 9.5.0 + built-in Kotlin
+  (`78aace4`); `compileSdk/targetSdk/maxSdk 36` (Play requires targetSdk 36 from
+  2026-08-31); deps pinned to minSdk-23-compatible freshest (core 1.16.0 /
+  appcompat 1.7.1; core 1.17+ needs minSdk 23, 1.19.0 additionally needs
+  compileSdk 37 — locked at 36). Version 1.41.
+- **Why:** Robolectric 4.16's `OLDEST_SDK = 23` means the app's declared min
+  never matched what tests ran; the new AndroidX floor is minSdk 23. Single
+  main flavor keeps the build simple and the gates green.
+- **Out of scope / consequences:** legacy flavor postponed; targetSdk 34→36
+  edge-to-edge enforcement on the fullscreen gamepad UI is the biggest risk and
+  needs an API 36 emulator smoke test. The minSdk reversal is itself recorded
+  as a decision (below).
+
+### [2026-08-05] lint.xml MissingTranslation relaxation
+
+- **Problem:** resources are English-only (`resourceConfigurations += ['en']`),
+  so the absence of other languages triggers `MissingTranslation`.
+- **Alternatives considered:** adding translations (rejected — out of scope,
+  English-only is the convention); failing the build (rejected).
+- **Chosen solution:** `lint.xml` downgrades `MissingTranslation` to a warning.
+- **Why:** missing translations are the intended convention, not a defect.
+  Recorded here per the suppression policy (every relaxation carries a
+  rationale).
+- **Out of scope / consequences:** no translation work; new lint issues still
+  fail the build (baseline ratchet).
+
+### [2026-08-06] Edge-to-edge and Robolectric 4.16.1 (SDK 36 migration)
+
+- **Problem:** targetSdk 36 enforces edge-to-edge. `MainActivity` used the
+  removed `FLAG_FULLSCREEN` + deprecated `View.SYSTEM_UI_FLAG_*` set, which is a
+  no-op on API 36 and leaves the window focus-less — Espresso then fails every
+  interaction with `RootViewWithoutFocusException`. Separately, Robolectric
+  4.15.1 (plan R8) does not know SDK 36 and throws `UnknownSdk` on
+  `Config.TARGET_SDK`.
+- **Alternatives considered:** keeping the legacy fullscreen flags (no-op,
+  rejected); Robolectric 4.15.1 (does not support SDK 36, rejected); 4.16.1.
+- **Chosen solution:** fullscreen → `WindowCompat.setDecorFitsSystemWindows(getWindow(), false)` + `WindowInsetsControllerCompat`
+  (`show`/`hide(WindowInsetsCompat.Type.systemBars())`,
+  `BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`). Robolectric → 4.16.1 (needs JDK 21,
+  which both local and CI provide). Also pre-empt the first-immersive-entry
+  `ImmersiveModeConfirmation` overlay with
+  `adb shell settings put secure immersive_mode_confirmations confirmed` before
+  `connectedDebugAndroidTest`.
+- **Why:** the modern `WindowInsetsControllerCompat` API is the only path that
+  works under API 36's enforced edge-to-edge; 4.16.1 is the first Robolectric
+  that supports SDK 36.
+- **Out of scope / consequences:** all 9 instrumented tests pass on the local
+  API 36 emulator (2 of 3 runs; one flake was an activity-launch timeout under
+  load, not a code issue). The immersive pre-empt is a CI/emulator prerequisite,
+  not app code.
+
+### [2026-08-08] Lint baseline cleanup: 11 → 2 (ROADMAP Phase 6)
+
+- **Problem:** the strict-lint baseline had 11 entries (AGP/deps/resources from
+  the Kotlin-migration head). Each entry is either fixable or a recorded,
+  intentional decision.
+- **Alternatives considered:** keep all 11 baselined (hides real issues);
+  fix/delete each and keep only genuine locks.
+- **Chosen solution:** drove the baseline to 2. Fixed the annotation bump;
+  `UnsupportedChromeOsHardware` → `required="false"` (the pads track a single
+  pointer each — no multi-pointer math); deleted 2 unused resources;
+  consolidated 2 duplicate strings; moved icons to density buckets; converted
+  PNGs to WebP. Kept baselined only: `AndroidGradlePluginVersion` + the
+  core-ktx 1.19.0 `GradleDependency` lock (both version-availability decisions).
+- **Why:** the baseline is a ratchet — new warnings must fail the build, so
+  only genuine version locks belong in it.
+- **Out of scope / consequences:** under AGP 9 the `AndroidGradlePluginVersion`
+  entry's baseline location became a machine-specific absolute path (wrapper
+  file) — per the env-dependent rule it moved to `lint.xml` as
+  `severity="ignore"`, leaving the baseline at two `GradleDependency` locks
+  (compileSdk 36 + core-ktx 1.16.0). Stale baseline entries are never
+  auto-pruned by AGP — prune by hand after a build-file refactor.
+
+### [2026-08-08] Configuration cache disabled — external keystore defeats it (then REVERSED by AGP 9)
+
+- **Problem:** every single Gradle invocation printed `configuration cache cannot be reused because an input to unknown location has changed` — config-cache was silently invalidated on every run, delivering zero benefit while re-deriving the task graph each time.
+- **Alternatives considered:** leave it on (zero benefit, constant invalidation);
+  disable it (the chosen path at the time); fix the keystore input (alone
+  insufficient — the AGP `https.proxyHost` sys-prop read was unfixable from our
+  build files).
+- **Chosen solution (user, 2026-08-08):** `org.gradle.configuration-cache=false`.
+  Deferred re-evaluation to the AGP 9 migration (Gradle 9 makes config-cache the
+  norm). The keystore detection logic itself is unchanged.
+- **Why:** config-cache delivered zero benefit (invalidated every run); the AGP
+  sys-prop read is unfixable from our side, so even fixing the keystore might
+  not restore reuse.
+- **Out of scope / consequences:** **REVERSED the same day** — the AGP 9
+  migration fixed the `https.proxyHost` read, so config-cache reuses again
+  (`=true`). Lesson: a toolchain migration can nullify a previously-correct
+  workaround — re-probe locked-inhibited features after a bump.
+
+### [2026-08-08] AGP 9.3.1 / Gradle 9.5.0 migration LANDED
+
+- **Problem:** AGP 8.13.2 + Gradle 8.14.5 were superseded; AGP 9 brings
+  built-in Kotlin and fixes the `https.proxyHost` config-cache blocker, and
+  Gradle 10 deprecations (space-assignment syntax) are coming.
+- **Alternatives considered:** stay on AGP 8 (miss the config-cache fix, accrue
+  deprecation debt); migrate directly on the main branch (risky); probe on a
+  scratch branch first.
+- **Chosen solution:** migrate to **AGP 9.3.1 + Gradle 9.5.0** with built-in
+  Kotlin, run first on a scratch branch (`feat/agp9-probe`), then
+  fast-forwarded onto `feat/global-refresh` (`78aace4`). Removed the
+  `org.jetbrains.kotlin.android` plugin (built-in Kotlin; `kotlinOptions {}`
+  gone, `jvmTarget` defaults to `compileOptions.targetCompatibility` = Java 11).
+  Re-enabled `org.gradle.configuration-cache=true`. Regenerated the wrapper to
+  9.5.0. Re-scoped the lint baseline.
+- **Why:** green first try on the probe proved the migration safe; no kapt /
+  `kotlin.sourceSets` used, so the switch was trivial here. Config-cache reuse
+  is confirmed ("Reusing configuration cache", two consecutive runs).
+- **Out of scope / consequences:** verified `assembleDebug` +
+  `assembleDebugAndroidTest`; full gate green (JaCoCo LINE 697/717 = 97.2%,
+  BRANCH 176/215 = 81.9%); CI run `31264372367` green (build 3m41s + 9/9
+  instrumented on aosp_atd). Remaining deprecation: `ReportingExtension.file(String)`
+  from a third-party plugin (scheduled Gradle 10 removal) — not ours. Scratch-
+  branch probing is the pattern for any future toolchain bump.
+
+______________________________________________________________________
+
+## Testing
+
+### [2026-08-05] Deterministic unit tests (ephemeral ports + latches)
+
+- **Problem:** `./gradlew test` intermittently failed. `DummyServer` bound its
+  `ServerSocket` on a background thread and asserted client/server state
+  immediately after `runAll()`+`idle()`. On fast machines the client connected
+  before the server bound → `ConnectException`, failed `isConnected()` assert,
+  and a leaked accept-thread kept the port bound → cascading `BindException`.
+  The three test variants (`debug`/`release`/`releaseDebug`) additionally ran
+  in parallel JVMs over the same fixed ports (`localhost:12345` + shifts) →
+  cross-JVM `BindException`s.
+- **Alternatives considered:** fixed ports with shifts (rejected — parallel
+  JVMs still collide); binding the socket on a background thread and polling
+  (rejected — bind-late race); bind synchronously + ephemeral port + latch
+  awaits.
+- **Chosen solution:** bind synchronously in the constructor; assert only after
+  `CountDownLatch` awaits (`awaitConnection`/`awaitCommands`, 5 s timeout); bind
+  **ephemeral ports** (`ServerSocket(0)`) and target `server.getPort()`.
+- **Why:** fixed ports cannot survive parallel JVMs; latch awaits remove the
+  accept/read race; constructor-bind removes the bind-late race.
+- **Out of scope / consequences:** 3× consecutive full `test` runs green.
+  `DummyServer.DEFAULT_PORT` no longer exists in the unit test (the androidTest
+  `DummyServer.kt` still has it — different class, don't merge).
+
+### [2026-08-05] AEHD for local emulator
+
+- **Problem:** `emulator -accel-check` returned code 6 ("hypervisor driver not
+  installed"); x86_64 images unusable.
+- **Alternatives considered:** Intel HAXM (superseded); AEHD.
+- **Chosen solution:** installed AEHD 2.2 via
+  `silent_install.bat` (UAC). Now `accel-check` = 0.
+- **Why:** HypervisorPresent=False, VBS off — no conflict with AEHD; it is the
+  current supported hypervisor driver for Windows.
+- **Out of scope / consequences:** local acceleration only; CI uses KVM on
+  ubuntu-latest.
+
+### [2026-08-06] Emulator: AVD config is the source of truth (slow-boot lesson)
+
+- **Problem:** an ad-hoc emulator launch used `-gpu swiftshader_indirect -no-snapshot`, overriding the AVD's declared `hw.gpu.mode=host` + quickboot. The
+  AVD cold-booted under software rendering at 1080×2340@440dpi and stayed
+  `offline` for ~2.7 h.
+- **Alternatives considered:** fighting the AVD config with CLI flags (rejected —
+  caused the 2.7 h boot); aligning the launch with the AVD's config.
+- **Chosen solution:** the AVD's `config.ini` is the source of truth; CLI flags
+  must not fight it. The `config.ini` was fixed to `hw.gpu.mode=host`,
+  `fastboot.forceFastBoot=yes`, `firstboot.bootFromDownloadableSnapshot=yes`,
+  6 cores, 4 GB, and two `emu-launch*.bat` launchers were created to teach the
+  correct invocation (then deleted as training material). Correct local launch:
+  `emulator -avd Simple_Phone_API36 -no-window -no-audio -no-boot-anim -gpu host`
+  (snapshots stay enabled).
+- **Why:** relaunch booted in ~39 s (`Boot completed in 38877 ms`, NVIDIA GPU
+  translator) vs ~2.7 h.
+- **Out of scope / consequences:** the `default_boot` snapshot
+  save-on-exit discrepancy was later **closed as a local cosmetic quirk**
+  (2026-08-08): snapshot save/load follows the emulator's own config
+  resolution; aosp_atd is CI-oriented (snapshot writing inert), loading still
+  works. Never pass `-no-snapshot` for local iteration; only for pristine
+  CI-style cold boots.
+
+### [2026-08-06] Coverage drive to 85%: static-state hazard + network-free pad tests
+
+- **Problem:** raising the JaCoCo gate from 10% to 85% line required unit tests
+  for previously-untested classes (MainActivity, pads, settings, mjpeg parsing).
+  Several Robolectric-specific traps emerged.
+- **Alternatives considered:** test the pad logic over a live TCP connection
+  (rejected — flaked on CI under load); test the pad's command-string/touch
+  math directly (chosen).
+- **Chosen solution:** test UI logic **without a network dependency** —
+  `SquareTouchPadLayoutTest` asserts `mExecutor.runAll() > 0` (a `send()` was
+  forwarded to the injected `PausedExecutorService`) instead of awaiting a live
+  connection. **Poll instead of fixed sleeps** — `keepaliveShouldBeSentWhileConnected`
+  polls up to 10 s (sleep 500 ms + `runAll()` + check each iteration).
+  Robolectric HTTP is unreliable for real sockets, so the `StartReadMjpegAsync`
+  success path is covered via null/error branches.
+- **Why:** deterministic, no sockets; polls absorb busy-CI JVM timing.
+- **Out of scope / consequences:** 11.3% → **85.3% line / 60.6% branch**
+  (604/708); gate raised to `0.85 LINE / 0.60 BRANCH`. The `SenderService`
+  static-state hazard (`keepaliveTimeout`/`mConnectTask`) that flaked the `[23]`
+  variant was **removed 2026-08-08 (ROADMAP Phase 3)** — constructor-injected
+  instance fields replace the reflection reset. MjpegView render-thread plumbing
+  stays ~0% (untestable) and is excluded from the gates.
+
+### [2026-08-08] Campaign 2 strategy: coverage-first, then refactor (and test-quality policy)
+
+- **Problem:** the ROADMAP campaign needed an order for refactoring (B),
+  coverage (C), CI hardening (A), cache tuning (D), AGP 9 (E) — and the suite
+  had a policy question: which refactors are safe first.
+- **Alternatives considered:** refactor-first (riskier — no coverage safety net
+  under the 95/80 ratchet); coverage-first with one exception.
+- **Chosen solution (user decision 2026-08-08):** **coverage-first** — increase
+  test coverage before refactoring, maintain it through refactoring. Order
+  B2 → B4 → C → B3 → A → D → E. B4 is the one granted exception (pure
+  touch-math extraction reduces test-writing complexity).
+- **Why:** a higher coverage floor makes every subsequent refactor verifiable;
+  the ratchet gate (95 line / 80 branch) protects against silent regressions.
+- **Out of scope / consequences:** release 1.42, Dependabot auto-merge and GPG
+  were explicitly deferred. Test-quality policy: the full 3-variant suite runs
+  twice before pushing test changes; async-server asserts use bounded polls.
+
+### [2026-08-08] Orchestrator kept for the 9-test suite
+
+- **Problem:** AndroidX Test Orchestrator adds per-test restarts (crash
+  isolation + clean package data) at a runtime cost; with only 9 instrumented
+  tests it is worth re-weighing.
+- **Alternatives considered:** drop Orchestrator (faster, but a crashing test
+  can poison the next test's state); keep it.
+- **Chosen solution:** keep `ANDROIDX_TEST_ORCHESTRATOR` for now.
+- **Why:** crash isolation and clean package data outweigh the runtime cost at
+  this size; re-weigh if the suite grows.
+- **Out of scope / consequences:** a fixed `localhost:12345` DummyServer port
+  would collide if the suite is ever sharded — not a current concern.
+
+______________________________________________________________________
+
+## CI & emulator
+
+### [2026-08-06] Immersive mode confirmation steals focus on API 35+ (instrumented tests)
+
+- **Problem:** after the SDK 36 / targetSdk 36 upgrade, every Espresso
+  interaction on the API 36 emulator failed with `RootViewWithoutFocusException`
+  (`has-window-focus=false` even though the DecorView reports `has-focus=true`).
+  The gamepad runs immersive (system bars hidden), and the first time an app
+  enters immersive mode on API 35+ the system pops an
+  `ImmersiveModeConfirmation` overlay ("swipe to exit fullscreen") that keeps
+  window focus.
+- **Alternatives considered:** editing app code (rejected — not an app bug);
+  disabling the confirmation overlay once per AVD.
+- **Chosen solution:** disable the confirmation before running instrumented
+  tests: `adb shell settings put secure immersive_mode_confirmations confirmed`.
+  This is a CI/emulator prerequisite, not app code. Also migrated
+  `MainActivity`'s fullscreen handling to
+  `WindowCompat.setDecorFitsSystemWindows(false)` + `WindowInsetsControllerCompat`
+  (the legacy set is a no-op under API 36).
+- **Why:** the overlay is an OS behavior on API 35+, not an app defect; the
+  settings write pre-empts it.
+- **Out of scope / consequences:** a "focus" symptom after a targetSdk bump is
+  often an OS overlay, not app code — check `dumpsys window` `mCurrentFocus`
+  for system windows before touching the app.
+
+### [2026-08-06] CI emulator image: google_apis broken-pipe → aosp_atd
+
+- **Problem:** the instrumented job failed twice with `Failed to commit install session ... package install-commit ... Broken pipe (32)` while installing the debug APK on an API 36 `google_apis` image under swiftshader. The emulator also spent minutes `offline` during boot, and the `google_apis` image is heavy (Google services the tests don't need).
+- **Alternatives considered:** keep `google_apis` (rejected — heavy, boots
+  slowly under software rendering, install-commit pipe dies under resource
+  pressure on 2-core runners); `aosp_atd` (Android Test Device — lightweight,
+  headless, CI-oriented).
+- **Chosen solution:** switch to `target: aosp_atd`, `cores: 4`,
+  `ram-size: 4096M`; bumped actions to Node-24 majors (`actions/checkout@v7`,
+  `actions/setup-java@v5`, `actions/upload-artifact@v7`) and pinned
+  `gradle/actions/setup-gradle@v5.0.2` (v6 ships a proprietary caching
+  component; v5 is MIT).
+- **Why:** aosp_atd is smaller and faster than google_apis; the extra resources
+  (cores/ram) relieve the install-commit pipe.
+- **Out of scope / consequences:** at the time the `build` job was green but
+  instrumented still failed 8/8 with `RootViewWithoutFocusException` under
+  `swiftshader_indirect` — root-caused next (below) to the software GPU, then
+  finally fixed by the focus pre-empt retry + focus-wait.
+
+### [2026-08-06] Local instrumented: adopt aosp_atd, root cause isolated
+
+- **Problem:** CI instrumented failed 8/8 (`RootViewWithoutFocusException`) on
+  `aosp_atd` + `-gpu swiftshader_indirect`, while the local `default`-image AVD
+  passed 9/9 with `-gpu host` — two variables (image and GPU) changed at once.
+- **Alternatives considered:** blame the aosp_atd image (wrong); test aosp_atd
+  locally with `-gpu host` to isolate the variable.
+- **Chosen solution (experiment):** installed `system-images;android-36;aosp_atd;x86_64`, created AVD `Atd_API36`, booted with `-gpu host` + immersive
+  pre-empt, ran `connectedDebugAndroidTest`.
+- **Why / result:** **9/9 green** (boot ~0 s via snapshot, suite 4m50s) — the
+  root cause is the `-gpu swiftshader_indirect` headless combo (under the
+  software GPU the app window never receives focus), NOT the image. Keep
+  `Atd_API36` (aosp_atd) as the local AVD; local runs must use `-gpu host`.
+- **Out of scope / consequences:** TESTING.md local recipe now names
+  `Atd_API36`/aosp_atd; CI added the missing KVM-enable step. Superseded on CI
+  by the focus pre-empt retry + `FocusAwareActivityTestRule` (below).
+
+### [2026-08-07] CI focus flake: root-caused and fixed (pre-empt race)
+
+- **Problem:** three consecutive CI instrumented runs failed with
+  `AssertionError: App window never gained focus` from the focus-wait rule.
+  Timestamps proved the pre-empt ran at 17:49:49 while "Boot completed" was not
+  logged until 17:51:30 — `sys.boot_completed` reports `1` before the settings
+  provider is ready, so a **single** `settings put` was silently lost.
+- **Alternatives considered:** a single pre-empt write (proven lost); a
+  GPU-capable/macOS runner (untried, expensive); retrying the settings write
+  until `settings get` confirms it.
+- **Chosen solution:** the ci.yml pre-empt **retries the settings write until
+  `settings get` confirms it** (up to 60 s), both before the suite and in the
+  retry branch; `FocusAwareActivityTestRule` waits for window focus and sends
+  bounded BACK presses to dismiss a lingering overlay, with a `waitForFocus`
+  flag so KeepAliveTests skip the wait.
+- **Why:** the race is the settings provider coming up after `sys.boot_completed`;
+  an acknowledged write cannot be silently lost.
+- **Out of scope / consequences:** validated on CI (`31206742960`): the first
+  ~5 tests pass with zero focus assertions (previously 0/9). Remaining
+  instrumented failures are a *separate* swiftshader issue — `Failed to find ColorBuffer` rendering errors that hang Espresso under load on small runners
+  (infra, not code).
+
+### [2026-08-08] Phase 1 experiment 2: aosp_atd + swiftshader PASSES instrumented (no-macOS runner)
+
+- **Problem:** every CI instrumented run had failed (build gate green
+  throughout). The original "aosp_atd + swiftshader NEVER grants focus (8/8)"
+  finding (08-06) predated the immersive pre-empt (retry-until-confirmed) and
+  the `FocusAwareActivityTestRule` focus-wait.
+- **Alternatives considered:** a GPU-capable/macOS runner with `-gpu host`
+  (expensive, ROADMAP fallback); re-testing `aosp_atd` + swiftshader with the
+  focus fixes in place (experiment 2).
+- **Chosen solution:** **no macOS/GPU runner — experiment 2 won.** Keep
+  `target: aosp_atd` + `-gpu swiftshader_indirect` + the immersive pre-empt +
+  `FocusAwareActivityTestRule`; all 9 instrumented tests PASSED (first
+  fully-green run `31232406163`, 2026-08-08). `profile: pixel_5` is dropped for
+  aosp_atd (atd needs no device profile).
+- **Why:** the 08-06 "never grants focus" conclusion was obsolete once the
+  focus-wait + pre-empt fixes landed; aosp_atd boots faster and renders less
+  than the default image.
+- **Out of scope / consequences:** a CI script trap was fixed during this —
+  `android-emulator-runner` runs each `script:` line as its own `sh -c`, so
+  multi-line `if/fi` retries never parsed; any conditional must be a single
+  line (`cmd || { ...; }`), validated with `sh -n`. No further experiments
+  needed.
+
+### [2026-08-08] CI publish job (dormant until master merge)
+
+- **Problem:** early adopters need an installable APK without a release build.
+- **Alternatives considered:** publishing release (keystore never enters CI —
+  rejected); a debug-signed `releaseDebug` artifact.
+- **Chosen solution:** a CI `publish` job (master-only) that uploads a
+  debug-signed `releaseDebug` APK artifact on green runs (`a4a39b8`).
+- **Why:** the debug keystore is auto-generated per machine/CI, so the artifact
+  stays installable while the real release keystore never leaves local.
+- **Out of scope / consequences:** **dormant** during the single-branch no-PR
+  workflow (nothing pushes to master); activates when a master merge lands.
+
+______________________________________________________________________
+
+## Architecture
+
+### [2026-08-06] MJPEG: reconnect-on-error replaces the 30 s forced restart
+
+- **Problem:** the video loop force-restarted the HTTP stream every 30 s via a
+  `postDelayed` runnable (`mRestartCallback`) regardless of whether the stream
+  was healthy — a magic number that wasted bandwidth and reconnected a perfectly
+  fine connection. The render thread already stopped itself on `IOException`,
+  but the app never acted on that.
+- **Alternatives considered:** keep the forced 30 s timer (wasteful, rejected);
+  act on the render thread's `IOException` via an error listener.
+- **Chosen solution:** `MjpegView` exposes an `OnStreamErrorListener` invoked
+  from the render thread when `readMjpegFrame()` throws; `MainActivity`
+  registers it in `onResume` and calls `restartVideoStream()` (marshalled to the
+  main thread via `runOnUiThread`). The forced 30 s timer and `mRestartCallback`
+  are gone — the stream restarts only when it breaks. `VideoStreamLoader` sets
+  5 s connect/read timeouts so a dead robot surfaces as an error quickly.
+- **Why:** the stream should restart only when it actually breaks; error-driven
+  reconnect is simpler and bandwidth-free.
+- **Out of scope / consequences:** no forced periodic restart. The render-thread
+  unblock pattern (close the stream from another thread — `InputStream.read` is
+  not interruptible) is a reusable leak fix (Campaign 3 P1).
+
+### [2026-08-08] NSC cleartext scoping to the default robot host (Campaign 3 P3)
+
+- **Problem:** `android:usesCleartextTraffic="true"` is global; targetSdk 36
+  defaults cleartext OFF and Play flags global cleartext. The app's HTTP video
+  stream needs cleartext to the robot.
+- **Alternatives considered:** keep global cleartext (Play-flagged, rejected);
+  scope cleartext via Network Security Config (chosen); bypass NSC entirely with
+  a raw-socket client (the Campaign 5 follow-up).
+- **Chosen solution:** `res/xml/network_security_config.xml` scoping cleartext
+  to the default robot hotspot `192.168.77.1` (base-config off).
+  `android:networkSecurityConfig` needs API 24+ → `tools:targetApi="n"` on the
+  `<application>` tag (a `"m"`/23 value fails lint `UnusedAttribute`).
+- **Why:** NSC is the sanctioned scoping mechanism; it whitelists only fixed
+  hostnames/IPs, which fits the default hotspot.
+- **Out of scope / consequences:** a user-configured **non-default** HTTP host
+  is now blocked by NSC (TCP commands still work — `SenderService` uses raw
+  sockets). The chosen fix for that is the raw-socket client (next decision).
+
+### [2026-08-08] Campaign 5: raw-socket MJPEG HTTP client (chosen fix)
+
+- **Problem:** NSC cleartext scoping (above) only whitelists `192.168.77.1`.
+  `VideoStreamLoader` uses `HttpURLConnection`, which honors NSC — so a user who
+  configures a robot at a **non-`192.168.77.1` host over plain HTTP loses the
+  video stream** (TCP commands still work).
+- **Alternatives considered:** add every user host to the NSC domain-config
+  (static XML, cannot cover arbitrary hosts); a toast on failure (interim only);
+  a **raw-socket HTTP client** parallel to `SenderService` (chosen).
+- **Chosen solution (user decision 2026-08-08):** open a `Socket`, write the
+  GET request, parse the HTTP response head, and hand the body stream to
+  `MjpegInputStream`. Bypasses NSC entirely, works for any user host, no
+  manifest/config change. ~40 lines; re-implements the minimal HTTP framing
+  (request line + headers, response `200 OK` + `Content-Length`/chunked).
+  `MjpegInputStream` already parses `Content-Length` frames, so the client only
+  needs the response head.
+- **Why:** NSC is a static resource that can only whitelist fixed hosts; the
+  raw-socket path is NSC-transparent (as `SenderService` already proves) and
+  requires no per-host config.
+- **Out of scope / consequences:** **Interim (before the fix):** on a
+  stream-open failure for a non-default host, toast pointing at the host/NSC
+  restriction instead of failing silently; record a known-limitation note in
+  README only if it becomes user-visible. **Verification:** reuse
+  `SyntheticMjpegServer` as the server side; assert the raw-socket client
+  decodes frames from a custom host the NSC would block.
+
+### [2026-08-08] ViewModel ownership + StateFlow connection state (Campaign 3 P2)
+
+- **Problem:** `SenderService` was Activity-owned — a stray callback after
+  `onDestroy` (`mSender!!`) could crash, and an Activity-owned socket is
+  closed/reopened on every config change (rotation).
+- **Alternatives considered:** a foreground Service (rejected — needs a declared
+  type + permission and Play scrutiny; a gamepad connection has no natural FGS
+  type); a ViewModel-owned connection.
+- **Chosen solution:** `SenderViewModel` (Activity-scoped, `by viewModels()`)
+  owns the `SenderService`; `onCleared()` closes the socket. `ConnectionState`
+  sealed interface + `StateFlow` fed from the service's connect/disconnect
+  paths; MainActivity collects with `repeatOnLifecycle(STARTED)` for the
+  disconnect toast. Pref-listener `register`/`unregister` made idempotent +
+  `private`.
+- **Why:** a ViewModel survives rotation and is cleared deterministically via
+  `onCleared()`; `StateFlow` + `repeatOnLifecycle` is the sanctioned,
+  non-deprecated state collection pattern.
+- **Out of scope / consequences:** **lint trap:** `repeatOnLifecycle` must be
+  called from `onCreate`, not a lifecycle callback like `onStart`
+  (`RepeatOnLifecycleWrongUsage` fails the build). Process death still kills the
+  socket — settings live in SharedPreferences so re-derivation is free.
+
+______________________________________________________________________
+
+## Workflows
+
+### [2026-08-05] Fork-only workflow (no upstream PRs)
+
+- **Problem:** the repo has two remotes — `origin` = the personal fork,
+  `upstream` = `trikset/trik-gamepad` (canonical). A planned branch+PR flow
+  needed a policy for upstream.
+- **Alternatives considered:** create cross-repo PRs against upstream (rejected);
+  sync/push to upstream (rejected).
+- **Chosen solution:** all work lives on the fork only; PRs are created within
+  the fork (`gh pr create --base master`, base = fork master). Never create
+  cross-repo PRs against `trikset/trik-gamepad`; never sync/push to upstream.
+- **Why:** the maintainer develops and merges on their own fork; upstream is a
+  distribution point, not a collaboration target for this project.
+- **Out of scope / consequences:** AGENTS.md "Before push / PR" and MEMORY
+  "Workflows" state the fork-only rule; future sessions must not propose
+  upstream PRs.
+
+______________________________________________________________________
+
+## Process
+
+### [2026-08-05] Docs culture adoption (from trik-lobe-server)
+
+- **Problem:** the project lacked a documentation convention that scales across
+  sessions and agents.
+- **Alternatives considered:** keep a single combined docs file (rejected);
+  adopt the trik-lobe-server split.
+- **Chosen solution:** adopt the **AGENTS/MEMORY/TESTING split** (AGENTS.md =
+  rules only, MEMORY.md = rationale, TESTING.md = strategy), the release-notes
+  opencode skill, and uv-managed Python tooling. Culture rules imported:
+  strict branch+PR discipline, Conventional Commits, Root cause/Profit/Trade-offs/Verification PR bodies, repo-root `.tmp/`, suppression policy,
+  error-leaves-a-trace.
+- **Why:** the split keeps the front door (AGENTS) small and points into the
+  detail stores on demand (progressive disclosure); proven in the sibling repo.
+- **Out of scope / consequences:** quality gates and the toolchain upgrade were
+  initially postponed, then approved (see the Toolchain decision). `.PLAN.md`
+  holds the full execution plan and locked decisions D1–D19.
+
+### [2026-08-06] Gradle pipeline hang: daemon inherits pipe handles
+
+- **Problem:** a gradle run "finished in 12 s" but the agent command blocked
+  until the 10-min timeout. Root cause: the invocation was a PowerShell pipeline
+  `gradlew ... 2>&1 | Tee-Object ... | Select-Object -Last 20`. Gradle spawns a
+  **daemon** (a long-lived JVM) that **inherits the parent shell's stdout/stderr
+  pipe handles**. PowerShell pipelines wait for the whole pipeline to complete
+  (EOF), and because the daemon keeps those handles open the pipeline never saw
+  EOF — even though `gradlew.bat` had long since returned.
+- **Alternatives considered:** keep piping (hangs, rejected); redirect to a file.
+- **Chosen solution:** never pipe a long-lived child (Gradle, emulator, servers)
+  through `Select-Object`/`Tee-Object`. Redirect to a file instead:
+  `& gradlew <args> *> <log>` (or `Start-Process -Wait -RedirectStandardOutput <log>`),
+  read the file afterward, use short timeouts for probes, and stop the daemon
+  (`gradlew --stop`) or use `--no-daemon` for one-shot probes. Rule recorded in
+  AGENTS.md "Operational rules".
+- **Why:** the daemon inheriting pipe handles is inherent to the Gradle daemon;
+  file redirection breaks the EOF dependency.
+- **Out of scope / consequences:** also mis-guessed the google-java-format
+  plugin coordinates once (verify plugin coordinates read-only before
+  committing to them — Tooling assumptions guardrail).
+
+### [2026-08-06] Operational rules for command hygiene
+
+- **Problem:** the agent stalled "staring at the emulator" — launched an async
+  process, then polled it instead of advancing the work queue. Root cause:
+  serialized the pipeline on an async resource (needed only later), and treated
+  polling as progress.
+- **Alternatives considered:** rely on ad-hoc discipline (failed); codify
+  command-hygiene rules in AGENTS.md.
+- **Chosen solution:** every command gets a reasonable timeout + a log tee
+  (`app/build/<task>.log` or `.tmp/`); expected-vs-actual time is compared;
+  ≥1.5× → analyze the wrong guess; slow commands → research + tune repeatable
+  tooling + document quirks. Async tools: capture `Start-Process -PassThru`,
+  verify liveness immediately, wait for the readiness signal with timeout, then
+  continue independent work — never stall on a poll.
+- **Why:** the stall was a cadence break, not a tooling failure; explicit rules
+  make autonomous execution non-blocking.
+- **Out of scope / consequences:** the rules live in AGENTS.md; this rationale
+  lives here.
+
+### [2026-08-06] Revival restructure (canonical layout, delete garbage)
+
+- **Problem:** the maintainer approved a full revival: canonical Android layout,
+  quality gates, coverage to 85%, then pure-Kotlin migration; no release, no PR.
+- **Alternatives considered:** keep the legacy single-module `as/` layout
+  (rejected); restructure to `settings.gradle` + `app/`.
+- **Chosen solution (R1–R15, full detail in `.PLAN.md`):** `settings.gradle` +
+  `app/` module at repo root; delete `xamarin/`, `as/import-summary.txt`,
+  Eclipse junk, `.local_development.db`; `imgs/` → `docs/img/`; retire CircleCI
+  → GitHub Actions; conditional signing (keystore stays outside the workdir);
+  toolchain Gradle 9.5.0 / AGP 9.3.1 / built-in Kotlin / SDK 36 / minSdk 23;
+  coverage gate starts 60% and ratchets to 85% before Kotlin migration; MJPEG
+  reconnect-on-error replaces the 30 s forced restart.
+- **Why:** the canonical layout is the maintainable, tooling-supported shape;
+  the deleted trees were unfinished/dead.
+- **Out of scope / consequences:** all gradle commands run from the repo root;
+  the restructure was a pure `git mv` so history is preserved.
+
+### [2026-08-07] Autonomous-run stall root cause (turn cadence)
+
+- **Problem:** during the global-refresh execution a swiftshader emulator was
+  launched with `Start-Process -PassThru`; the agent ended its turn on the
+  liveness check ("PID alive") without issuing the readiness poll. In an
+  autonomous run nothing re-pokes the agent, so the run sat idle indefinitely.
+  Adjacent failures the same day: a push shipped a google-java-format violation
+  (only compile + instrumented tests were run, not `spotlessCheck`), and a
+  GitHub Partial System Outage silently dropped the push events for three
+  commits (push events during an outage are not backfilled).
+- **Alternatives considered:** rely on the pre-existing "capture handle, verify
+  liveness, wait for readiness" rule (it lacked the turn-completion
+  constraint); codify three explicit rules.
+- **Chosen solution:** three new AGENTS.md operational rules — (1) *async
+  turn-cadence invariant*: a turn that launches an async process is not complete
+  until the readiness result is recorded; the next call after the liveness check
+  must be a single bounded poll, or the process is logged as a `poll:`/`watch:`
+  todo for the next turn; (2) *pre-push full gate*: every push runs the complete
+  logged gate list, not just compile + tests; (3) *CI cadence*: one bounded run
+  check per push, document-and-continue if absent, re-check at the next push.
+- **Why:** the stall was a cadence break — the rule lacked the explicit *a turn
+  is not complete until readiness is recorded* constraint that autonomous
+  execution requires.
+- **Out of scope / consequences:** a swiftshader AVD (`Swiftshader_API36`,
+  config==CLI so it never fights the AVD config) was created to validate
+  focus-sensitive changes locally without burning CI runs.
+
+### [2026-08-07] Uncommitted-fix trap: local gates green, CI compile red
+
+- **Problem:** after migrating MainActivity to Kotlin, a `fun interface` fix on
+  `SenderService.OnEventListener` was made in the working tree but never staged —
+  every commit used `git add <specific files>`, so the change rode along in the
+  working tree while the commits lacked it. Local gates passed (they validate
+  the *working tree*, which had the fix), but CI `compileDebugKotlin` failed on
+  every pushed commit.
+- **Alternatives considered:** rely on `git add <specific files>` discipline
+  (failed); verify `git status --short` is clean before push.
+- **Chosen solution:** new AGENTS.md rule — verify `git status --short` is clean
+  before `git push`; review `git diff HEAD --stat` before push; prefer staging
+  the whole intended set and reviewing the staged diff.
+- **Why:** local gates validating an uncommitted working tree are meaningless
+  for the pushed state; the working tree and the commit must be the same.
+- **Out of scope / consequences:** the same class of issue had shipped a
+  spotless violation earlier the same session — the rule closes it for good.
+
+### [2026-08-08] Auto mode contract (rationale for the AGENTS.md rule)
+
+- **Problem:** the maintainer asked what in their prompt drove high-quality
+  autonomous execution, then instructed that "auto mode" be codified in AGENTS.md.
+- **Alternatives considered:** leave auto mode implicit (rejected); codify a
+  four-point contract.
+- **Chosen solution:** AGENTS.md's "run auto" guardrail expands into a
+  four-point auto-mode contract: (1) work inside the stated container without
+  ceremony, committing/pushing per the gate rules as you go; (2) apply
+  documented traps and hooks from AGENTS/MEMORY/TESTING before acting and probe
+  tooling read-only — don't stall on a command call; (3) research the best
+  solution (web/code) before deciding, and if still unsure after experiments,
+  think hard and postpone rather than guess; (4) implement only proved,
+  reasonable decisions.
+- **Why:** (1) autonomy + a defined container removes decision overhead; (2) the
+  maintainer pre-loads the exact failure modes — apply them, don't rediscover;
+  (3) permission to research first and postpone honestly prevents forcing a
+  result; (4) the evidence-over-guesses bar is what makes big-scope mandates
+  safe to grant.
+- **Out of scope / consequences:** future "go full auto mode" instructions carry
+  this contract without re-explaining it; rationale lives here, rule text lives
+  in AGENTS.md.
