@@ -147,6 +147,7 @@ configurations, update this section and the referenced config files.
 - **3 identical failures → stop and read the shadow/API source**, don't tweak-and-rerun. This applies to **any repeated tooling signal, not just test assertions**: the same message appearing N≥3 times across commands (e.g. `spotlessKotlinCheck FAILED`, "configuration cache cannot be reused") means a systemic cause — find and fix it, don't absorb it.
 - **Never read `window`/activity-scoped state in a field initializer** — `Activity.window` is only assigned during `attach()` (after the constructor), so a field initializer referencing it throws in Robolectric ("Window creation failed!") and NPEs on device. Use `by lazy` or a provider lambda; declare such fields with a default that defers the access.
 - **Push gates**: the full local gate list is run and logged, and **`git status --short` must be clean** before every push (local gates validate the working tree, not the commits).
+- **`scripts/__pycache__/` regenerates on every Python-script run** — `gate.py`/`spotless_apply.py` import `_gradle.py`, leaving an untracked `scripts/__pycache__/`. Delete it before staging (`Remove-Item -Recurse scripts\__pycache__` / `rm -rf scripts/__pycache__`); a `.gitignore` `__pycache__/` entry is pending user approval.
 - **CI cadence**: one bounded run check (~3 min) after each push; if no run appears, document it and re-check at the next push rather than blocking.
 
 ### On tool error
