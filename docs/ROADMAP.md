@@ -138,7 +138,7 @@ per-class branch diff, `spotlessApply` as a separate invocation, `detekt --rerun
 
 - **A** ✅ Metric + tooling: `lizard` (`.venv`) + jscpd (npx) probed; baseline
   measured; `.jscpd.json` calibrated (min-tokens 50, threshold 0, `mild`,
-  `ignorePattern: ["import"]`); metric recorded in `DECISIONS.md`; ROADMAP
+  `ignorePattern: ["import.*"]`); metric recorded in `DECISIONS.md`; ROADMAP
   section; TESTING.md baseline table. `f336cf1`.
 - **B** ✅ Test-support reuse (commit-per-concern): **B1** shared `TestTcpServer`
   merging `SenderServiceTest.DummyServer` + `SenderServiceAdvancedTest. ReadUntilStopServer` (ephemeral port + latch + bounded-poll `awaitReceived`;

@@ -199,7 +199,7 @@ SLOC metric"):
 - **Duplication hard gate**: `npx jscpd app/src/test app/src/androidTest --config .jscpd.json` (min-tokens 50, threshold 0) — fails the gate on any
   new duplicated block ≥ 50 tokens. jscpd's `paths` config key does not
   restrict the scan, so the two source dirs are always positional args.
-  Import tokens are excluded (`ignorePattern: ["import"]`); the residual
+  Import lines are excluded (`ignorePattern: ["import.*"]`); the residual
   import-header clones (52–76 tokens) are language boilerplate, not logic
   duplication. Wired into `scripts/gate.ps1` + the CI build job (Campaign 6 D1).
 

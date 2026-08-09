@@ -1206,15 +1206,21 @@ reset the fixture per row where it does.
   consistent before/after, so the trend is sound).
 - **jscpd `paths` config key does NOT restrict the scan** (it scanned cwd and
   pulled in `main` sources) — the gate always passes `app/src/test app/src/androidTest` as positional args. jscpd 5 `ignorePattern` must be an
-  array in the config (`["import"]`); a bare string is rejected.
+  array in the config; a bare string is rejected.
+- **jscpd `ignorePattern` is line-ending-fragile (CI red run 31303791390):** with
+  `["import"]` (bare token) the gate passed locally on CRLF (the trailing `\r`
+  broke the import-clone token match) but failed on CI's LF checkout (2 import
+  clones reappeared). Fix: `["import.*"]`, which skips whole import lines and
+  passes on BOTH line endings (verified on an LF export). The residual import
+  clones (52–76 tokens) are language boilerplate, never logic duplication.
 - jscpd `mode: strict` found MORE clones than `mild` (21 vs 11) — counter-
   intuitive; `mild` matches the CLI default. Verified empirically.
 - PowerShell `Set-Content -Encoding utf8` writes a BOM that jscpd's JSON parser
   rejects ("expected value at line 1 column 1") — use the write tool for
   `.jscpd.json` edits.
 - The residual jscpd clones after dedup are import-header blocks (52–76 tokens)
-  — language boilerplate, excluded via `ignorePattern`. Real logic duplication
-  is now 0.
+  — language boilerplate, excluded via `ignorePattern: ["import.*"]`. Real logic
+  duplication is now 0.
 
 **Gate wiring (D1):** `scripts/gate.ps1` runs the jscpd hard gate (fail on new
 clones ≥ 50 tokens) and prints the lizard token total as a trend; the CI build
