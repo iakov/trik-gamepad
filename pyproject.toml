@@ -1,0 +1,15 @@
+[project]
+name = "trik-gamepad-tooling"
+version = "0.1.0"
+description = "Cross-platform dev tooling for trik-gamepad (gate, pre-commit, docs)"
+requires-python = ">=3.9"
+
+[dependency-groups]
+dev = [
+    "lizard==1.23.0",
+    "mdformat==0.7.21",
+    "pre-commit",
+]
+
+[tool.uv]
+package = false
