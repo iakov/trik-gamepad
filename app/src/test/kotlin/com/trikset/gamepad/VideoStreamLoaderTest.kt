@@ -29,4 +29,15 @@ class VideoStreamLoaderTest {
     val url = URL("http://127.0.0.1:1/nope")
     assertNull(loader.openStream(url))
   }
+
+  @Test
+  fun openStreamHttpsFallsBackToHttpUrlConnectionAndReturnsNullOnFailure() {
+    val view = MjpegView(RuntimeEnvironment.getApplication())
+    val loader = VideoStreamLoader(view)
+    // Non-http schemes keep the HttpURLConnection path (the raw-socket client is
+    // http-only); an unreachable https endpoint fails inside HttpURLConnection
+    // and the IOException is caught -> null.
+    val url = URL("https://127.0.0.1:1/nope")
+    assertNull(loader.openStream(url))
+  }
 }

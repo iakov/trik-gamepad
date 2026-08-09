@@ -37,12 +37,20 @@ constructor(
   internal fun openStream(url: URL?): MjpegInputStream? {
     if (url == null) return null
     return try {
-      val connection = url.openConnection() as HttpURLConnection
-      connection.connectTimeout = CONNECT_TIMEOUT_MS
-      connection.readTimeout = READ_TIMEOUT_MS
-      val stream = MjpegInputStream(connection.inputStream)
+      // Plain-HTTP MJPEG streams go over a raw socket so any user-configured
+      // robot host works regardless of the NSC cleartext whitelist (Campaign 5).
+      val stream =
+          if (url.protocol.equals("http", ignoreCase = true)) {
+            RawSocketHttpStream.open(url)
+          } else {
+            val connection = url.openConnection() as HttpURLConnection
+            connection.connectTimeout = CONNECT_TIMEOUT_MS
+            connection.readTimeout = READ_TIMEOUT_MS
+            connection.inputStream
+          }
+      val mjpeg = MjpegInputStream(stream)
       Log.i("JPGReader", "Restarted connection.")
-      stream
+      mjpeg
     } catch (e: IOException) {
       Log.e("JPGReader", "Failed to open MJPEG stream.", e)
       null

@@ -1,0 +1,222 @@
+package com.trikset.gamepad
+
+import com.trikset.gamepad.mjpeg.MjpegInputStream
+import com.trikset.gamepad.mjpeg.SyntheticMjpegServer
+import java.io.IOException
+import java.io.InputStream
+import java.net.ServerSocket
+import java.net.URL
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
+class RawSocketHttpStreamTest {
+
+  private val seededFrames = SyntheticMjpegServer.defaultFrameImages()
+
+  @Test
+  fun opensStreamFromNonDefaultHostAndReadsFrames() {
+    val server =
+        SyntheticMjpegServer(
+            frameImages = seededFrames,
+            framesPerConnection = 10,
+            frameIntervalMs = 50,
+        )
+    try {
+      val port = server.start()
+      // 127.0.0.1 is NOT the NSC-whitelisted default robot host, so a cleartext
+      // HttpURLConnection to it would be blocked on device. The raw socket must
+      // not care about NSC (Campaign 5).
+      val url = URL("http://127.0.0.1:$port/?action=stream")
+      val stream = RawSocketHttpStream.open(url)
+      try {
+        val parser = MjpegInputStream(stream)
+        val decoded = mutableListOf<ByteArray>()
+        val deadline = System.currentTimeMillis() + 15000
+        while (decoded.size < 2 && System.currentTimeMillis() < deadline) {
+          val frame = parser.readMjpegFrame() ?: continue
+          decoded.add(frame.readBytes())
+          frame.close()
+        }
+        assertTrue(
+            "expected >=2 frames from the raw-socket client, got ${decoded.size}",
+            decoded.size >= 2,
+        )
+        val byteMatch = decoded.any { bytes -> seededFrames.any { it.contentEquals(bytes) } }
+        assertTrue("expected a frame byte-identical to a seeded JPEG", byteMatch)
+      } finally {
+        stream.close()
+      }
+    } finally {
+      server.close()
+    }
+  }
+
+  @Test
+  fun readsChunkedResponseBody() {
+    withRawResponse(
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n" +
+            "5\r\nhello\r\n" +
+            "6\r\n world\r\n" +
+            "0\r\n\r\n",
+    ) { url ->
+      RawSocketHttpStream.open(url).use { stream ->
+        assertEquals('h'.code, stream.read())
+        assertEquals("ello world", String(stream.readBytes(), Charsets.US_ASCII))
+        // Reading past the terminating 0-chunk exercises the done short-circuit.
+        assertEquals(-1, stream.read())
+        assertTrue(stream.readBytes().isEmpty())
+      }
+    }
+  }
+
+  @Test
+  fun chunkedBodyWithoutTerminatorEndsAtEof() {
+    withRawResponse(
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n" +
+            "5\r\nhello\r\n",
+    ) { url ->
+      RawSocketHttpStream.open(url).use { stream ->
+        // The server closes without the final 0-size chunk: the decoder must end
+        // on EOF instead of looping or throwing.
+        assertEquals("hello", String(stream.readBytes(), Charsets.US_ASCII))
+      }
+    }
+  }
+
+  @Test
+  fun chunkedBodyWithTrailers() {
+    withRawResponse(
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n" +
+            "3\r\nabc\r\n" +
+            "0\r\nX-Trailer: value\r\n\r\n",
+    ) { url ->
+      RawSocketHttpStream.open(url).use { stream ->
+        assertEquals("abc", String(stream.readBytes(), Charsets.US_ASCII))
+      }
+    }
+  }
+
+  @Test
+  fun throwsOnBadChunkSize() {
+    withRawResponse(
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n" +
+            "zz\r\nnot-a-size\r\n",
+    ) { url ->
+      RawSocketHttpStream.open(url).use { stream ->
+        assertThrows(IOException::class.java) { stream.readBytes() }
+      }
+    }
+  }
+
+  @Test
+  fun readAndSkipDelegateToBody() {
+    withRawResponse(
+        "HTTP/1.1 200 OK\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello",
+    ) { url ->
+      RawSocketHttpStream.open(url).use { stream ->
+        assertEquals('h'.code, stream.read())
+        assertEquals(2L, stream.skip(2))
+        assertEquals("lo", String(stream.readBytes(), Charsets.US_ASCII))
+      }
+    }
+  }
+
+  @Test
+  fun throwsOnNon2xxStatus() {
+    withRawResponse("HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n") {
+        url ->
+      assertThrows(IOException::class.java) { RawSocketHttpStream.open(url) }
+    }
+  }
+
+  @Test
+  fun truncatedResponseHeadStillParsesAndEndsAtEof() {
+    withRawResponse("HTTP/1.1 200 OK\r\nContent-Type: multipart\r\n") { url ->
+      // The server closes mid-head (no blank line): the head parser hits EOF but
+      // the status line is already there, so open() succeeds with an empty body.
+      RawSocketHttpStream.open(url).use { stream ->
+        assertTrue(stream.readBytes().isEmpty())
+      }
+    }
+  }
+
+  @Test
+  fun toleratesHeaderLinesWithoutColon() {
+    withRawResponse(
+        "HTTP/1.1 200 OK\r\nNotAHeaderLine\r\nContent-Length: 5\r\nConnection: close\r\n\r\nhello",
+    ) { url ->
+      RawSocketHttpStream.open(url).use { stream ->
+        assertEquals("hello", String(stream.readBytes(), Charsets.US_ASCII))
+      }
+    }
+  }
+
+  @Test
+  fun emptyChunkedBodyReadsAsEmpty() {
+    withRawResponse(
+        "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n0\r\n\r\n",
+    ) { url ->
+      RawSocketHttpStream.open(url).use { stream ->
+        assertTrue(stream.readBytes().isEmpty())
+      }
+    }
+  }
+
+  @Test
+  fun throwsOnServerClosingWithoutResponse() {
+    val serverSocket = ServerSocket(0)
+    val thread = Thread {
+      val client = serverSocket.accept()
+      client.use { readRequestHead(it.getInputStream()) }
+    }
+    try {
+      thread.start()
+      assertThrows(IOException::class.java) {
+        RawSocketHttpStream.open(URL("http://127.0.0.1:${serverSocket.localPort}/stream"))
+      }
+    } finally {
+      serverSocket.close()
+    }
+  }
+
+  /** Serves [response] to a single GET request and runs [block] with the URL. */
+  private fun withRawResponse(response: String, block: (URL) -> Unit) {
+    val serverSocket = ServerSocket(0)
+    val thread = Thread {
+      val client = serverSocket.accept()
+      client.use {
+        readRequestHead(it.getInputStream())
+        it.getOutputStream().apply {
+          write(response.toByteArray(Charsets.US_ASCII))
+          flush()
+        }
+      }
+    }
+    try {
+      thread.start()
+      block(URL("http://127.0.0.1:${serverSocket.localPort}/stream"))
+    } finally {
+      serverSocket.close()
+    }
+  }
+
+  private fun readRequestHead(input: InputStream) {
+    var matched = 0
+    val crlfCrlf =
+        byteArrayOf('\r'.code.toByte(), '\n'.code.toByte(), '\r'.code.toByte(), '\n'.code.toByte())
+    while (matched < crlfCrlf.size) {
+      val b = input.read()
+      if (b < 0) return
+      matched = if (b.toByte() == crlfCrlf[matched]) matched + 1 else 0
+    }
+  }
+}
