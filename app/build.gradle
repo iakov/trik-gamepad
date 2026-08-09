@@ -1,10 +1,10 @@
 plugins {
     id 'idea'
-    id 'com.android.application'
-    id 'io.gitlab.arturbosch.detekt'
+    alias(libs.plugins.androidApplication)
+    alias(libs.plugins.detekt)
     id 'jacoco'
-    id 'com.github.spotbugs'
-    id 'com.diffplug.spotless'
+    alias(libs.plugins.spotbugs)
+    alias(libs.plugins.spotless)
 }
 
 def abiCode = 0 // just for fun
@@ -114,7 +114,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 spotbugs {
-    toolVersion = '4.10.3'
+    toolVersion = libs.versions.spotbugsTool.get()
     effort = com.github.spotbugs.snom.Effort.MAX
     reportLevel = com.github.spotbugs.snom.Confidence.valueOf('MEDIUM')
     excludeFilter = file('findbugs-android-exclude.xml')
@@ -126,7 +126,7 @@ spotbugs {
 }
 
 detekt {
-    toolVersion = '1.23.8'
+    toolVersion = libs.versions.detekt.get()
     config = files('config/detekt/detekt.yml')
     // Start from detekt's bundled default ruleset and layer only the curated
     // deviations in config/detekt/detekt.yml on top.
@@ -136,7 +136,7 @@ detekt {
 // find-sec-bugs as the security SAST detector on the SpotBugs classpath. The
 // SpotBugs engine itself is pulled in via toolVersion above.
 dependencies {
-    spotbugsPlugins 'com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0'
+    spotbugsPlugins "com.h3xstream.findsecbugs:findsecbugs-plugin:${libs.versions.findsecbugs.get()}"
 }
 
 tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
@@ -152,7 +152,7 @@ tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {
 spotless {
     java {
         target 'src/**/*.java'
-        googleJavaFormat('1.22.0')
+        googleJavaFormat(libs.versions.googleJavaFormat.get())
         removeUnusedImports()
         trimTrailingWhitespace()
         endWithNewline()
@@ -163,14 +163,14 @@ spotless {
         // than ktlint: ktlint 0.51 (the last com.pinterest:ktlint artifact)
         // embeds a Kotlin 1.9 compiler that cannot parse Kotlin 2.0.21 sources.
         // 0.63 is the version Spotless 8.9.0 was built against.
-        ktfmt('0.63')
+        ktfmt(libs.versions.ktfmt.get())
         trimTrailingWhitespace()
         endWithNewline()
     }
 }
 
 jacoco {
-    toolVersion = '0.8.12'
+    toolVersion = libs.versions.jacoco.get()
 }
 
 // Coverage is measured on the debug unit tests; the report is always produced
@@ -244,16 +244,16 @@ tasks.register('jacocoTestCoverageVerification', JacocoCoverageVerification) {
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.7.1'
-    implementation 'androidx.core:core-ktx:1.16.0'
-    implementation 'androidx.annotation:annotation:1.10.0'
-    implementation 'androidx.preference:preference-ktx:1.2.1'
-    implementation 'commons-io:commons-io:2.22.0'
-    testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.robolectric:robolectric:4.16.1'
-    androidTestImplementation 'androidx.test:runner:1.7.0'
-    androidTestUtil 'androidx.test:orchestrator:1.6.1'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
-    androidTestImplementation 'androidx.test:rules:1.7.0'
-    androidTestImplementation 'junit:junit:4.13.2'
+    implementation libs.appcompat
+    implementation libs.coreKtx
+    implementation libs.androidxAnnotation
+    implementation libs.preferenceKtx
+    implementation libs.commonsIo
+    testImplementation libs.junit
+    testImplementation libs.robolectric
+    androidTestImplementation libs.androidxTestRunner
+    androidTestUtil libs.androidxTestOrchestrator
+    androidTestImplementation libs.espressoCore
+    androidTestImplementation libs.androidxTestRules
+    androidTestImplementation libs.junit
 }
