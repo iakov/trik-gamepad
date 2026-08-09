@@ -1,9 +1,9 @@
 package com.trikset.gamepad
 
+import com.trikset.gamepad.mjpeg.HttpRequestHead
 import com.trikset.gamepad.mjpeg.MjpegInputStream
 import com.trikset.gamepad.mjpeg.SyntheticMjpegServer
 import java.io.IOException
-import java.io.InputStream
 import java.net.ServerSocket
 import java.net.URL
 import org.junit.Assert.assertEquals
@@ -12,13 +12,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class RawSocketHttpStreamTest {
+class RawSocketHttpStreamTest : RobolectricTestBase() {
 
   private val seededFrames = SyntheticMjpegServer.defaultFrameImages()
 
@@ -176,7 +174,7 @@ class RawSocketHttpStreamTest {
     val serverSocket = ServerSocket(0)
     val thread = Thread {
       val client = serverSocket.accept()
-      client.use { readRequestHead(it.getInputStream()) }
+      client.use { HttpRequestHead.read(it.getInputStream()) }
     }
     try {
       thread.start()
@@ -194,7 +192,7 @@ class RawSocketHttpStreamTest {
     val thread = Thread {
       val client = serverSocket.accept()
       client.use {
-        readRequestHead(it.getInputStream())
+        HttpRequestHead.read(it.getInputStream())
         it.getOutputStream().apply {
           write(response.toByteArray(Charsets.US_ASCII))
           flush()
@@ -206,17 +204,6 @@ class RawSocketHttpStreamTest {
       block(URL("http://127.0.0.1:${serverSocket.localPort}/stream"))
     } finally {
       serverSocket.close()
-    }
-  }
-
-  private fun readRequestHead(input: InputStream) {
-    var matched = 0
-    val crlfCrlf =
-        byteArrayOf('\r'.code.toByte(), '\n'.code.toByte(), '\r'.code.toByte(), '\n'.code.toByte())
-    while (matched < crlfCrlf.size) {
-      val b = input.read()
-      if (b < 0) return
-      matched = if (b.toByte() == crlfCrlf[matched]) matched + 1 else 0
     }
   }
 }

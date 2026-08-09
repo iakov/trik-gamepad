@@ -82,7 +82,7 @@ class SyntheticMjpegServer(
     try {
       client.use {
         // Consume the HTTP request headers so the client's write doesn't block.
-        readRequestHeaders(it.getInputStream())
+        HttpRequestHead.read(it.getInputStream())
         val out = BufferedOutputStream(it.getOutputStream())
         writeResponseHeaders(out)
         out.flush()
@@ -102,22 +102,6 @@ class SyntheticMjpegServer(
       // Client went away mid-frame; drop the connection as usual.
     } catch (e: InterruptedException) {
       // server stopping
-    }
-  }
-
-  private fun readRequestHeaders(input: java.io.InputStream) {
-    // Consume until the CRLF CRLF that ends the request head.
-    val crlfCrlf =
-        byteArrayOf('\r'.code.toByte(), '\n'.code.toByte(), '\r'.code.toByte(), '\n'.code.toByte())
-    var matched = 0
-    while (matched < crlfCrlf.size) {
-      val b = input.read()
-      if (b < 0) return
-      if (b.toByte() == crlfCrlf[matched]) {
-        matched++
-      } else {
-        matched = if (b == '\r'.code) 1 else 0
-      }
     }
   }
 
