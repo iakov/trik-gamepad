@@ -1874,3 +1874,52 @@ detekt inputs weren't invalidated). The "Exit 0 ≠ the tool ran" rule applied t
 once after adding/renaming sources, then the normal gate. Prefer
 `--rerun-tasks` over trusting UP-TO-DATE for the analyzers on first analysis of
 new files.
+
+### [2026-08-08] Campaign 3+4 retrospective — reusable knowledge
+
+Cross-campaign wrap-up (the two review-driven campaigns, full-auto). Per-campaign
+execution detail lives in the "Campaign 3 execution run" / "Campaign 4 execution
+run" entries above; this entry keeps the *reusable* lessons in one place.
+
+**Lint traps (each cost one CI failure, now build-gated so they cannot recur):**
+
+- `repeatOnLifecycle(STARTED)` must be called from **`onCreate`**, not a lifecycle
+  callback like `onStart` — lint `RepeatOnLifecycleWrongUsage` fails the build.
+- `android:networkSecurityConfig` needs API 24+ → the manifest must carry
+  `tools:targetApi="n"` (not `"m"`) or lint `UnusedAttribute` fails CI.
+- (Both fixed together in `5994128`.)
+
+**Static-analysis UP-TO-DATE false-green.** detekt (and other analyzers) can stay
+`UP-TO-DATE` when new source files are added via an untracked path, so the local
+gate "passes" while CI fails. After adding/renaming sources, force one real pass:
+`./gradlew detekt --rerun-tasks` (the concrete realization of AGENTS.md "Exit 0 ≠
+tool ran").
+
+**Robolectric `@GraphicsMode(NATIVE)` API-23 quirk.** Under native graphics,
+`BitmapFactory` decodes correctly on the default SDK but **API 23 pixels decode
+near-black** (e.g. solid red → r=1,g=0,b=0). Not an app bug — byte-identical
+frames still prove parser/decode correctness. Color-asserting tests must pin
+`@Config(sdk=[TARGET_SDK])`.
+
+**MJPEG parser pacing rule.** `MjpegInputStream.readMjpegFrame()` returns a frame
+only when `available() < 2*contentLength`; small frames are dropped first when the
+client lags. Synthetic MJPEG servers should emit **comparable-JPEG-size** frames at
+~50 ms pacing so every frame survives the gate.
+
+**"Setting parsed via the wrong API" bug class.** `Integer.getInteger(pref, default)`
+reads a **JVM system property**, not the pref; `Sensor.TYPE_ALL` is a **mask**, not
+a sensor type. Both passed a 95/80 coverage gate because the tests asserted "no
+crash", not behavior. Coverage measures what RAN — assert real behavior, not just
+the absence of an exception.
+
+**pre-commit re-format dance.** The local `spotlessApply` hook reformats Kotlin
+files AFTER staging, so the first commit attempt silently fails with "files were
+modified by this hook". Fix: re-`git add` + re-commit. Hit on ~every commit in
+Campaigns 3–4.
+
+**MJPEG leak fix pattern (reusable).** A render thread blocked in a
+non-interruptible `InputStream.read` cannot be unblocked by `join(timeout)` — the
+thread and its HTTP connection linger across pause/resume. Close the stream **from
+another thread** (the documented unblock pattern) and suppress the error-listener
+on deliberate stops via a `stopping` flag, or the close spuriously triggers
+reconnect.

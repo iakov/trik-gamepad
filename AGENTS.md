@@ -23,7 +23,10 @@ Improvement roadmap: `docs/ROADMAP.md`.
   All gradle commands run from the repo root (`./gradlew ...`).
 - `_apk/` — committed release APKs (historical).
 - `.github/workflows/` — CI: build, Robolectric unit tests, lint/detekt/
-  spotbugs/jacoco gates, instrumented tests on emulator.
+  spotbugs/jacoco gates, instrumented tests on emulator, plus a **dormant
+  `publish` job** (master-only: on green runs it uploads a debug-signed
+  `releaseDebug` APK artifact for early adopters — see ci.yml; dormant until a
+  master merge lands, do not expect it to run in the single-branch workflow).
 - `.opencode/skills/` — opencode skills (e.g. release-notes).
 - `docs/architecture.md` — module map, TCP protocol, MJPEG pipeline, test layering.
 - `docs/img/` — screenshots/logos.
@@ -122,7 +125,7 @@ configurations, update this section and the referenced config files.
 - **Measure the second CI run after a build change**: the first run after a `settings.gradle`/`build.gradle` change is polluted by config-cache invalidation — compare the second run on the same head, not the first.
 - **Async turns**: capture a process handle (`Start-Process -PassThru`), verify liveness immediately, then a single bounded readiness poll in the same working loop — a turn is not complete until the readiness result is recorded; never end a turn on a bare liveness check.
 - **Never pipe long-lived children (gradle/emulator) through Tee/Select** — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) and use `--no-daemon`/`--stop` for probes.
-- **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green.
+- **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green. Concrete trigger: a static-analysis task that shows `UP-TO-DATE` right after you added/renamed source files (e.g. detekt can stay UP-TO-DATE when new files arrive via an untracked path) — force one `./gradlew detekt --rerun-tasks` pass before trusting the gate.
 - **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries); **run the full 3-variant `test` suite twice** before pushing test changes.
 - **Format before you gate — automate, don't remember.** Every touched file type has a formatter: `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`. Run them **before** the gate (`spotlessCheck` will otherwise fail the first gate run and cost a wasted ~2-min rerun — hit 4× in one session). Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` — in one invocation it rewrites `.kt` while `test` compiles the same files (a race). Both are now automated: the pre-commit `spotless-apply` local hook runs `gradlew.bat spotlessApply` on `.kt` changes (Windows-probed; `cmd /c` is required for `language: system`), the mdformat pre-commit hook covers `.md`, and `scripts/gate.ps1` is the canonical gate (two invocations — see Commands).
 - **Generate lint baselines with the aggregate `lint` task**, not `lintDebug`; env-dependent checks (e.g. `OldTargetApi`) go in `lint.xml`, not the baseline.

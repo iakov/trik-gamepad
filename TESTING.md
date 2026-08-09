@@ -96,6 +96,24 @@ Local instrumented run:
   three variants in parallel JVMs; fixed ports caused `BindException` cascades
   (see MEMORY.md Testing).
 
+### Synthetic MJPEG server (Campaign 4) — the third test server
+
+`app/src/test/.../mjpeg/SyntheticMjpegServer.kt` is a real HTTP
+`multipart/x-mixed-replace` MJPEG server (ephemeral port) that streams seeded
+JPEG frames to the app's real `VideoStreamLoader`/`MjpegInputStream` decode path
+and can **drop the connection after N frames** to exercise R12 reconnect.
+Companion `SyntheticMjpegServerTest.kt`:
+
+- **Must run under `@GraphicsMode(GraphicsMode.Mode.NATIVE)`** — default
+  Robolectric graphics return fake bitmaps, making decode correctness/perf
+  assertions meaningless.
+- **Color-asserting tests must pin `@Config(sdk=[Config.TARGET_SDK])`**: on
+  API 23, native `BitmapFactory` decodes pixels near-black (red → r=1,g=0,b=0) —
+  byte-equality checks still prove correctness on the full SDK triple.
+- **Pace the server (~50 ms) and keep seeded JPEGs comparable in size**: the
+  parser's `available() < 2*contentLength` gate drops small frames first when
+  the client lags.
+
 ### Why awaits are required
 
 The server thread accepts and reads asynchronously. Asserting immediately after

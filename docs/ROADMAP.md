@@ -83,6 +83,37 @@ path**, **cycle a few images** (solid color + gradient + second color). Landed
 `e0dcc18`; execution record: `.PLAN.md` "Campaign 4" + MEMORY "Campaign 4
 execution run".
 
+## Deferred from Campaign 3/4
+
+Parked items (rationale in MEMORY "Campaign 3"/"Campaign 4"): **core-ktx 1.19.0**
+(needs compileSdk 37; R7 locks 36) · **detekt 2.0.0** until stable · **version
+catalogs** · **AGP 9.3 lint report-DSL migration**. Plus **Campaign 5** below.
+
+## Campaign 5 — raw-socket MJPEG HTTP client (planned 2026-08-08)
+
+NSC cleartext is now scoped to the default robot hotspot `192.168.77.1`
+(`res/xml/network_security_config.xml`, Campaign 3 P3). NSC is a static XML
+resource — it can only whitelist fixed hostnames/IPs, and `VideoStreamLoader`
+uses `HttpURLConnection`, which honors it. So a user who configures a robot at a
+**non-`192.168.77.1` host over plain HTTP loses the video stream** (TCP commands
+still work: `SenderService` uses raw sockets, NSC-transparent).
+
+**Chosen fix (user decision 2026-08-08): raw-socket HTTP client** for the MJPEG
+stream, parallel to `SenderService` — opens a `Socket`, writes the GET request,
+parses the HTTP response head, and hands the body stream to `MjpegInputStream`.
+Bypasses NSC entirely, works for any user host, no manifest/config change. ~40
+lines; re-implements the minimal HTTP framing (request line + headers, response
+`200 OK` + `Content-Length`/chunked). `MjpegInputStream` already parses
+`Content-Length` frames, so the client only needs the response head.
+
+**Interim (before the fix):** on a stream-open failure for a non-default host,
+toast pointing at the host/NSC restriction instead of failing silently. Record a
+known-limitation note in README only if it becomes user-visible.
+
+**Verification:** reuse `SyntheticMjpegServer` (Campaign 4) as the server side;
+assert the raw-socket client decodes frames from a custom host the NSC would
+block.
+
 ## Phase 1 — Instrumented CI without macOS
 
 Explicit decision: **no macOS/GPU runner.** ✅ **DONE — experiment 2 won.**
