@@ -204,6 +204,57 @@ docs/tooling were Windows-first. Rationale + alternatives: `DECISIONS.md`
 `ci.yml` deliberately unchanged (already Linux); the Linux/macOS paths of the
 new tooling are validated on the first POSIX dev box, not in CI.
 
+## Campaign 8 — MJPEG video self-healing (bounded retry, control-gated)
+
+User-visible regression, found 2026-08-10 while comparing against upstream: the
+original app's **unconditional 30 s MJPEG restart loop** was removed as the
+socket-leak driver (Campaign 3 P1) and replaced with `reconnect-on-error`, which
+only fires on a real `IOException` from the render thread. The video can then
+freeze until the user leaves and re-enters the app — the classic case is the
+robot driving out of wifi range and back: the socket `SO_TIMEOUT` (5 s) fires
+once, the reconnect attempt fails while the robot is gone, and **nothing
+retries**. Same gap after a failed first open (robot not booted yet), and after
+surface recreation (foldable hinge, `stopPlayback` joins the render thread with
+no restarter).
+
+**Goal / acceptance criteria:**
+
+- **Recovery ≤ 10 s after the robot is reachable again** — gamepad open, no
+  user action. The retry is **gated on the existing TCP control-connection
+  keepalive** (`connectionState is Connected`): the keepalive loop sends
+  `keepalive <ms>` every (timeout − 300) ms while connected, so `Connected` is
+  a reachability proxy for the same robot/wifi — no new probe is added and
+  retries never hammer a robot that is clearly down. Target worst case:
+  5 s tick + ≤ 5 s connect ≈ 10 s.
+- **No unconditional periodic reconnect** — a healthy stream keeps flowing
+  (preserves the P1 leak fix, no 30 s blips).
+- **No leaks** — retry timers cancelled on pause/destroy; `stopPlayback`
+  close+join unchanged.
+- Coverage gate 95/80 kept; retry logic unit-testable; reuses
+  `SyntheticMjpegServer`.
+
+**Decided design (2026-08-10, user):** new injectable `VideoRetryController`
+(main-thread `Handler` postDelayed tick, interval 5000 ms). Reload the video
+when *activity resumed ∧ control `Connected` ∧ video URL configured ∧
+`!view.isPlaying()`*. Evaluated (a) on the bounded tick while those hold, and
+(b) immediately on the control `Connected` edge transition (a pad touch
+reconnects the control connection → instant reload instead of waiting for the
+tick). `VideoStreamLoader.load` reports success/failure via an `onResult`
+callback (today a failed open returns null silently) and `MjpegView` exposes
+`isPlaying()` — one "not playing" predicate covers silent stall, failed first
+open, and surface recreation.
+
+**Process (user decision 2026-08-10): TDD** — failing tests first that simulate
+the problem (server down → load fails → retry → server up → playing; mid-stream
+drop → reconnect), then the implementation, then the full 3-variant suite ×2 +
+jacoco 95/80 + instrumented suite.
+
+**Verification:** `SyntheticMjpegServer` — server down at open → retries →
+server up → stream starts (bounded poll); mid-stream socket kill → reconnect;
+stall with the socket kept open → `SO_TIMEOUT` → reconnect; control-`Connected`
+edge reloads immediately. `VideoRetryControllerTest` drives the tick
+deterministically under the PAUSED looper.
+
 ## Phase 1 — Instrumented CI without macOS
 
 Decision: **no macOS/GPU runner** — rationale and alternatives in `DECISIONS.md`
