@@ -182,6 +182,53 @@ Every batch of changes touching `SenderService` or the tests should consider:
 - Instrumented: orientation (landscape-only activity), fullscreen/immersive UI,
   settings-driven host/port/video-URI changes.
 
+## Test quality metrics (Campaign 6)
+
+Tests are code: keep logical SLOC low and re-use what is similar. Two metrics
+(Campaign 6; rationale + alternatives: `DECISIONS.md` "[2026-08-09] Test logical
+SLOC metric"):
+
+- **Logical SLOC = summed per-class `token_count`** from
+  `lizard -l kotlin app/src/test app/src/androidTest` (a Halstead-N proxy:
+  operators + operands, comments/blanks excluded). Reported as a **trend**
+  against the A0 baseline below; re-measured at the end of each campaign.
+- **Duplication hard gate**: `npx jscpd app/src/test app/src/androidTest --config .jscpd.json` (min-tokens 50, threshold 0) — fails the gate on any
+  new duplicated block ≥ 50 tokens. jscpd's `paths` config key does not
+  restrict the scan, so the two source dirs are always positional args.
+
+A0 baseline (2026-08-09; `main` sources excluded):
+
+| File | tokens |
+|------|-------:|
+| MainActivityTest | 2009 |
+| MainWindowTests (androidTest) | 1266 |
+| SquareTouchPadLayoutTest | 1021 |
+| SenderServiceAdvancedTest | 807 |
+| mjpeg/MjpegInputStreamTest | 801 |
+| mjpeg/SyntheticMjpegServerTest | 656 |
+| SettingsTests (androidTest) | 634 |
+| RawSocketHttpStreamTest | 626 |
+| MainActivitySettingsControllerTest | 616 |
+| mjpeg/SyntheticMjpegServer | 547 |
+| mjpeg/MjpegFrameRendererTest | 540 |
+| SenderServiceTest | 441 |
+| mjpeg/MjpegViewTest | 414 |
+| SettingsActivityTest | 357 |
+| MagicButtonPanelTest | 331 |
+| TouchPadControllerTest | 294 |
+| WheelControllerTest | 291 |
+| KeepAliveTests (androidTest) | 273 |
+| DummyServer (androidTest) | 231 |
+| SystemUiControllerTest | 163 |
+| FocusAwareActivityTestRule (androidTest) | 159 |
+| VideoStreamLoaderTest | 113 |
+| SenderViewModelTest | 69 |
+| **Total** | **12,659** |
+
+jscpd baseline: 11 clones, 754 duplicated tokens (3.36%) at min-tokens 50 —
+dominated by the 17-class `@Config` triple, the two nested TCP test servers,
+and the androidTest tap/`initNetworkSettings` duplication (Campaign 6 B1/B4/B8).
+
 ## Known gaps
 
 - Coverage gate is a JaCoCo ratchet at **95% line / 80% branch**

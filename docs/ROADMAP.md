@@ -116,6 +116,54 @@ silently under-measuring new app classes; fixed to the live
 `intermediates/built_in_kotlinc` output (`abdbcd3`) and coverage restored to
 97.2% line / 80.85% branch.
 
+## Campaign 6 — test quality as code: reduce logical SLOC via reuse
+
+Tests are code; keep them high-quality by re-using what is similar. Drive down
+test **logical SLOC** (per-class summed `token_count` from `lizard -l kotlin`
+over `app/src/test` + `app/src/androidTest`, a Halstead-N proxy) without
+degrading coverage. The 95 line / 80 branch gate measures **app** classes only,
+so shrinking tests cannot lower it — the rule is to preserve the **set of
+exercised branches**, not the set of assertions (each table row keeps hitting
+its distinct branch). User decisions 2026-08-09: scope = unit + androidTest ·
+metric = per-class token total (not a per-function cap) · enforcement = **hard
+duplication gate + token trend** · push cadence = commit per concern, push at
+milestones · postponed items stay parked. Metric rationale: `DECISIONS.md`
+"[2026-08-09] Test logical SLOC metric".
+
+Baseline (measured 2026-08-09): **12,659 total tokens** across 23 files;
+jscpd **11 clones, 754 duplicated tokens (3.36%)** at min-tokens 50. Target:
+tokens ↓ ~12–15%, duplication blocks ≈ 0, coverage unchanged. Per-commit
+verification: full 3-variant suite ×2, jacoco 95/80 + per-class branch diff,
+`spotlessApply` as a separate invocation, `detekt --rerun-tasks`, jscpd gate,
+clean tree before push.
+
+- **A** ✅ Metric + tooling: `lizard` (`.venv`) + jscpd (npx) probed; baseline
+  measured; `.jscpd.json` calibrated (min-tokens 50, threshold 0, `mild`); metric
+  recorded in `DECISIONS.md`; ROADMAP section; TESTING.md baseline table.
+- **B** Test-support reuse (each its own commit): **B1** shared `TestTcpServer`
+  merging `SenderServiceTest.DummyServer` + `SenderServiceAdvancedTest. ReadUntilStopServer` (ephemeral port + latch + bounded-poll `awaitReceived`;
+  TESTING.md contracts preserved) · **B2** shared CRLF-CRLF request-head reader
+  (`RawSocketHttpStreamTest` + `SyntheticMjpegServer`) · **B3** `setPref(key, value)` helper (`MainActivityTest` + `MainActivitySettingsControllerTest`) ·
+  **B4** `RobolectricTest` base class for the `@Config` triple (~17 classes;
+  @Config inheritance probed) · **B5** MjpegInputStreamTest frame-builder ·
+  **B6** `measureAndLayout(w, h)` (`SquareTouchPadLayoutTest`) · **B7**
+  SettingsActivityTest shared `@Before` · **B8** androidTest shared tap
+  `ViewAction` + `initNetworkSettings` base rule + `childAtPosition`
+  consolidation (`DummyServer` stays separate by design).
+- **C** Data-driven tables (branch-preserving; plain `listOf(...).forEach {}`,
+  assertion messages carry the input): **C1** `TouchPadControllerTest` +
+  `WheelControllerTest` → one table each · **C2** `MainActivityTest` clusters
+  (keepalive / wheel-step / video-URI) · **C3** `MainActivitySettingsControllerTest`
+  clusters (pads-alpha clamp, wheel-step clamp).
+- **D** Gate + docs: **D1** jscpd hard gate wired into `scripts/gate.ps1` + the
+  `ci.yml` quality step; gate prints per-class token totals · **D2** AGENTS.md
+  rule + Commands; TESTING.md "Two DummyServers" → `TestTcpServer` + metrics
+  section; MEMORY retrospective · **D3** final re-measure vs baseline + coverage
+  diff.
+
+Out of scope: JUnit 5, AGP `testFixtures`, androidTest `DummyServer`
+consolidation, comment removal, per-function token caps.
+
 ## Phase 1 — Instrumented CI without macOS
 
 Decision: **no macOS/GPU runner** — rationale and alternatives in `DECISIONS.md`

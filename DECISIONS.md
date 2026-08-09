@@ -335,6 +335,40 @@ ______________________________________________________________________
 - **Out of scope / consequences:** a fixed `localhost:12345` DummyServer port
   would collide if the suite is ever sharded — not a current concern.
 
+### [2026-08-09] Test logical SLOC metric: per-class token total + duplication gate (Campaign 6)
+
+- **Problem:** tests are code and must stay high quality — copy-paste growth
+  (three hand-rolled TCP test servers, repeated `prefs.edit().putString(...)`
+  boilerplate, a 17-class `@Config` triple, per-test frame-assembly in
+  MjpegInputStreamTest) inflates logical SLOC and hides the real intent of each
+  test. We needed a *measureable* target to keep it low, not a vibes rule.
+- **Alternatives considered:** (1) physical line count — gameable by formatting
+  and ignores comment/blank weight; (2) a per-function `token_count`/NLOC cap
+  (`lizard -T ...`) — punishes data-driven tables whose `cases` literals are
+  legitimate test data; (3) **per-class summed `token_count` (lizard) + a hard
+  duplication gate (jscpd)** — the chosen one.
+- **Chosen solution:** metric = summed per-class `token_count` from
+  `lizard -l kotlin` over `app/src/test` + `app/src/androidTest` (a Halstead-N
+  proxy: operators + operands, comments/blanks excluded), reported as a trend
+  against a committed baseline (A0 = 12,659 tokens). Enforcement = **jscpd hard
+  gate**: `npx jscpd app/src/test app/src/androidTest --config .jscpd.json`
+  (min-tokens 50, threshold 0) fails the gate on ANY new duplication block ≥ 50
+  tokens — this directly encodes "re-use what is similar".
+- **Why:** the coverage gate (95 line / 80 branch) measures app classes only
+  (`**/*Test*.*` excluded), so shrinking tests cannot lower it; the only rule is
+  preserving the set of exercised branches (each table row must keep hitting its
+  distinct branch). Token totals reward the table-izing pattern (one class total
+  collapses) that a naive per-function cap would fight. The duplication gate is
+  the "reuse" enforcement and is not brittle to legitimate new tests (new tests
+  add little duplication).
+- **Out of scope / consequences:** JUnit 5 (would change the test toolchain for
+  parameterization we get free from `listOf(...).forEach {}`); AGP `testFixtures`
+  (no unit↔androidTest server sharing yet); androidTest `DummyServer` keeps its
+  fixed `localhost:12345` by design; per-function caps; comment removal
+  (rationale comments are docs, not logical SLOC). jscpd's `paths` config key
+  does not restrict the scan (scans cwd) — the gate always passes the two source
+  dirs as positional arguments (verified 2026-08-09).
+
 ______________________________________________________________________
 
 ## CI & emulator

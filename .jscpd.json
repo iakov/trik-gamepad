@@ -1,0 +1,8 @@
+{
+  "pattern": "**/*.kt",
+  "minTokens": 50,
+  "mode": "mild",
+  "threshold": 0,
+  "reporters": ["console"],
+  "ignore": ["**/build/**", "**/.venv/**", "**/.tmp/**"]
+}
