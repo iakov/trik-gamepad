@@ -56,6 +56,12 @@ jobs:
           -PpreDexEnable=false
           --build-cache
 
+      # Campaign 6 D1: hard test-duplication gate. Any cloned block >= 50 tokens
+      # in the unit/androidTest sources fails the build (import tokens excluded
+      # via .jscpd.json). The logical-SLOC token trend is local-only (gate.ps1).
+      - name: Test duplication gate (jscpd)
+        run: npx -y jscpd app/src/test app/src/androidTest --config .jscpd.json --reporters console
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7
