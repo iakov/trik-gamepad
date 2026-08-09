@@ -107,52 +107,38 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun onSharedPreferenceChangedWithSmallKeepaliveShouldResetToMinimum() {
-    setPref(SettingsFragment.SK_KEEPALIVE, "100")
-    // Below MINIMAL_KEEPALIVE: the value is reset to the current keepalive.
-    val stored = prefs().getString(SettingsFragment.SK_KEEPALIVE, "")
-    assertEquals(SenderService.DEFAULT_KEEPALIVE.toString(), stored)
+  fun keepaliveBelowMinimumOrInvalidShouldResetToDefault() {
+    for (value in listOf("100", "abc")) {
+      setPref(SettingsFragment.SK_KEEPALIVE, value)
+      // Below MINIMAL_KEEPALIVE / non-numeric: reset to the current keepalive.
+      val stored = prefs().getString(SettingsFragment.SK_KEEPALIVE, "")
+      assertEquals(
+          "keepalive '$value' must reset to the default",
+          SenderService.DEFAULT_KEEPALIVE.toString(),
+          stored,
+      )
+    }
   }
 
   @Test
-  fun onSharedPreferenceChangedWithInvalidKeepaliveShouldReset() {
-    setPref(SettingsFragment.SK_KEEPALIVE, "abc")
-    // Non-numeric -> reset to the current keepalive, no crash.
-    val stored = prefs().getString(SettingsFragment.SK_KEEPALIVE, "")
-    assertEquals(SenderService.DEFAULT_KEEPALIVE.toString(), stored)
+  fun wheelStepOutOfRangeOrInvalidShouldStaySane() {
+    for (value in listOf("999", "abc")) {
+      // Integer.getInteger reads a SYSTEM property named by the pref value, so
+      // arbitrary values fall back to the default (7); the clamp keeps [1,100].
+      setPref(SettingsFragment.SK_WHEEL_STEP, value)
+      val step = field(activity, "mWheelStep") as Int
+      assertTrue("expected wheel step in [1,100] for '$value', got $step", step in 1..100)
+    }
   }
 
   @Test
-  fun onSharedPreferenceChangedShouldClampWheelStep() {
-    // Note: the app reads the wheel step via Integer.getInteger(pref, default),
-    // which reads a SYSTEM property named by the pref value, so arbitrary pref
-    // values fall back to the default (7) and the clamp keeps it in [1,100].
-    setPref(SettingsFragment.SK_WHEEL_STEP, "999")
-    val step = field(activity, "mWheelStep") as Int
-    assertTrue("expected wheel step in [1,100], got $step", step in 1..100)
-  }
-
-  @Test
-  fun onSharedPreferenceChangedWithNonNumericWheelStepShouldKeepDefault() {
-    // A non-numeric value makes Integer.getInteger return null; the elvis keeps
-    // the current step.
-    setPref(SettingsFragment.SK_WHEEL_STEP, "abc")
-    val step = field(activity, "mWheelStep") as Int
-    assertTrue("expected a sane wheel step, got $step", step in 1..100)
-  }
-
-  @Test
-  fun onSharedPreferenceChangedWithBadVideoUriShouldNotCrash() {
-    setPref(SettingsFragment.SK_VIDEO_URI, "not a uri")
-    // URISyntaxException/MalformedURLException handled; mVideoURL stays null.
-    assertNull(field(activity, "mVideoURL"))
-  }
-
-  @Test
-  fun onSharedPreferenceChangedWithUnknownProtocolShouldNotCrash() {
-    // "foo:bar" is a valid URI but toURL() throws MalformedURLException.
-    setPref(SettingsFragment.SK_VIDEO_URI, "foo:bar")
-    assertNull(field(activity, "mVideoURL"))
+  fun invalidVideoUriShouldNotCrash() {
+    for (value in listOf("not a uri", "foo:bar")) {
+      setPref(SettingsFragment.SK_VIDEO_URI, value)
+      // "not a uri" fails URI parsing, "foo:bar" is a valid URI but toURL()
+      // throws MalformedURLException; both leave mVideoURL null.
+      assertNull("video url must stay null for '$value'", field(activity, "mVideoURL"))
+    }
   }
 
   @Test
