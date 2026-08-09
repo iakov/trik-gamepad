@@ -37,6 +37,9 @@ proguard/
 # Python tooling (repo-local uv venv)
 .venv/
 
+# Python bytecode caches (scripts regenerate on every run)
+__pycache__/
+
 # Gradle
 .gradle/
 build/
