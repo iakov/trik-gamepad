@@ -7,6 +7,13 @@ robots.
 
 You can get it [here](https://play.google.com/store/apps/details?id=com.trikset.gamepad)
 
+## For users
+
+On large-screen devices running Android 16 (tablets and foldables), Android may
+not allow the app to lock to landscape, so the gamepad can appear rotated or
+stretched. If this happens, lock your device's rotation to landscape from the
+system quick settings.
+
 ## For developers
 
 New session or contributor? Start here:
