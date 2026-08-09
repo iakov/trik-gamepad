@@ -15,7 +15,7 @@ Removing a documented rule changes agent behavior — only delete if provably in
 
 Android app (pure Kotlin, 0 `.java` files) that mimics a gamepad to control
 TRIK robots. It sends plain-text commands over a TCP socket and streams MJPEG
-video over HTTP. Coverage gate: 95% line / 80% branch (measured 97.3% / 81.9%).
+video over HTTP. Coverage gate: 95% line / 80% branch (measured: TESTING.md).
 Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Layout
@@ -42,9 +42,7 @@ Improvement roadmap: `docs/ROADMAP.md`.
   under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`,
   `targetSdk 36`, `minSdk 23`, `maxSdk 36` — single main flavor, no product
   flavors. AGP 9's new DSL is on (no `android.newDsl=false` opt-out).
-- `org.gradle.configuration-cache=true` — **re-enabled under AGP 9**: the AGP
-  `https.proxyHost` sys-prop read that defeated it on AGP 8 was fixed, so the
-  cache is now actually reused. Do not disable it again.
+- `org.gradle.configuration-cache=true` — re-enabled under AGP 9; do not disable it again (rationale: DECISIONS.md).
 - Three build types (`debug`/`release`/`releaseDebug`); `./gradlew test` runs
   Robolectric under all three in parallel JVMs — unit tests must use ephemeral
   ports and reset SharedPreferences per test (they persist across methods in a
@@ -134,7 +132,7 @@ configurations, update this section and the referenced config files.
 - **Never pipe long-lived children (gradle/emulator) through Tee/Select** — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) and use `--no-daemon`/`--stop` for probes.
 - **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green. Concrete trigger: a static-analysis task that shows `UP-TO-DATE` right after you added/renamed source files (e.g. detekt can stay UP-TO-DATE when new files arrive via an untracked path) — force one `./gradlew detekt --rerun-tasks` pass before trusting the gate.
 - **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries); **run the full 3-variant `test` suite twice** before pushing test changes.
-- **Format before you gate — automate, don't remember.** Every touched file type has a formatter: `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`. Run them **before** the gate (`spotlessCheck` will otherwise fail the first gate run and cost a wasted ~2-min rerun — hit 4× in one session). Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` — in one invocation it rewrites `.kt` while `test` compiles the same files (a race). Both are now automated: the pre-commit `spotless-apply` local hook runs `gradlew.bat spotlessApply` on `.kt` changes (Windows-probed; `cmd /c` is required for `language: system`), the mdformat pre-commit hook covers `.md`, and `scripts/gate.ps1` is the canonical gate (two invocations — see Commands).
+- **Format before you gate — automate, don't remember.** `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`; run them before the gate or `spotlessCheck` fails. Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` (it rewrites `.kt` while `test` compiles them — a race). Formatting is automated: pre-commit hooks (spotless-apply on `.kt`, `cmd /c gradlew.bat` required on Windows; mdformat on `.md`) + `scripts/gate.ps1` (two invocations — see Commands).
 - **Generate lint baselines with the aggregate `lint` task**, not `lintDebug`; env-dependent checks (e.g. `OldTargetApi`) go in `lint.xml`, not the baseline.
 - **CI `script:` blocks run per-line.** `reactivecircus/android-emulator-runner`
   splits `script:` into individual lines and runs each as its own `sh -c`
@@ -147,7 +145,8 @@ configurations, update this section and the referenced config files.
 - **Gaps escalate** (1st: document · 2nd: automate · 3rd+: tool config); **verify "runs automatically" claims with a command**; **measure, don't estimate**.
 - **3 identical failures → stop and read the shadow/API source**, don't tweak-and-rerun. This applies to **any repeated tooling signal, not just test assertions**: the same message appearing N≥3 times across commands (e.g. `spotlessKotlinCheck FAILED`, "configuration cache cannot be reused") means a systemic cause — find and fix it, don't absorb it.
 - **Never read `window`/activity-scoped state in a field initializer** — `Activity.window` is only assigned during `attach()` (after the constructor), so a field initializer referencing it throws in Robolectric ("Window creation failed!") and NPEs on device. Use `by lazy` or a provider lambda; declare such fields with a default that defers the access.
-- **Pre-format `.md` with `uvx mdformat`** before pre-commit (the first hook run reformats and fails).
+- **`.md` formatting + EOL trap**: pre-format with `uvx mdformat` before pre-commit (the first hook run reformats and fails); after committing `.md`, expect a dirty working tree — the hook rewrites to LF (vs CRLF) with a **content-identical** diff (`git diff --stat` empty, `git status` dirty). Verify content-identical, then `git checkout -- <md>`; never `git add` the EOL-only state.
+- **PS 5.1 `$ErrorActionPreference='Stop'` + native stderr is a terminating error**: `& npx ... *>> $log` under EAP=Stop silently kills the script the moment the tool prints to stderr (jscpd prints "Using config from ..."). Scope `$ErrorActionPreference='Continue'` around native calls (as gate.ps1 does) and check `$LASTEXITCODE` — for ANY new native command in a script with EAP=Stop.
 - **`gh` run commands take the run **id**, not a PowerShell object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
 - **Push gates**: the full local gate list is run and logged, and **`git status --short` must be clean** before every push (local gates validate the working tree, not the commits).
 - **CI cadence**: one bounded run check (~3 min) after each push; if no run appears, document it and re-check at the next push rather than blocking.
@@ -185,7 +184,7 @@ configurations, update this section and the referenced config files.
 - **Session context is ephemeral**: persist decisions to `AGENTS.md`/`DECISIONS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
 - **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
 - **Verify toolchain/dependency-manager names against executable sources** (build files, lockfiles) before writing them into any doc.
-- **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`, pref/measure helpers, data-driven tables) instead of copy-pasting. The jscpd duplication gate (in `gate.ps1` + CI; `min-tokens 50`, import tokens excluded via `.jscpd.json`) fails on NEW duplicated blocks ≥ 50 tokens, and `gate.ps1` prints the lizard token total as the logical-SLOC trend (A0 baseline 12,659). Rationale + alternatives: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric".
+- **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`, pref/measure helpers, data-driven tables) instead of copy-pasting. The jscpd gate (in `gate.ps1` + CI) fails on new clones ≥ 50 tokens and `gate.ps1` prints the lizard token trend. **Dedup drives the token number, not table-ization**; a table row's expected value must not depend on an earlier row's state (reset the fixture per row). Rationale + details: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric" + TESTING.md "Test quality metrics".
 - **Mark dormant hooks**: a rule/hook that does not apply to the current phase must say so explicitly (e.g. PR-workflow hooks are dormant during the single-branch no-PR `.PLAN.md` execution plan) — otherwise it silently misdirects agents into workflow artifacts that don't exist yet.
 
 ## Commands
@@ -229,7 +228,7 @@ demand:
 | Topic | Section |
 |-------|---------|
 | Layout, keystore path, versioning | MEMORY.md "Build & layout" |
-| Test suite structure, DummyServer ports, emulator prerequisites | MEMORY.md "Testing" + TESTING.md |
+| Test suite structure, TCP test servers, emulator prerequisites | MEMORY.md "Testing" + TESTING.md |
 | SenderService protocol, keepalive, MJPEG | MEMORY.md "App protocol" |
 | CI (GitHub Actions), emulator prerequisites | MEMORY.md "CI quirks" |
 | Branch/PR and release workflows | MEMORY.md "Workflows" |

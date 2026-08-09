@@ -239,8 +239,8 @@ ______________________________________________________________________
   (rejected — bind-late race); bind synchronously + ephemeral port + latch
   awaits.
 - **Chosen solution:** bind synchronously in the constructor; assert only after
-  `CountDownLatch` awaits (`awaitConnection`/`awaitCommands`, 5 s timeout); bind
-  **ephemeral ports** (`ServerSocket(0)`) and target `server.getPort()`.
+  `CountDownLatch` awaits (`awaitConnection`/`awaitCount`, 5 s timeout); bind
+  **ephemeral ports** (`ServerSocket(0)`) and target `server.port`.
 - **Why:** fixed ports cannot survive parallel JVMs; latch awaits remove the
   accept/read race; constructor-bind removes the bind-late race.
 - **Out of scope / consequences:** 3× consecutive full `test` runs green.
@@ -368,6 +368,28 @@ ______________________________________________________________________
   (rationale comments are docs, not logical SLOC). jscpd's `paths` config key
   does not restrict the scan (scans cwd) — the gate always passes the two source
   dirs as positional arguments (verified 2026-08-09).
+
+### [2026-08-09] jscpd import-ignore calibration is cross-platform (CI red 31303791390)
+
+- **Problem:** the jscpd hard gate passed locally (Windows, CRLF working tree)
+  but failed on CI's Linux/LF checkout: `ignorePattern: ["import"]` (bare token)
+  suppressed the residual import-header clones locally, but CI re-found 2 of
+  them (67/54 tokens) — a red run + debugging.
+- **Alternatives considered:** raise `minTokens` to 80 (robust but lets real
+  50–79-token logic duplication through the gate); keep the bare-token pattern
+  (proven LF-fragile); use a whole-line pattern `["import.*"]`.
+- **Chosen solution:** `ignorePattern: ["import.*"]` in `.jscpd.json` — skips
+  whole import lines, verified on both the CRLF working tree and an LF export
+  of the committed blobs (the technique for reproducing CI line endings locally).
+- **Why:** the bare-token match only strips the `import` keyword (~8 tokens per
+  import block), leaving the block ≥ 50 tokens; the local CRLF pass was an
+  artifact of the trailing `\r` breaking the clone token match. `import.*` is
+  the only pattern verified line-ending-independent. `minTokens=80` would
+  meaningfully weaken the gate (the removed `@Config`/frame-assembly clones were
+  50–88 tokens).
+- **Out of scope / consequences:** the residual import-header clones (52–76
+  tokens) are language boilerplate, never logic duplication; the gate still
+  fails on any real logic clone ≥ 50 tokens.
 
 ______________________________________________________________________
 

@@ -5,7 +5,8 @@
 Scope: Test strategy, how to run tests, mocking/synchronization patterns, and
 known gaps for the canonical `app/` layout.
 Aim: Document how tests work, what is covered, and hard-won lessons about
-Robolectric timing, emulator prerequisites, and the two `DummyServer` classes.
+Robolectric timing, emulator prerequisites, and the test TCP servers (unit
+`TestTcpServer` + instrumented `DummyServer`).
 Structure: Overview → Running tests → Diagnostic discipline → Patterns →
 Edge-case audit → Known gaps.
 
@@ -124,7 +125,7 @@ Companion `SyntheticMjpegServerTest.kt`:
 
 The server thread accepts and reads asynchronously. Asserting immediately after
 `mExecutor.runAll()` + `shadowOf(getMainLooper()).idle()` races the server.
-Always await the latch (`awaitConnection()` / `awaitCommands()`) before
+Always await the latch (`awaitConnection()` / `awaitCount(n)`) before
 asserting connected/command state.
 
 **Bounded polls for server-received data, never bare asserts.** A test that
@@ -235,6 +236,18 @@ A0 baseline (2026-08-09; `main` sources excluded):
 jscpd baseline: 11 clones, 754 duplicated tokens (3.36%) at min-tokens 50 —
 dominated by the 17-class `@Config` triple, the two nested TCP test servers,
 and the androidTest tap/`initNetworkSettings` duplication (Campaign 6 B1/B4/B8).
+
+**What moves the token number (Campaign 6 result):** 12,659 → 11,234 (-11.3%) came
+almost entirely from **dedup** (B-block, shared `TestTcpServer`/`HttpRequestHead`/
+`setPref`/`RobolectricTestBase`/frame-builder/helpers); data-driven **tables**
+(C-block) buy fewer methods + clearer intent, not fewer tokens — the `cases`
+literals are the test. Expect dedup to cut tokens; don't chase the number with
+table-ization.
+
+**Stateful-table trap:** a table row's expected value must not depend on state an
+earlier row set (e.g. a non-numeric wheel step *keeps* the current step, so after
+a `"42"` row the expected default became 42). Reset the fixture per row where a
+row's outcome depends on prior state (`ui.step = 7` before each case).
 
 ## Known gaps
 

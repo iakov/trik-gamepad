@@ -144,7 +144,7 @@ per-class branch diff, `spotlessApply` as a separate invocation, `detekt --rerun
   merging `SenderServiceTest.DummyServer` + `SenderServiceAdvancedTest. ReadUntilStopServer` (ephemeral port + latch + bounded-poll `awaitReceived`;
   TESTING.md contracts preserved) · **B2** shared CRLF-CRLF request-head reader
   (`RawSocketHttpStreamTest` + `SyntheticMjpegServer`) · **B3** `setPref(key, value)` helper (`MainActivityTest` + `MainActivitySettingsControllerTest`) ·
-  **B4** `RobolectricTestBase` for the `@Config` triple (~17 classes; @Config/
+  **B4** `RobolectricTestBase` for the `@Config` triple (15 classes; @Config/
   @LooperMode inheritance probed) · **B5** MjpegInputStreamTest `frameWithHeaders`
   builder · **B6** `measureAndLayout(w, h)` (`SquareTouchPadLayoutTest`) · **B7**
   SettingsActivityTest shared `@Before` · **B8** androidTest `initNetworkSettings`
@@ -156,12 +156,15 @@ per-class branch diff, `spotlessApply` as a separate invocation, `detekt --rerun
   `WheelControllerTest` → one table each · **C2** `MainActivityTest` clusters
   (keepalive / wheel-step / video-URI) · **C3** `MainActivitySettingsControllerTest`
   clusters (pads-alpha clamp, wheel-step clamp). `80f33ce`..`a4f46ce`.
-- **D** Gate + docs: **D1** ✅ jscpd hard gate wired into `scripts/gate.ps1` +
+- **D** ✅ Gate + docs: **D1** jscpd hard gate wired into `scripts/gate.ps1` +
   the `ci.yml` quality step; `gate.ps1` prints the lizard token total · **D2**
-  AGENTS.md "Tests are code" guardrail + Commands; TESTING.md "Two DummyServers"
-  → "Test TCP servers" + metrics section; MEMORY retrospective · **D3** final
+  AGENTS.md "Tests are code" guardrail + Commands; TESTING.md "Test TCP servers"
+  → section rename + metrics section; MEMORY retrospective · **D3** final
   re-measure vs baseline (11,234 tokens / 0 clones) + coverage diff (97.2 / 80.9,
-  flat).
+  flat). `219ff3e` + `c43084c`; the cross-platform jscpd `ignorePattern`
+  calibration (`5bd0b69`, see DECISIONS.md). **CAMPAIGN 6 COMPLETE — closing CI
+  run `31304148201` fully green (build + jscpd + instrumented).** Retrospective:
+  MEMORY.md "Campaign 6 execution run".
 
 Out of scope: JUnit 5, AGP `testFixtures`, androidTest `DummyServer`
 consolidation, comment removal, per-function token caps.

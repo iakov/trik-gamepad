@@ -104,9 +104,9 @@ parallel JVMs.
 
 ### Ephemeral ports (hard-won)
 
-The unit-test `DummyServer` (inner class of `SenderServiceTest`) binds an
-**ephemeral port** (`new ServerSocket(0)`); the client targets
-`server.getPort()`. Fixed ports (historically `localhost:12345` + shifts) are
+The shared unit-test `TestTcpServer` (`app/src/test/.../TestTcpServer.kt`)
+binds an **ephemeral port** (`ServerSocket(0)`); the client targets
+`server.port`. Fixed ports (historically `localhost:12345` + shifts) are
 forbidden here: the parallel variants collided with `BindException` cascades
 and flaky asserts. The androidTest `DummyServer.kt` is a *different* class
 and still binds `localhost:12345` — don't merge or confuse the two.
@@ -114,8 +114,9 @@ and still binds `localhost:12345` — don't merge or confuse the two.
 ### Deterministic awaits
 
 The server thread is async (accept/read on its own thread). Tests must await
-server state via `CountDownLatch`: `awaitConnection()` (after `accept()`) and
-`awaitCommands()` (after reading N lines), each with a 5 s timeout, before
+server state via `CountDownLatch`/bounded polls: `awaitConnection()` (after
+`accept()`), `awaitCount(n)` (after reading N lines), and the bounded
+`awaitReceived(fragment, drain)` poll, each with a 5 s timeout, before
 asserting. The constructor binds the socket synchronously so the port is
 guaranteed listening before the client connects.
 
@@ -1225,3 +1226,32 @@ reset the fixture per row where it does.
 **Gate wiring (D1):** `scripts/gate.ps1` runs the jscpd hard gate (fail on new
 clones ≥ 50 tokens) and prints the lizard token total as a trend; the CI build
 job gained a `Test duplication gate (jscpd)` step (`npx -y jscpd ... --config .jscpd.json`). AGENTS.md gained the "Tests are code" guardrail + Commands.
+
+**Reusable lessons (additions after the closing CI run `31304148201`):**
+
+- **PS 5.1: `$ErrorActionPreference='Stop'` + native stderr = terminating error.**
+  `& npx jscpd ... *>> $log` under EAP=Stop died the gate silently (nothing in
+  the log; only a console `NativeCommandError` record) — npx writes "Using config
+  from ..." to stderr. Any future native call added to `gate.ps1` (or any script
+  with EAP=Stop) must scope `$ErrorActionPreference='Continue'` around the call
+  and capture `$LASTEXITCODE`.
+- **Data-driven tables do NOT move the token metric.** C-block (table-ization)
+  was −60 tokens vs B-block (dedup) −1,365: the `cases` literals ARE the test.
+  Expect dedup to cut logical SLOC; table-ization buys method-count/clarity, not
+  tokens. Don't chase the token number with tables.
+- **mdformat EOL trap recurred 3×.** After any commit touching `.md`, the
+  pre-commit mdformat hook leaves the working tree dirty (LF vs CRLF) with a
+  **content-identical** diff: `git diff --stat` is empty but `git status` shows
+  the files modified. Verify content-identical, then `git checkout -- <md>` to
+  clear (never `git add` the EOL-only state).
+- **Kotlin nullable-var smart-cast vs nested lambda.** `var line: String?; while (readLine().also { line = it } != null) { synchronized(lock) { list.add(line) } }`
+  does NOT compile (the `synchronized{}` lambda defeats the smart-cast the
+  original direct call relied on). Use `input.readLine() ?: break`.
+- **Kotlin nested (non-`inner`) classes can't read outer instance fields.**
+  `tapPrecision` hoisted to `MainWindowTests`' outer class was invisible to its
+  nested `SquareButtonTest`/`MagicButtonsTests` — it had to live in a `companion object` (visible to nested classes unqualified).
+- **Reproducing CI line endings locally:** when a tool behaves differently on
+  CI (LF checkout) vs local (CRLF working tree), export the committed blobs to
+  an external temp dir (`git show HEAD:<path>` → LF) and run the tool against
+  that export. This reproduced the jscpd CI red in ~30s (see DECISIONS.md
+  "jscpd import-ignore calibration").
