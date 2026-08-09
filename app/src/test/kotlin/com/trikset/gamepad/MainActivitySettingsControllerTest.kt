@@ -13,12 +13,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.android.util.concurrent.PausedExecutorService
-import org.robolectric.annotation.Config
 
 /** Direct tests for [MainActivitySettingsController] (ROADMAP Phase 2-E, coverage push). */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class MainActivitySettingsControllerTest {
+class MainActivitySettingsControllerTest : RobolectricTestBase() {
 
   private class FakeUi : MainActivitySettingsController.SettingsUi {
     var title: String? = null
@@ -71,6 +69,12 @@ class MainActivitySettingsControllerTest {
     controller = MainActivitySettingsController(context, sender, ui)
   }
 
+  /** Stores [value] under [key] and notifies the controller (the common act step). */
+  private fun setPref(key: String, value: String) {
+    prefs.edit().putString(key, value).commit()
+    controller.onPreferenceChanged(prefs)
+  }
+
   @Test
   fun onPreferenceChangedWithTitleFailureShouldToast() {
     ui.titleSet = false
@@ -83,11 +87,7 @@ class MainActivitySettingsControllerTest {
     // First pass establishes the address; a second identical pass keeps the
     // address the same -> the video-URI rewrite is skipped.
     controller.onPreferenceChanged(prefs)
-    prefs
-        .edit()
-        .putString(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
-        .commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
     assertEquals(
         "http://10.0.0.7:8080/?action=stream",
         prefs.getString(SettingsFragment.SK_VIDEO_URI, ""),
@@ -96,15 +96,13 @@ class MainActivitySettingsControllerTest {
 
   @Test
   fun onPreferenceChangedShouldClampPadsAlphaLow() {
-    prefs.edit().putString(SettingsFragment.SK_SHOW_PADS, "-50").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_SHOW_PADS, "-50")
     assertEquals(0f, ui.lastAlpha, 0.001f)
   }
 
   @Test
   fun onPreferenceChangedShouldClampPadsAlphaHigh() {
-    prefs.edit().putString(SettingsFragment.SK_SHOW_PADS, "999").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_SHOW_PADS, "999")
     assertEquals(1f, ui.lastAlpha, 0.001f)
   }
 
@@ -113,19 +111,14 @@ class MainActivitySettingsControllerTest {
     // Establish the default address first so the video-URI rewrite-on-host-change
     // does not overwrite the empty value we set next.
     controller.onPreferenceChanged(prefs)
-    prefs.edit().putString(SettingsFragment.SK_VIDEO_URI, "").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_VIDEO_URI, "")
     assertNull(ui.url)
   }
 
   @Test
   fun onPreferenceChangedWithVideoUriShouldSetUrl() {
     controller.onPreferenceChanged(prefs)
-    prefs
-        .edit()
-        .putString(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
-        .commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
     assertEquals("http://10.0.0.7:8080/?action=stream", ui.url.toString())
   }
 
@@ -159,22 +152,19 @@ class MainActivitySettingsControllerTest {
 
   @Test
   fun onPreferenceChangedShouldApplyStoredWheelStep() {
-    prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "42").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_WHEEL_STEP, "42")
     assertEquals(42, ui.step)
   }
 
   @Test
   fun onPreferenceChangedWithGarbageWheelStepShouldKeepDefault() {
-    prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "not-a-number").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_WHEEL_STEP, "not-a-number")
     assertEquals(7, ui.step)
   }
 
   @Test
   fun onPreferenceChangedShouldClampWheelStepToMax() {
-    prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "500").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_WHEEL_STEP, "500")
     assertEquals(100, ui.step)
   }
 }

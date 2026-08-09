@@ -15,11 +15,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class MainActivityTest {
+class MainActivityTest : RobolectricTestBase() {
 
   private lateinit var activity: MainActivity
 
@@ -38,6 +36,15 @@ class MainActivityTest {
   fun setUp() {
     activity = org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup().get()
   }
+
+  /** Stores [value] under [key] and notifies the settings controller (the common act step). */
+  private fun setPref(key: String, value: String) {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
+    prefs.edit().putString(key, value).commit()
+    requireNotNull(activity.getSettingsController()).onPreferenceChanged(prefs)
+  }
+
+  private fun prefs() = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
 
   private fun field(target: Any, name: String): Any? {
     val f: Field = target.javaClass.getDeclaredField(name)
@@ -67,23 +74,13 @@ class MainActivityTest {
 
   @Test
   fun onSharedPreferenceChangedShouldSetTarget() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-    assertNotNull(controller)
-
-    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7").commit()
-    controller.onPreferenceChanged(prefs)
-
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
     assertEquals("10.0.0.7", activity.getSenderService().getHostAddr())
   }
 
   @Test
   fun onSharedPreferenceChangedWithBadPortShouldToastAndKeepDefault() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
-    prefs.edit().putString(SettingsFragment.SK_HOST_PORT, "not-a-number").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_HOST_PORT, "not-a-number")
     // No crash; target still set with default 4444 because the parse failure is
     // caught and the port variable keeps its initial value.
     assertNotNull(activity.getSenderService().getHostAddr())
@@ -91,13 +88,8 @@ class MainActivityTest {
 
   @Test
   fun onSharedPreferenceChangedShouldRewriteVideoUriOnHostChange() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
-    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "192.168.1.42").commit()
-    controller.onPreferenceChanged(prefs)
-
-    val uri = prefs.getString(SettingsFragment.SK_VIDEO_URI, "")
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "192.168.1.42")
+    val uri = prefs().getString(SettingsFragment.SK_VIDEO_URI, "")
     assertEquals("http://192.168.1.42:8080/?action=stream", uri)
   }
 
@@ -116,98 +108,62 @@ class MainActivityTest {
 
   @Test
   fun onSharedPreferenceChangedWithSmallKeepaliveShouldResetToMinimum() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
-    prefs.edit().putString(SettingsFragment.SK_KEEPALIVE, "100").commit()
-    controller.onPreferenceChanged(prefs)
-
+    setPref(SettingsFragment.SK_KEEPALIVE, "100")
     // Below MINIMAL_KEEPALIVE: the value is reset to the current keepalive.
-    val stored = prefs.getString(SettingsFragment.SK_KEEPALIVE, "")
+    val stored = prefs().getString(SettingsFragment.SK_KEEPALIVE, "")
     assertEquals(SenderService.DEFAULT_KEEPALIVE.toString(), stored)
   }
 
   @Test
   fun onSharedPreferenceChangedWithInvalidKeepaliveShouldReset() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
-    prefs.edit().putString(SettingsFragment.SK_KEEPALIVE, "abc").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_KEEPALIVE, "abc")
     // Non-numeric -> reset to the current keepalive, no crash.
-    val stored = prefs.getString(SettingsFragment.SK_KEEPALIVE, "")
+    val stored = prefs().getString(SettingsFragment.SK_KEEPALIVE, "")
     assertEquals(SenderService.DEFAULT_KEEPALIVE.toString(), stored)
   }
 
   @Test
   fun onSharedPreferenceChangedShouldClampWheelStep() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
     // Note: the app reads the wheel step via Integer.getInteger(pref, default),
     // which reads a SYSTEM property named by the pref value, so arbitrary pref
     // values fall back to the default (7) and the clamp keeps it in [1,100].
-    prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "999").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_WHEEL_STEP, "999")
     val step = field(activity, "mWheelStep") as Int
     assertTrue("expected wheel step in [1,100], got $step", step in 1..100)
   }
 
   @Test
   fun onSharedPreferenceChangedWithNonNumericWheelStepShouldKeepDefault() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
     // A non-numeric value makes Integer.getInteger return null; the elvis keeps
     // the current step.
-    prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "abc").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_WHEEL_STEP, "abc")
     val step = field(activity, "mWheelStep") as Int
     assertTrue("expected a sane wheel step, got $step", step in 1..100)
   }
 
   @Test
   fun onSharedPreferenceChangedWithBadVideoUriShouldNotCrash() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
-    prefs.edit().putString(SettingsFragment.SK_VIDEO_URI, "not a uri").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_VIDEO_URI, "not a uri")
     // URISyntaxException/MalformedURLException handled; mVideoURL stays null.
     assertNull(field(activity, "mVideoURL"))
   }
 
   @Test
   fun onSharedPreferenceChangedWithUnknownProtocolShouldNotCrash() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
     // "foo:bar" is a valid URI but toURL() throws MalformedURLException.
-    prefs.edit().putString(SettingsFragment.SK_VIDEO_URI, "foo:bar").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_VIDEO_URI, "foo:bar")
     assertNull(field(activity, "mVideoURL"))
   }
 
   @Test
   fun onSharedPreferenceChangedWithValidVideoUriShouldSetUrl() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
-    prefs
-        .edit()
-        .putString(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
-        .commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
     assertNotNull(field(activity, "mVideoURL"))
   }
 
   @Test
   fun onSharedPreferenceChangedWithValidKeepaliveShouldApply() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
-    prefs.edit().putString(SettingsFragment.SK_KEEPALIVE, "2000").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_KEEPALIVE, "2000")
     // >= MINIMAL_KEEPALIVE -> applied to the sender.
     assertEquals(2000, activity.getSenderService().getKeepaliveTimeout())
   }
@@ -385,11 +341,7 @@ class MainActivityTest {
 
   @Test
   fun onSharedPreferenceChangedWithBadShowPadsShouldNotCrash() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    val controller = requireNotNull(activity.getSettingsController())
-
-    prefs.edit().putString(SettingsFragment.SK_SHOW_PADS, "not-a-number").commit()
-    controller.onPreferenceChanged(prefs)
+    setPref(SettingsFragment.SK_SHOW_PADS, "not-a-number")
     // The non-numeric pads alpha is caught; nothing crashes.
     assertNotNull(activity.findViewById<View>(R.id.controlsOverlay))
   }
