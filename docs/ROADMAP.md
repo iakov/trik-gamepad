@@ -86,32 +86,35 @@ execution run".
 ## Deferred from Campaign 3/4
 
 Parked items (rationale in MEMORY "Campaign 3"/"Campaign 4"): **core-ktx 1.19.0**
-(needs compileSdk 37; R7 locks 36) · **detekt 2.0.0** until stable · **version
-catalogs** · **AGP 9.3 lint report-DSL migration**. Plus **Campaign 5** below.
+(needs compileSdk 37; R7 locks 36) · **detekt 2.0.0** until stable. Resolved
+2026-08-09: **version catalogs** ✅ (gradle/libs.versions.toml) · **AGP 9.3 lint
+report-DSL migration** — N/A, the build never used the deprecated
+`htmlReport`/`textReport` DSL.
 
-## Campaign 5 — raw-socket MJPEG HTTP client (planned 2026-08-08)
+## Campaign 5 — raw-socket MJPEG HTTP client (DONE 2026-08-09)
 
-NSC cleartext is now scoped to the default robot hotspot `192.168.77.1`
+NSC cleartext is scoped to the default robot hotspot `192.168.77.1`
 (`res/xml/network_security_config.xml`, Campaign 3 P3). NSC is a static XML
-resource — it can only whitelist fixed hostnames/IPs, and `VideoStreamLoader`
-uses `HttpURLConnection`, which honors it. So a user who configures a robot at a
-**non-`192.168.77.1` host over plain HTTP loses the video stream** (TCP commands
-still work: `SenderService` uses raw sockets, NSC-transparent).
+resource — it can only whitelist fixed hostnames/IPs, so a user who configures
+a robot at a **non-`192.168.77.1` host over plain HTTP loses the video stream**
+(TCP commands still work: `SenderService` uses raw sockets, NSC-transparent).
 
 **Chosen fix (user decision 2026-08-08): raw-socket HTTP client** — rationale
-and rejected alternatives (incl. per-host NSC additions) in `DECISIONS.md`
-"Campaign 5: raw-socket MJPEG HTTP client". Outline: open a `Socket`, write the
-GET request, parse the HTTP response head (`200 OK` + `Content-Length`/chunked),
-and hand the body stream to `MjpegInputStream`; bypasses NSC entirely, ~40
-lines.
+and rejected alternatives in `DECISIONS.md` "Campaign 5: raw-socket MJPEG HTTP
+client". Landed `40587a3`: `RawSocketHttpStream` opens a `Socket`, writes the
+GET request, parses the response head (`200 OK` + `Content-Length` / chunked /
+until-close), and hands the body to `MjpegInputStream`; bypasses NSC entirely.
+`VideoStreamLoader.openStream` uses it for all `http` URLs (https keeps
+`HttpURLConnection`).
 
-**Interim (before the fix):** on a stream-open failure for a non-default host,
-toast pointing at the host/NSC restriction instead of failing silently. Record a
-known-limitation note in README only if it becomes user-visible.
-
-**Verification:** reuse `SyntheticMjpegServer` (Campaign 4) as the server side;
-assert the raw-socket client decodes frames from a custom host the NSC would
-block.
+**Verification:** `SyntheticMjpegServer` reused as the server side — the client
+decodes frames from a `127.0.0.1` (non-NSC-whitelisted) host, plus chunked /
+bad-size / truncated-head / EOF unit cases (`RawSocketHttpStreamTest`).
+**Bonus found during the run:** the jacoco class dir pointed at a stale
+`tmp/kotlin-classes/debug` under AGP 9's built-in Kotlin, so the 95/80 gate was
+silently under-measuring new app classes; fixed to the live
+`intermediates/built_in_kotlinc` output (`abdbcd3`) and coverage restored to
+97.2% line / 80.85% branch.
 
 ## Phase 1 — Instrumented CI without macOS
 

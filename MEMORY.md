@@ -1113,3 +1113,51 @@ thread and its HTTP connection linger across pause/resume. Close the stream **fr
 another thread** (the documented unblock pattern) and suppress the error-listener
 on deliberate stops via a `stopping` flag, or the close spuriously triggers
 reconnect.
+
+### [2026-08-09] Campaign 5 + docs restructure session retrospective
+
+**Docs restructure:** the decision log moved out of MEMORY into the new
+`DECISIONS.md` (grouped by area, dated, problem/alternatives/why/out-of-scope
+shape, agentic index). MEMORY "Design decisions" now keeps only retrospectives /
+execution records / reference quirks; the Domain-review knowledge was rephrased
+into `docs/architecture.md` (new "Domain knowledge & best-practice reference" +
+"Known pitfalls & quirks" sections). All moved content was verified present in
+the targets before removal (write-target-first rule).
+
+**Campaign 5 (raw-socket MJPEG HTTP client, `40587a3`):** `RawSocketHttpStream`
+opens a `Socket` for plain-HTTP MJPEG, parses the response head and hands the
+body to `MjpegInputStream`, bypassing NSC so non-`192.168.77.1` hosts work.
+Handles Content-Length, chunked (with the chunk-data CRLF), and until-close.
+`VideoStreamLoader.openStream` uses it for `http`; `https` keeps
+`HttpURLConnection`.
+
+**Biggest find: the coverage gate was silently under-measuring.** Under AGP 9's
+built-in Kotlin the class output moved to
+`intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes`, but the
+jacoco `debugKotlinClasses` fileTree still pointed at the stale
+`tmp/kotlin-classes/debug` — so new app classes were invisible to the 95/80
+gate and CI was green on a false measurement (true: 93.0% line / 69.7% branch).
+Fixed (`abdbcd3`) to the live dir + targeted coverage tests (chunked decoder,
+SenderViewModel.onCleared, VideoStreamLoader https fallback, raw-stream
+read/skip/EOF edges) → 97.2% line / 80.85% branch. Decision record:
+`DECISIONS.md` "[2026-08-09] JaCoCo class dir".
+
+**Version catalogs (`57c552d`):** `gradle/libs.versions.toml` centralizes AGP/
+Gradle/dependency/tool versions. **Gradle limitation hit:** catalog plugins
+cannot be referenced in the `settings.gradle` `plugins {}` block ("You cannot
+use a plugin declared in a version catalog in your settings file") — settings
+keeps direct ids, the app module uses `alias(libs.plugins.*)`. The AGP 9.3 lint
+report-DSL migration is **N/A** — the build never used the deprecated
+`htmlReport`/`textReport` DSL.
+
+**Chunked-parse bug (reusable lesson):** chunked transfer encoding is
+`SIZE\r\nDATA\r\n` — after reading `DATA`, the trailing CRLF must be consumed
+before the next size line, or `readLine()` returns an empty line. First
+implementation read only `DATA`; the empty line surfaced as `Bad chunk size: `
+(empty). Fixed by swallowing the 2-byte CRLF when a chunk's `remaining` hits 0.
+
+**Gradle version-catalog diagnostic detour:** hitting the "only
+alias(libs.plugins.someAlias) ... where libs is a valid version catalog" error
+4-5× before reading the docs — the "3 identical failures → research the source"
+rule applies to build-DSL constraints too, not just test shadows. Reading the
+Gradle version-catalogs page would have saved ~15 min.

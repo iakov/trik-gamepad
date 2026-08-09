@@ -24,7 +24,7 @@ Each note follows the same shape:
 
 | Area | Covers | Newest decision |
 |------|--------|-----------------|
-| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline | [2026-08-08] AGP 9.3.1 / Gradle 9.5.0 migration LANDED |
+| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate | [2026-08-09] JaCoCo class dir for AGP 9 built-in Kotlin |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-06] Coverage drive to 85% |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel | [2026-08-08] Campaign 5: raw-socket MJPEG HTTP client |
@@ -193,6 +193,32 @@ ______________________________________________________________________
   instrumented on aosp_atd). Remaining deprecation: `ReportingExtension.file(String)`
   from a third-party plugin (scheduled Gradle 10 removal) — not ours. Scratch-
   branch probing is the pattern for any future toolchain bump.
+
+### [2026-08-09] JaCoCo class dir for AGP 9 built-in Kotlin (coverage gate was under-measuring)
+
+- **Problem:** adding the first new app class since the AGP 9 migration
+  (`RawSocketHttpStream`) exposed that the jacoco report/verification read a
+  **stale** `tmp/kotlin-classes/debug` dir — AGP 9's built-in Kotlin now outputs
+  to `intermediates/built_in_kotlinc/...`, so the 95 line / 80 branch gate was
+  silently measuring an outdated class set and **new app classes were invisible
+  to it**. The corrected measurement was 93.0% line / 69.7% branch — below the
+  gate, yet CI had been green.
+- **Alternatives considered:** keep the stale path (gate stays false-green —
+  rejected); lower the gate to the measured level (hides the real state —
+  rejected); point jacoco at the live built-in Kotlin output and drive coverage
+  back above the gate.
+- **Chosen solution:** `debugKotlinClasses` now points at
+  `intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes` (verified
+  against the compile output; if AGP relocates it the report shows ~0% and the
+  gate fails loudly rather than silently passing). Coverage restored to
+  **97.2% line / 80.85% branch** with targeted tests (chunked decoder,
+  SenderViewModel, https fallback, read/skip edges) (`abdbcd3`).
+- **Why:** the gate is only worth having if it measures the code that actually
+  compiles; a silent false-green is worse than a loud red.
+- **Out of scope / consequences:** pre-existing gaps (MjpegInputStream recovery
+  edges, MainActivity branches) remain uncovered but the gate now holds at the
+  corrected measurement. Any future toolchain move should re-verify the jacoco
+  class-dir path.
 
 ______________________________________________________________________
 

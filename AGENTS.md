@@ -50,6 +50,12 @@ Improvement roadmap: `docs/ROADMAP.md`.
   ports and reset SharedPreferences per test (they persist across methods in a
   JVM; the old SenderService static-state trap was removed in ROADMAP Phase 3 —
   see TESTING.md).
+- **Verify coverage measures the live class output.** The 95 line / 80 branch
+  gate reads `intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes`
+  under AGP 9's built-in Kotlin — a stale `tmp/kotlin-classes` path silently
+  under-measures and lets new app classes bypass the gate (hit 2026-08-09, see
+  DECISIONS.md). After any toolchain migration, add a new app class and confirm
+  it appears in the JaCoCo report.
 - `settings.gradle` at repo root: `rootProject.name = 'trik-gamepad'`, `include ':app'`.
 - `local.properties` (gitignored): `sdk.dir` must escape the drive-colon (`C\:/...`) or lint's `PropertyEscape` check fails the build.
 - Signing: `app/build.gradle` applies a release signing config conditionally — only when `file('../android-keystorage.jks')` exists. Debug builds fall back to the auto-generated debug keystore in CI. See MEMORY.md "Build & layout" for gitignore status and how the path resolves.
