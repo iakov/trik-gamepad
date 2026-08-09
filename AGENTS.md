@@ -3,8 +3,9 @@
 <!-- encoding: utf-8 -->
 
 Scope: Action triggers, guardrails, and commands for AI agents.
-Memory: Details, architecture, design decisions, and quirks explanations live
-in `MEMORY.md` (pull sections on demand) — never duplicate rationale here.
+Memory: Details, architecture, and quirks explanations live in `MEMORY.md`;
+decisions (problem → alternatives → why → out-of-scope) live in
+`DECISIONS.md`. Pull sections on demand — never duplicate rationale here.
 Testing strategy lives in `TESTING.md`.
 
 Every line must answer: "Would an agent likely miss this without help?" If not, cut it.
@@ -61,7 +62,7 @@ configurations, update this section and the referenced config files.
 
 ### On session init
 
-- Read this file, `MEMORY.md` header + section list, `TESTING.md`, `app/build.gradle`, and `.github/workflows/ci.yml`; pull MEMORY sections on demand.
+- Read this file, `MEMORY.md` header + section list, `DECISIONS.md` index, `TESTING.md`, `app/build.gradle`, and `.github/workflows/ci.yml`; pull MEMORY/DECISIONS sections on demand.
 - Don't talk to the user before session warm-up is complete.
 
 ### Before commit
@@ -170,13 +171,13 @@ configurations, update this section and the referenced config files.
 - **Suppressions**: every `@Suppress*` / `//noinspection` / `lint.xml` relaxation carries a reasoning comment or a recorded rationale in `MEMORY.md`.
 - **Tooling assumptions**: never assume tooling behaves intuitively — verify options against `--help`/docs/schema with a read-only probe. PowerShell escaping differs from bash (backticks, `-1` in `git commit -m`); route complex arguments through a `.tmp/` file rather than inlining.
 - **Re-read `.md` diffs after mdformat**: line-start `+`/`-`/`*` mid-paragraph get reflowed into lists — never start a wrapped line with a list character.
-- **Documenting decisions**: `AGENTS.md` stores rules/constraints only — never rationale. If a line explains *why*, it belongs in `MEMORY.md`. Removing a documented rule changes agent behavior — only delete if provably wrong; relocate rationale, never drop it.
+- **Documenting decisions**: `AGENTS.md` stores rules/constraints only — never rationale. A *decision* (problem → alternatives → why → out-of-scope) belongs in `DECISIONS.md`; a fact/quirk/retrospective belongs in `MEMORY.md`. Removing a documented rule changes agent behavior — only delete if provably wrong; relocate rationale, never drop it.
 - **Safe-updates mirror** (when removing content): would removing this change agent behavior? → keep it. Is the claim provably wrong? → only then delete/correct, verified against executable sources (config, workflow, code). Does it enforce a docs/structure contract? → keep structural-convention rules even when the wording looks generic.
 - **Merge, don't delete**: when replacing a section, merge old content into the new rather than deleting outright; confirm each deletion is intentional.
 - **Generalize, then extract**: on docs-drift review, read `AGENTS.md` top-to-bottom for generalization and push detail/rationale down to `MEMORY.md`.
-- **Progressive disclosure**: `AGENTS.md` = pointers, `MEMORY.md` = on-demand detail; keep context small and focused.
-- **Session context is ephemeral**: persist decisions to `AGENTS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
-- **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
+- **Progressive disclosure**: `AGENTS.md` = pointers, `MEMORY.md`/`DECISIONS.md` = on-demand detail; keep context small and focused.
+- **Session context is ephemeral**: persist decisions to `AGENTS.md`/`DECISIONS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
+- **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
 - **Verify toolchain/dependency-manager names against executable sources** (build files, lockfiles) before writing them into any doc.
 - **Mark dormant hooks**: a rule/hook that does not apply to the current phase must say so explicitly (e.g. PR-workflow hooks are dormant during the single-branch no-PR `.PLAN.md` execution plan) — otherwise it silently misdirects agents into workflow artifacts that don't exist yet.
 
@@ -206,17 +207,19 @@ TCP protocol, keepalive, MJPEG reconnect, settings keys: MEMORY.md "App protocol
 
 ## Memory index
 
-Details live in `MEMORY.md` — pull a section on demand:
+Details and decisions live in `MEMORY.md` / `DECISIONS.md` — pull a section on
+demand:
 
-| Topic | Section in MEMORY.md |
-|-------|----------------------|
-| Layout, keystore path, versioning | Build & layout |
-| Test suite structure, DummyServer ports, emulator prerequisites | Testing |
-| SenderService protocol, keepalive, MJPEG | App protocol |
-| CI (GitHub Actions), emulator prerequisites | CI quirks |
-| Branch/PR and release workflows | Workflows |
-| Rationale for tool choices and past fixes | Design decisions |
-| Full-project audit findings + Android/Kotlin/CI best-practice reference (ViewModels, coroutines, MJPEG, SurfaceView, sensors, lint, detekt, JaCoCo) | Domain review |
+| Topic | Section |
+|-------|---------|
+| Layout, keystore path, versioning | MEMORY.md "Build & layout" |
+| Test suite structure, DummyServer ports, emulator prerequisites | MEMORY.md "Testing" + TESTING.md |
+| SenderService protocol, keepalive, MJPEG | MEMORY.md "App protocol" |
+| CI (GitHub Actions), emulator prerequisites | MEMORY.md "CI quirks" |
+| Branch/PR and release workflows | MEMORY.md "Workflows" |
+| Retrospectives, execution records, reference quirks | MEMORY.md "Design decisions & retrospectives" |
+| **Decision log** (problem → alternatives → why → out-of-scope) | **DECISIONS.md** (index at top) |
+| Architecture notes + quirks + Android/Kotlin/CI best-practice reference | `docs/architecture.md` |
 
 ## Current work
 
@@ -224,7 +227,7 @@ Details live in `MEMORY.md` — pull a section on demand:
 
 ## Conventions
 
-- Resources are English-only (`resourceConfigurations += ['en']`); `lint.xml` downgrades `MissingTranslation` so missing translations are expected, not an error (rationale in MEMORY.md).
+- Resources are English-only (`resourceConfigurations += ['en']`); `lint.xml` downgrades `MissingTranslation` so missing translations are expected, not an error (rationale in DECISIONS.md).
 - `buildFeatures.buildConfig = true` — `BuildConfig.VERSION_NAME` is used by the About section.
 - SIMPLE ENGLISH for all globally-visible content (release notes, PR
   descriptions, commits, docs, comments); reply to GitHub issues/comments in

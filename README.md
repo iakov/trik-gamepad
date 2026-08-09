@@ -12,11 +12,14 @@ You can get it [here](https://play.google.com/store/apps/details?id=com.trikset.
 New session or contributor? Start here:
 
 - `AGENTS.md` — rules, guardrails, and commands for AI agents and contributors.
-- `MEMORY.md` — architecture details, design decisions, and quirks (pull on
-  demand; `AGENTS.md` points to its sections).
+- `MEMORY.md` — project facts, architecture details, CI quirks, and
+  retrospectives (pull on demand; `AGENTS.md` points to its sections).
+- `DECISIONS.md` — the decision log (problem → alternatives → why → out-of-scope
+  for every decision in the repo).
 - `TESTING.md` — test strategy and how to run the test suites.
 - `docs/architecture.md` — module map, TCP command protocol, MJPEG video
-  pipeline, and test layering.
+  pipeline, and test layering, plus the Android/Kotlin/CI best-practice
+  reference.
 - `docs/ROADMAP.md` — the committed improvement plan (next phases and
   sequencing).
 - The maintained app lives in the canonical `app/` module at the repo root
