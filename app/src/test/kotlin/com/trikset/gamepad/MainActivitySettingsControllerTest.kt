@@ -95,15 +95,12 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
   }
 
   @Test
-  fun onPreferenceChangedShouldClampPadsAlphaLow() {
-    setPref(SettingsFragment.SK_SHOW_PADS, "-50")
-    assertEquals(0f, ui.lastAlpha, 0.001f)
-  }
-
-  @Test
-  fun onPreferenceChangedShouldClampPadsAlphaHigh() {
-    setPref(SettingsFragment.SK_SHOW_PADS, "999")
-    assertEquals(1f, ui.lastAlpha, 0.001f)
+  fun onPreferenceChangedShouldClampPadsAlpha() {
+    val cases = listOf("-50" to 0f, "999" to 1f)
+    for ((value, expected) in cases) {
+      setPref(SettingsFragment.SK_SHOW_PADS, value)
+      assertEquals("pads alpha for '$value' must clamp", expected, ui.lastAlpha, 0.001f)
+    }
   }
 
   @Test
@@ -151,20 +148,14 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
   }
 
   @Test
-  fun onPreferenceChangedShouldApplyStoredWheelStep() {
-    setPref(SettingsFragment.SK_WHEEL_STEP, "42")
-    assertEquals(42, ui.step)
-  }
-
-  @Test
-  fun onPreferenceChangedWithGarbageWheelStepShouldKeepDefault() {
-    setPref(SettingsFragment.SK_WHEEL_STEP, "not-a-number")
-    assertEquals(7, ui.step)
-  }
-
-  @Test
-  fun onPreferenceChangedShouldClampWheelStepToMax() {
-    setPref(SettingsFragment.SK_WHEEL_STEP, "500")
-    assertEquals(100, ui.step)
+  fun onPreferenceChangedShouldApplyOrClampWheelStep() {
+    val cases = listOf("42" to 42, "not-a-number" to 7, "500" to 100)
+    for ((value, expected) in cases) {
+      // A non-numeric value keeps the CURRENT step, so reset the fake's default
+      // per row to reproduce the fresh-state condition each case expects.
+      ui.step = 7
+      setPref(SettingsFragment.SK_WHEEL_STEP, value)
+      assertEquals("wheel step for '$value'", expected, ui.step)
+    }
   }
 }
