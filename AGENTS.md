@@ -185,6 +185,7 @@ configurations, update this section and the referenced config files.
 - **Session context is ephemeral**: persist decisions to `AGENTS.md`/`DECISIONS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
 - **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
 - **Verify toolchain/dependency-manager names against executable sources** (build files, lockfiles) before writing them into any doc.
+- **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`, pref/measure helpers, data-driven tables) instead of copy-pasting. The jscpd duplication gate (in `gate.ps1` + CI; `min-tokens 50`, import tokens excluded via `.jscpd.json`) fails on NEW duplicated blocks ≥ 50 tokens, and `gate.ps1` prints the lizard token total as the logical-SLOC trend (A0 baseline 12,659). Rationale + alternatives: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric".
 - **Mark dormant hooks**: a rule/hook that does not apply to the current phase must say so explicitly (e.g. PR-workflow hooks are dormant during the single-branch no-PR `.PLAN.md` execution plan) — otherwise it silently misdirects agents into workflow artifacts that don't exist yet.
 
 ## Commands
@@ -196,8 +197,17 @@ configurations, update this section and the referenced config files.
 ./gradlew lint                               # lint.xml downgrades MissingTranslation to warning
 ./gradlew connectedDebugAndroidTest          # needs running emulator/device (AEHD)
 ./scripts/gate.ps1                           # canonical local gate: spotlessApply THEN the
-                                             # full quality suite, each --no-daemon, tee'd to .tmp/gate.log
+                                             # full quality suite + jscpd duplication gate +
+                                             # lizard token trend, each --no-daemon, tee'd to .tmp/gate.log
 ./gradlew detekt spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck   # quality gates (also run in CI; checkstyle/pmd retired after the pure-Kotlin migration)
+```
+
+Test-quality tooling (Campaign 6 — see TESTING.md "Test quality metrics"):
+
+```sh
+uv pip install --python .venv lizard           # logical-SLOC token counter (Kotlin)
+npx -y jscpd app/src/test app/src/androidTest --config .jscpd.json   # hard duplication gate (fails on new clones >= 50 tokens; `paths` config key is ignored, positional dirs required)
+.venv/Scripts/lizard -l kotlin app/src/test app/src/androidTest --csv   # per-function token counts (summed = logical SLOC trend)
 ```
 
 ```sh

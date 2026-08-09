@@ -86,17 +86,21 @@ Local instrumented run:
 
 ## Patterns
 
-### Two DummyServers — do not confuse them
+### Test TCP servers — ephemeral unit server vs fixed-port instrumented server
 
-- `app/src/test/.../SenderServiceTest` defines its **own inner `DummyServer`**.
-  It binds an **ephemeral port** (`ServerSocket(0)`), exposes `getPort()`,
-  `awaitConnection()`, `awaitCommands()` (5 s timeouts), and closes the
-  listening socket in `close()`.
+- `app/src/test/.../TestTcpServer.kt` is the **shared unit** server (Campaign 6
+  B1, merging the old inner `DummyServer` + `ReadUntilStopServer`). It binds an
+  **ephemeral port** (`ServerSocket(0)`), exposes `port`, `awaitConnection()`,
+  `awaitCount()`, the bounded-poll `awaitReceived()` (with a caller-supplied
+  drain), and `closeClient()`. Always `use {}` it.
 - `app/src/androidTest/.../DummyServer.kt` is a separate class binding
   `localhost:12345`, used by the instrumented tests.
 - **Never reintroduce fixed ports in the unit test**: `./gradlew test` runs
   three variants in parallel JVMs; fixed ports caused `BindException` cascades
   (see MEMORY.md Testing).
+- **Never merge the two**: the instrumented server is fixed-port by design
+  (single emulator process); the unit server must stay ephemeral (3 parallel
+  JVMs).
 
 ### Synthetic MJPEG server (Campaign 4) — the third test server
 
@@ -195,6 +199,9 @@ SLOC metric"):
 - **Duplication hard gate**: `npx jscpd app/src/test app/src/androidTest --config .jscpd.json` (min-tokens 50, threshold 0) — fails the gate on any
   new duplicated block ≥ 50 tokens. jscpd's `paths` config key does not
   restrict the scan, so the two source dirs are always positional args.
+  Import tokens are excluded (`ignorePattern: ["import"]`); the residual
+  import-header clones (52–76 tokens) are language boilerplate, not logic
+  duplication. Wired into `scripts/gate.ps1` + the CI build job (Campaign 6 D1).
 
 A0 baseline (2026-08-09; `main` sources excluded):
 

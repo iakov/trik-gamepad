@@ -1161,3 +1161,61 @@ alias(libs.plugins.someAlias) ... where libs is a valid version catalog" error
 4-5× before reading the docs — the "3 identical failures → research the source"
 rule applies to build-DSL constraints too, not just test shadows. Reading the
 Gradle version-catalogs page would have saved ~15 min.
+
+### [2026-08-09] Campaign 6 execution run — test logical-SLOC reduction
+
+**Goal:** keep tests high-quality code by re-using what is similar; drive down
+test logical SLOC without degrading coverage. Metric + enforcement decisions in
+`DECISIONS.md` "[2026-08-09] Test logical SLOC metric". Commits
+`145401b`..`a4f46ce` (B-block + C-block), gate green, CI green.
+
+**Results (measured):**
+
+| Metric | A0 baseline | After B+C | Δ |
+|---|---|---|---|
+| logical SLOC (summed lizard `token_count`) | 12,659 | 11,234 | **-11.3%** |
+| jscpd clones (≥50 tokens) | 11 | **0** | -11 |
+| duplicated tokens | 754 | **0** | -100% |
+| coverage | 97.2 / 80.85 | 97.2 / 80.9 | flat (gate 95/80) |
+
+**What landed (B-block reuse):** shared `TestTcpServer` (merged the inner
+`DummyServer` + `ReadUntilStopServer`; ephemeral port + bounded-poll
+`awaitReceived` preserved); shared `HttpRequestHead` (CRLF-CRLF reader reused by
+`SyntheticMjpegServer` + `RawSocketHttpStreamTest`); `setPref(key, value)` in the
+two pref tests; **`RobolectricTestBase`** carrying the `@Config` 3-SDK triple
+across 15 classes — **@Config/@LooperMode inheritance from a superclass probed
+and confirmed** (Robolectric `Config.OLDEST_SDK` is the sentinel `-4`, resolved
+to the app minSdk 23); MjpegInputStreamTest `frameWithHeaders` builder;
+`measureAndLayout`; SettingsActivityTest shared `@Before`;
+`initNetworkSettings` + tap/command helpers in the instrumented tests. The
+androidTest `DummyServer` (fixed `localhost:12345`) stays separate by design.
+
+**C-block (data-driven tables):** `TouchPadControllerTest`/`WheelControllerTest`
+→ one `listOf(...)` table each; `MainActivityTest` keepalive/wheel-step/
+video-URI clusters and `MainActivitySettingsControllerTest` pads-alpha/wheel-step
+clusters. **Stateful-table trap hit:** `"not-a-number"` keeps the *current*
+wheel step, so merging it with `"42"` into one shared-state loop failed
+(expected 7, got 42) — the row needed a per-row fake-state reset. Lesson: a
+table row's expected value must not depend on state set by an earlier row;
+reset the fixture per row where it does.
+
+**Tooling lessons:**
+
+- `lizard --csv` column 3 is the per-function `token_count`; per-class total =
+  sum (spurious `(anonymous)`/`get@...` rows for Kotlin file-level code are
+  consistent before/after, so the trend is sound).
+- **jscpd `paths` config key does NOT restrict the scan** (it scanned cwd and
+  pulled in `main` sources) — the gate always passes `app/src/test app/src/androidTest` as positional args. jscpd 5 `ignorePattern` must be an
+  array in the config (`["import"]`); a bare string is rejected.
+- jscpd `mode: strict` found MORE clones than `mild` (21 vs 11) — counter-
+  intuitive; `mild` matches the CLI default. Verified empirically.
+- PowerShell `Set-Content -Encoding utf8` writes a BOM that jscpd's JSON parser
+  rejects ("expected value at line 1 column 1") — use the write tool for
+  `.jscpd.json` edits.
+- The residual jscpd clones after dedup are import-header blocks (52–76 tokens)
+  — language boilerplate, excluded via `ignorePattern`. Real logic duplication
+  is now 0.
+
+**Gate wiring (D1):** `scripts/gate.ps1` runs the jscpd hard gate (fail on new
+clones ≥ 50 tokens) and prints the lizard token total as a trend; the CI build
+job gained a `Test duplication gate (jscpd)` step (`npx -y jscpd ... --config .jscpd.json`). AGENTS.md gained the "Tests are code" guardrail + Commands.
