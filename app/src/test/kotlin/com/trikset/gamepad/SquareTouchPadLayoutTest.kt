@@ -11,14 +11,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.android.util.concurrent.PausedExecutorService
-import org.robolectric.annotation.Config
 import org.robolectric.annotation.LooperMode
 import org.robolectric.annotation.LooperMode.Mode.PAUSED
 
 @RunWith(RobolectricTestRunner::class)
 @LooperMode(PAUSED)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class SquareTouchPadLayoutTest {
+class SquareTouchPadLayoutTest : RobolectricTestBase() {
 
   private val mExecutor = PausedExecutorService()
   private lateinit var sender: SenderService
@@ -26,6 +24,15 @@ class SquareTouchPadLayoutTest {
 
   private fun eventAt(x: Float, y: Float, action: Int): MotionEvent =
       MotionEvent.obtain(0L, 0L, action, x, y, 0)
+
+  /** Measures [pad] at [width]x[height] in [mode] and lays it out at that size. */
+  private fun measureAndLayout(width: Int, height: Int, mode: Int = View.MeasureSpec.EXACTLY) {
+    pad.measure(
+        View.MeasureSpec.makeMeasureSpec(width, mode),
+        View.MeasureSpec.makeMeasureSpec(height, mode),
+    )
+    pad.layout(0, 0, width, height)
+  }
 
   @Before
   fun setUp() {
@@ -39,11 +46,7 @@ class SquareTouchPadLayoutTest {
     pad.setPadName("pad 1")
     pad.setSender(sender)
     parent.addView(pad)
-    pad.measure(
-        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
-        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
-    )
-    pad.layout(0, 0, 200, 200)
+    measureAndLayout(200, 200)
     parent.measure(
         View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
         View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
@@ -73,20 +76,14 @@ class SquareTouchPadLayoutTest {
 
   @Test
   fun measureShouldMakeSquareFromWidthAndHeight() {
-    pad.measure(
-        View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY),
-        View.MeasureSpec.makeMeasureSpec(150, View.MeasureSpec.EXACTLY),
-    )
+    measureAndLayout(300, 150)
     assertEquals(150, pad.measuredWidth)
     assertEquals(150, pad.measuredHeight)
   }
 
   @Test
   fun measureShouldFallBackToDefaultWhenNoSize() {
-    pad.measure(
-        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
-    )
+    measureAndLayout(0, 0, View.MeasureSpec.UNSPECIFIED)
     assertTrue(pad.measuredWidth > 0)
     assertTrue(pad.measuredHeight > 0)
   }
@@ -149,11 +146,7 @@ class SquareTouchPadLayoutTest {
   @Test
   fun onSizeChangedShouldCenterWhenStartingEmpty() {
     // size changed from (0,0) -> centers the touch point.
-    pad.measure(
-        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
-        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
-    )
-    pad.layout(0, 0, 200, 200)
+    measureAndLayout(200, 200)
     // After a layout with old size 0, dispatch a move to read the new center.
     pad.dispatchTouchEvent(eventAt(100f, 100f, MotionEvent.ACTION_DOWN))
     assertTrue(sender !== null)
@@ -162,17 +155,9 @@ class SquareTouchPadLayoutTest {
   @Test
   fun onSizeChangedWithExistingSizeShouldKeepPosition() {
     // Size change from a non-zero old size -> the else branch: position kept.
-    pad.measure(
-        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
-        View.MeasureSpec.makeMeasureSpec(200, View.MeasureSpec.EXACTLY),
-    )
-    pad.layout(0, 0, 200, 200)
+    measureAndLayout(200, 200)
     pad.dispatchTouchEvent(eventAt(50f, 50f, MotionEvent.ACTION_DOWN))
-    pad.measure(
-        View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY),
-        View.MeasureSpec.makeMeasureSpec(300, View.MeasureSpec.EXACTLY),
-    )
-    pad.layout(0, 0, 300, 300)
+    measureAndLayout(300, 300)
     // No crash; the old position is retained.
     pad.dispatchTouchEvent(eventAt(50f, 50f, MotionEvent.ACTION_MOVE))
   }
