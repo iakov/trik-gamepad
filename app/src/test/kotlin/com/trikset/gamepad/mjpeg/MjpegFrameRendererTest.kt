@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import com.trikset.gamepad.RobolectricTestBase
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import org.apache.commons.io.input.BoundedInputStream
@@ -14,11 +15,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class MjpegFrameRendererTest {
+class MjpegFrameRendererTest : RobolectricTestBase() {
 
   private fun bitmap(w: Int, h: Int): Bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
 

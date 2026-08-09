@@ -8,12 +8,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
 /** Direct tests for [SystemUiController] (ROADMAP Phase B2). */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class SystemUiControllerTest {
+class SystemUiControllerTest : RobolectricTestBase() {
 
   private lateinit var activity: Activity
   private lateinit var mainView: View

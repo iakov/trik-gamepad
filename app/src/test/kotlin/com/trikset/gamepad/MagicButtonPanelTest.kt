@@ -7,12 +7,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
 /** Direct tests for [MagicButtonPanel] (ROADMAP Phase B1). */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class MagicButtonPanelTest {
+class MagicButtonPanelTest : RobolectricTestBase() {
 
   private val context = org.robolectric.RuntimeEnvironment.getApplication()
   private val sent = ArrayList<String>()

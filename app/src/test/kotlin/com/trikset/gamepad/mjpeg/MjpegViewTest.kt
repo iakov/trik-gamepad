@@ -1,5 +1,6 @@
 package com.trikset.gamepad.mjpeg
 
+import com.trikset.gamepad.RobolectricTestBase
 import java.io.ByteArrayInputStream
 import java.net.ServerSocket
 import java.net.Socket
@@ -11,11 +12,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
-import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class MjpegViewTest {
+class MjpegViewTest : RobolectricTestBase() {
 
   @Test
   fun setSourceAndStartStopPlaybackShouldNotCrash() {

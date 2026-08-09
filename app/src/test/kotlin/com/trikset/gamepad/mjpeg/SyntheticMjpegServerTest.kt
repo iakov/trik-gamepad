@@ -2,6 +2,7 @@ package com.trikset.gamepad.mjpeg
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.trikset.gamepad.RobolectricTestBase
 import com.trikset.gamepad.VideoStreamLoader
 import java.io.IOException
 import java.net.URL
@@ -23,8 +24,7 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class SyntheticMjpegServerTest {
+class SyntheticMjpegServerTest : RobolectricTestBase() {
 
   @Test
   @Config(sdk = [Config.TARGET_SDK])

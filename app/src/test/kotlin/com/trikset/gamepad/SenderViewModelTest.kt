@@ -4,11 +4,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class SenderViewModelTest {
+class SenderViewModelTest : RobolectricTestBase() {
 
   @Test
   fun onClearedDisconnectsTheSenderWithoutThrowing() {

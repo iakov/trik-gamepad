@@ -6,29 +6,32 @@ import androidx.preference.Preference
 import androidx.preference.PreferenceManager
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class SettingsActivityTest {
+class SettingsActivityTest : RobolectricTestBase() {
+
+  private lateinit var activity: SettingsActivity
+  private lateinit var fragment: SettingsFragment
+
+  @Before
+  fun setUp() {
+    activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
+    fragment =
+        activity.supportFragmentManager.findFragmentById(android.R.id.content) as SettingsFragment
+  }
 
   @Test
   fun onCreateShouldAddSettingsFragment() {
-    val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
-    assertNotNull(activity.supportFragmentManager.findFragmentById(android.R.id.content))
+    assertNotNull(fragment)
   }
 
   @Test
   fun settingsFragmentShouldLoadPreferences() {
-    val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
-    val fragment =
-        activity.supportFragmentManager.findFragmentById(android.R.id.content) as SettingsFragment
-    assertNotNull(fragment)
-
     // The fragment reads the shared preferences when it builds its summaries;
     // verify the default preferences were registered by accessing them.
     assertTrue(PreferenceManager.getDefaultSharedPreferences(activity).contains("hostAddress"))
@@ -36,11 +39,6 @@ class SettingsActivityTest {
 
   @Test
   fun aboutSystemClickShouldCopyToClipboard() {
-    val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
-    val fragment =
-        activity.supportFragmentManager.findFragmentById(android.R.id.content) as SettingsFragment
-    assertNotNull(fragment)
-
     val about = fragment.findPreference<Preference>(SettingsFragment.SK_ABOUT_SYSTEM)
     assertNotNull(about)
     // Trigger the click listener set up by the fragment.
@@ -54,11 +52,6 @@ class SettingsActivityTest {
 
   @Test
   fun dynamicSummaryShouldUpdateOnChange() {
-    val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
-    val fragment =
-        activity.supportFragmentManager.findFragmentById(android.R.id.content) as SettingsFragment
-    assertNotNull(fragment)
-
     val host = fragment.findPreference<Preference>(SettingsFragment.SK_HOST_ADDRESS)
     assertNotNull(host)
     // The change listener sets the summary to the new value.
@@ -68,11 +61,6 @@ class SettingsActivityTest {
 
   @Test
   fun hostPortAndKeepaliveSummariesShouldUpdateOnChange() {
-    val activity = Robolectric.buildActivity(SettingsActivity::class.java).setup().get()
-    val fragment =
-        activity.supportFragmentManager.findFragmentById(android.R.id.content) as SettingsFragment
-    assertNotNull(fragment)
-
     for (key in arrayOf(SettingsFragment.SK_HOST_PORT, SettingsFragment.SK_KEEPALIVE)) {
       val pref = fragment.findPreference<Preference>(key)
       assertNotNull(pref)

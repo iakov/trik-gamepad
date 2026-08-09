@@ -1,5 +1,6 @@
 package com.trikset.gamepad.mjpeg
 
+import com.trikset.gamepad.RobolectricTestBase
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.io.InputStream
@@ -11,23 +12,25 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-class MjpegInputStreamTest {
+class MjpegInputStreamTest : RobolectricTestBase() {
 
-  /** Builds a minimal MJPEG stream: headers (Content-Length), SOI marker, body. */
-  private fun mjpegFrame(body: ByteArray): ByteArray {
-    val headers = "Content-Type: image/jpeg\r\nContent-Length: ${body.size}\r\n\r\n"
+  /** Builds a minimal MJPEG stream: [headers] followed by [tail] bytes. */
+  private fun frameWithHeaders(headers: String, tail: ByteArray = ByteArray(0)): ByteArray {
     val headerBytes = headers.toByteArray(StandardCharsets.US_ASCII)
-    val frame = ByteArray(headerBytes.size + 2 + body.size)
+    val frame = ByteArray(headerBytes.size + tail.size)
     System.arraycopy(headerBytes, 0, frame, 0, headerBytes.size)
-    frame[headerBytes.size] = 0xFF.toByte()
-    frame[headerBytes.size + 1] = 0xD8.toByte()
-    System.arraycopy(body, 0, frame, headerBytes.size + 2, body.size)
+    System.arraycopy(tail, 0, frame, headerBytes.size, tail.size)
     return frame
   }
+
+  /** Builds a minimal MJPEG frame: headers (Content-Length), SOI marker, [body]. */
+  private fun mjpegFrame(body: ByteArray): ByteArray =
+      frameWithHeaders(
+          "Content-Type: image/jpeg\r\nContent-Length: ${body.size}\r\n\r\n",
+          byteArrayOf(0xFF.toByte(), 0xD8.toByte()) + body,
+      )
 
   private fun jpegBytes(size: Int): ByteArray {
     val b = ByteArray(size)
@@ -65,9 +68,8 @@ class MjpegInputStreamTest {
   fun readMjpegFrameWithMissingContentLengthShouldThrow() {
     // Header without a Content-Length line: the parser recovers by skipping
     // and eventually gives up with an IOException on the broken stream.
-    val headers = "Content-Type: image/jpeg\r\n\r\n"
-    val frame = headers.toByteArray(StandardCharsets.US_ASCII)
-    MjpegInputStream(ByteArrayInputStream(frame)).readMjpegFrame()
+    MjpegInputStream(ByteArrayInputStream(frameWithHeaders("Content-Type: image/jpeg\r\n\r\n")))
+        .readMjpegFrame()
   }
 
   @Test
@@ -90,12 +92,15 @@ class MjpegInputStreamTest {
     // Header advertises a big Content-Length but only a few body bytes
     // follow; the available() < 2*contentLength path is skipped and the
     // short skip exercises the "Skipped only" warning path.
-    val headers = "Content-Type: image/jpeg\r\nContent-Length: 500\r\n\r\n"
-    val headerBytes = headers.toByteArray(StandardCharsets.US_ASCII)
-    val frame = ByteArray(headerBytes.size + 10)
-    System.arraycopy(headerBytes, 0, frame, 0, headerBytes.size)
-    System.arraycopy(byteArrayOf(0xFF.toByte(), 0xD8.toByte()), 0, frame, headerBytes.size, 2)
-    val stream = MjpegInputStream(ByteArrayInputStream(frame))
+    val stream =
+        MjpegInputStream(
+            ByteArrayInputStream(
+                frameWithHeaders(
+                    "Content-Type: image/jpeg\r\nContent-Length: 500\r\n\r\n",
+                    byteArrayOf(0xFF.toByte(), 0xD8.toByte()),
+                )
+            )
+        )
     val result = stream.readMjpegFrame()
     result?.close()
   }
@@ -104,12 +109,15 @@ class MjpegInputStreamTest {
   fun readMjpegFrameWithZeroLengthBodyShouldDropAndReturnNull() {
     // Content-Length 0 makes available() >= 2*contentLength, so the success
     // path is skipped and the "Frame dropped." recovery returns null.
-    val headers = "Content-Type: image/jpeg\r\nContent-Length: 0\r\n\r\n"
-    val headerBytes = headers.toByteArray(StandardCharsets.US_ASCII)
-    val frame = ByteArray(headerBytes.size + 2 + 100)
-    System.arraycopy(headerBytes, 0, frame, 0, headerBytes.size)
-    System.arraycopy(byteArrayOf(0xFF.toByte(), 0xD8.toByte()), 0, frame, headerBytes.size, 2)
-    val stream = MjpegInputStream(ByteArrayInputStream(frame))
+    val stream =
+        MjpegInputStream(
+            ByteArrayInputStream(
+                frameWithHeaders(
+                    "Content-Type: image/jpeg\r\nContent-Length: 0\r\n\r\n",
+                    byteArrayOf(0xFF.toByte(), 0xD8.toByte()) + ByteArray(100),
+                )
+            )
+        )
     assertNull(stream.readMjpegFrame())
   }
 
@@ -118,12 +126,15 @@ class MjpegInputStreamTest {
     // A non-numeric Content-Length throws NumberFormatException (an
     // IllegalArgumentException) inside the header parse; the recovery path
     // re-searches for the header and returns null.
-    val headers = "Content-Type: image/jpeg\r\nContent-Length: abc\r\n\r\n"
-    val headerBytes = headers.toByteArray(StandardCharsets.US_ASCII)
-    val frame = ByteArray(headerBytes.size + 2)
-    System.arraycopy(headerBytes, 0, frame, 0, headerBytes.size)
-    System.arraycopy(byteArrayOf(0xFF.toByte(), 0xD8.toByte()), 0, frame, headerBytes.size, 2)
-    val stream = MjpegInputStream(ByteArrayInputStream(frame))
+    val stream =
+        MjpegInputStream(
+            ByteArrayInputStream(
+                frameWithHeaders(
+                    "Content-Type: image/jpeg\r\nContent-Length: abc\r\n\r\n",
+                    byteArrayOf(0xFF.toByte(), 0xD8.toByte()),
+                )
+            )
+        )
     assertNull(stream.readMjpegFrame())
   }
 
@@ -131,14 +142,21 @@ class MjpegInputStreamTest {
   fun readMjpegFrameWithHugeContentLengthShouldRecover() {
     // A header advertising a body far larger than what follows: the success
     // branch is skipped, the short-skip recovery runs and returns null.
-    val headers = "Content-Type: image/jpeg\r\nContent-Length: 100000\r\n\r\n"
-    val headerBytes = headers.toByteArray(StandardCharsets.US_ASCII)
-    val frame = ByteArray(headerBytes.size + 5)
-    System.arraycopy(headerBytes, 0, frame, 0, headerBytes.size)
-    val tail =
-        byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xD8.toByte(), 0x01.toByte())
-    System.arraycopy(tail, 0, frame, headerBytes.size, tail.size)
-    val stream = MjpegInputStream(ByteArrayInputStream(frame))
+    val stream =
+        MjpegInputStream(
+            ByteArrayInputStream(
+                frameWithHeaders(
+                    "Content-Type: image/jpeg\r\nContent-Length: 100000\r\n\r\n",
+                    byteArrayOf(
+                        0xFF.toByte(),
+                        0xD8.toByte(),
+                        0xFF.toByte(),
+                        0xD8.toByte(),
+                        0x01.toByte(),
+                    ),
+                )
+            )
+        )
     val result = stream.readMjpegFrame()
     result?.close()
   }
