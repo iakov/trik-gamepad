@@ -11,12 +11,11 @@ Each item: commit-per-concern, gated by the full local suite (test lint
 detekt spotbugsDebug jacocoTestReport jacocoTestCoverageVerification
 spotlessCheck) before each push, `git status --short` clean before push.
 
-## Campaign 2 (post-ROADMAP — in progress 2026-08-08)
+## Campaign 2 (post-ROADMAP — DONE 2026-08-08)
 
-Scope set by user decision (2026-08-08). **Strategy: coverage-first** — increase
-test coverage before refactoring, maintain it through refactoring (B4 is the one
-granted exception: it reduces test-writing complexity). Revised order
-B2 → B4 → C → B3 → A → D → E → F. Full detail + execution record:
+Scope and the **coverage-first strategy** (order B2 → B4 → C → B3 → A → D → E,
+with B4 as the one refactor-first exception) were set by user decision — see
+`DECISIONS.md` "Campaign 2 strategy: coverage-first". Full execution record:
 `.PLAN.md` "Campaign 2".
 
 - **B1** ✅ `MagicButtonPanel` extracted (buttons + haptic; direct tests). `ee4a91b`.
@@ -46,8 +45,9 @@ B2 → B4 → C → B3 → A → D → E → F. Full detail + execution record:
 
 ## Campaign 3 — strict full-project review (DONE 2026-08-08)
 
-Full code audit + web best-practice research; findings and durable reference in
-MEMORY.md "Domain review". Priorities: **P0 correctness → P1 leak fix → P2
+Full code audit + web best-practice research; durable reference in
+`docs/architecture.md` (domain knowledge + pitfalls), findings in the "Campaign
+3 execution run" MEMORY entry. Priorities: **P0 correctness → P1 leak fix → P2
 architecture → P3 hygiene** (each item one commit, gate, push; detailed plan:
 `.PLAN.md` "Campaign 3").
 
@@ -98,13 +98,12 @@ uses `HttpURLConnection`, which honors it. So a user who configures a robot at a
 **non-`192.168.77.1` host over plain HTTP loses the video stream** (TCP commands
 still work: `SenderService` uses raw sockets, NSC-transparent).
 
-**Chosen fix (user decision 2026-08-08): raw-socket HTTP client** for the MJPEG
-stream, parallel to `SenderService` — opens a `Socket`, writes the GET request,
-parses the HTTP response head, and hands the body stream to `MjpegInputStream`.
-Bypasses NSC entirely, works for any user host, no manifest/config change. ~40
-lines; re-implements the minimal HTTP framing (request line + headers, response
-`200 OK` + `Content-Length`/chunked). `MjpegInputStream` already parses
-`Content-Length` frames, so the client only needs the response head.
+**Chosen fix (user decision 2026-08-08): raw-socket HTTP client** — rationale
+and rejected alternatives (incl. per-host NSC additions) in `DECISIONS.md`
+"Campaign 5: raw-socket MJPEG HTTP client". Outline: open a `Socket`, write the
+GET request, parse the HTTP response head (`200 OK` + `Content-Length`/chunked),
+and hand the body stream to `MjpegInputStream`; bypasses NSC entirely, ~40
+lines.
 
 **Interim (before the fix):** on a stream-open failure for a non-default host,
 toast pointing at the host/NSC restriction instead of failing silently. Record a
@@ -116,14 +115,16 @@ block.
 
 ## Phase 1 — Instrumented CI without macOS
 
-Explicit decision: **no macOS/GPU runner.** ✅ **DONE — experiment 2 won.**
-`target: aosp_atd` + `-gpu swiftshader_indirect` + the immersive pre-empt +
-`FocusAwareActivityTestRule` passes all 9 instrumented tests (first fully-green
-run `31232406163`, 2026-08-08). The old "aosp_atd never grants focus (8/8)"
-finding predated the pre-empt/focus-wait fixes. The last red run was a CI
-script trap: `android-emulator-runner` runs each `script:` line as its own
-`sh -c`, so the multi-line `if/fi` retry never parsed — fixed as a single-line
-`cmd || { ...; }` (AGENTS.md rule updated). No remaining experiments needed.
+Decision: **no macOS/GPU runner** — rationale and alternatives in `DECISIONS.md`
+"Phase 1 experiment 2: aosp_atd + swiftshader PASSES instrumented". ✅ **DONE —
+experiment 2 won:** `target: aosp_atd` + `-gpu swiftshader_indirect` + the
+immersive pre-empt + `FocusAwareActivityTestRule` passes all 9 instrumented
+tests (first fully-green run `31232406163`, 2026-08-08). The old "aosp_atd
+never grants focus (8/8)" finding predated the pre-empt/focus-wait fixes. The
+last red run was a CI script trap: `android-emulator-runner` runs each
+`script:` line as its own `sh -c`, so the multi-line `if/fi` retry never
+parsed — fixed as a single-line `cmd || { ...; }` (AGENTS.md rule updated). No
+remaining experiments needed.
 
 ## Phase 2 — Legacy API + biggest code smell (local, low risk)
 

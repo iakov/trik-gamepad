@@ -41,8 +41,9 @@ Local instrumented run:
 1. Verify acceleration: `emulator -accel-check` (needs AEHD → returns `0`).
 1. Boot the **`aosp_atd` image** AVD `Atd_API36` — the lightweight, headless,
    CI-oriented image (adopted after it passed 9/9 locally with `-gpu host`;
-   lighter/faster boot than the `default` image). Correct launch (~instant via
-   snapshot, suite ~5 min):
+   lighter/faster boot than the `default` image; rationale + alternatives:
+   `DECISIONS.md` "Local instrumented: adopt aosp_atd"). Correct launch (~instant
+   via snapshot, suite ~5 min):
    `emulator -avd Atd_API36 -no-window -no-audio -no-boot-anim -gpu host`
    (drop `-no-window` to see the UI; keep snapshots enabled for fast reboots).
 1. Wait for `adb shell getprop sys.boot_completed` → `1`.
@@ -56,8 +57,9 @@ Local instrumented run:
 
 > **Do NOT use `-gpu swiftshader_indirect` locally.** Verified: with the
 > software GPU the app window never receives focus and the same suite fails
-> 8/8 with `RootViewWithoutFocusException` — the exact failure CI saw. Local
-> runs must use `-gpu host`.
+> 8/8 with `RootViewWithoutFocusException` — the exact failure CI saw (decision
+> and verification in `DECISIONS.md` "Local instrumented: adopt aosp_atd").
+> Local runs must use `-gpu host`.
 
 > **CI focus flake — root-caused and fixed (2026-08-07).** The
 > `RootViewWithoutFocusException` storm on CI was traced to the immersive
