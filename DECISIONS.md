@@ -681,9 +681,9 @@ ______________________________________________________________________
   cross-repo PRs against `trikset/trik-gamepad`; never sync/push to upstream.
 - **Why:** the maintainer develops and merges on their own fork; upstream is a
   distribution point, not a collaboration target for this project.
-- **Out of scope / consequences:** AGENTS.md "Before push / PR" and MEMORY
-  "Workflows" state the fork-only rule; future sessions must not propose
-  upstream PRs.
+- **Out of scope / consequences:** AGENTS.md "Before push — publishing gate"
+  and MEMORY "Workflows" state the fork-only rule; future sessions must not
+  propose upstream PRs.
 
 ______________________________________________________________________
 

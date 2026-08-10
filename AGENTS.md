@@ -25,9 +25,8 @@ Improvement roadmap: `docs/ROADMAP.md`.
 - `_apk/` — committed release APKs (historical).
 - `.github/workflows/` — CI: build, Robolectric unit tests, lint/detekt/
   spotbugs/jacoco gates, instrumented tests on emulator, plus a **dormant
-  `publish` job** (master-only: on green runs it uploads a debug-signed
-  `releaseDebug` APK artifact for early adopters — see ci.yml; dormant until a
-  master merge lands, do not expect it to run in the single-branch workflow).
+  master-only `publish` job** (uploads a debug-signed `releaseDebug` APK — see
+  ci.yml; dormant in the single-branch workflow, do not expect it to run).
 - `.opencode/skills/` — opencode skills (e.g. release-notes).
 - `docs/architecture.md` — module map, TCP protocol, MJPEG pipeline, test layering.
 - `docs/img/` — screenshots/logos.
@@ -35,13 +34,7 @@ Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Build (from repo root)
 
-- Toolchain (locked in `DECISIONS.md` "AGP 9.3.1 / Gradle 9.5.0 migration LANDED"): **AGP 9.3.1, Gradle 9.5.0, built-in Kotlin**
-  (AGP 9 removed the `org.jetbrains.kotlin.android` plugin — Kotlin compilation
-  is built in; `kotlinOptions {}` is gone, `jvmTarget` defaults to
-  `compileOptions.targetCompatibility`), Java 11 source/target — Gradle runs
-  under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`,
-  `targetSdk 36`, `minSdk 23`, `maxSdk 36` — single main flavor, no product
-  flavors. AGP 9's new DSL is on (no `android.newDsl=false` opt-out).
+- Toolchain (locked in `DECISIONS.md` "AGP 9.3.1 / Gradle 9.5.0 migration LANDED"): **AGP 9.3.1, Gradle 9.5.0, built-in Kotlin** (AGP 9 removed the `org.jetbrains.kotlin.android` plugin — DSL/jvmTarget detail: DECISIONS.md). Java 11 source/target, Gradle runs under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`, `targetSdk 36`, `minSdk 23`, `maxSdk 36` — single main flavor, no product flavors.
 - `org.gradle.configuration-cache=true` — re-enabled under AGP 9; do not disable it again (rationale: DECISIONS.md).
 - Three build types (`debug`/`release`/`releaseDebug`); `./gradlew test` runs
   Robolectric under all three in parallel JVMs — unit tests must use ephemeral
@@ -79,18 +72,18 @@ configurations, update this section and the referenced config files.
   into the new rather than deleting outright; confirm each deletion is
   intentional.
 
-### Before push / PR
+### Before push — publishing gate (commit-sprint)
 
 - Fork-only workflow: work lives in the personal fork (origin remote; run `git remote -v` for the URL). Never create PRs against upstream `trikset/trik-gamepad`.
 - Branch from fork `master` (== `origin/master`); name `feat/`, `fix/`, `docs/`, `style/`, `refactor/`, or `chore/`.
 - Never push to `master` directly — always a within-fork PR (`gh pr create --base master`), squash-merged after green CI (see Guardrails).
 - Squash-fix mistakes before push: `git reset --soft HEAD~1 && git commit`.
+- **Commit cheaply during development** — pre-commit formats only, no heavy gates per commit. All validation batches here: run the canonical gate once (`uv run python scripts/gate.py`) and re-iterate fix→gate until green before pushing. Test changes additionally: full 3-variant `test` suite twice. `git status --short` must be clean (local gates validate the working tree, not the commits).
 - After pushing new commits, update the PR body (stale bodies mislead):
   `gh pr edit <N> --body-file .tmp/pr-body.md`; verify bodies with
   `gh pr view --json body` for mojibake. *Dormant during the current
   single-branch no-PR execution plan — applies once the within-fork
   PR workflow resumes.*
-- Re-validate from repo root: `./gradlew test` and `./gradlew lint`.
 - **Docs pushes (`.md`-only changes): never wait for green CI** — if a docs push spoils CI, fix it before the next campaign (campaigns start only from green CI).
 - If `AGENTS.md` changed: `git diff HEAD -- AGENTS.md`, check every added/removed line against the boundary test (see Guardrails — Documenting decisions).
 
@@ -132,24 +125,14 @@ configurations, update this section and the referenced config files.
 - **Single-branch CI cache trap**: `gradle/actions/setup-gradle` `cache-read-only: ${{ github.ref != 'refs/heads/master' }}` means the cache is **never written** when the workflow never pushes to `master` (single-branch no-PR) — every CI run is cold. Set `cache-read-only: false` and verify a follow-up run is faster. Measured here: build gate 4m27s → 1m05s (~4×).
 - **Measure the second CI run after a build change**: the first run after a `settings.gradle`/`build.gradle` change is polluted by config-cache invalidation — compare the second run on the same head, not the first.
 - **Async turns**: capture a process handle (`Start-Process -PassThru`), verify liveness immediately, then a single bounded readiness poll in the same working loop — a turn is not complete until the readiness result is recorded; never end a turn on a bare liveness check.
-- **Never pipe long-lived children (gradle/emulator) through Tee/Select (Windows-only — see "Windows/PowerShell quirks")** — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) and use `--no-daemon`/`--stop` for probes.
 - **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green. Concrete trigger: a static-analysis task that shows `UP-TO-DATE` right after you added/renamed source files (e.g. detekt can stay UP-TO-DATE when new files arrive via an untracked path) — force one `./gradlew detekt --rerun-tasks` pass before trusting the gate.
-- **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries); **run the full 3-variant `test` suite twice** before pushing test changes.
+- **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries).
 - **Format before you gate — automate, don't remember.** `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`; run them before the gate or `spotlessCheck` fails. Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` (it rewrites `.kt` while `test` compiles them — a race). Formatting is automated: pre-commit hooks (spotless-apply on `.kt` via `scripts/spotless_apply.py` — cross-platform; mdformat on `.md`) + `scripts/gate.py` (two invocations — see Commands).
 - **Generate lint baselines with the aggregate `lint` task**, not `lintDebug`; env-dependent checks (e.g. `OldTargetApi`) go in `lint.xml`, not the baseline.
-- **CI `script:` blocks run per-line.** `reactivecircus/android-emulator-runner`
-  splits `script:` into individual lines and runs each as its own `sh -c`
-  (comments dropped). Multi-line `if/fi` blocks, `\` continuations, and
-  `while` loops never work — any conditional must be a single line
-  (`cmd || { ...; }`). Validate every line with `sh -n` before pushing.
-- **Distinguish infra from code failures** (adb boot flake, GHA action-download) — triage by job/step and boot-vs-tests; keep a note of the last known-good CI run id.
-- **When a CI "fix" doesn't hold, read the step timestamps, not just the failure**: if a setup/prerequisite step ran before its dependency was ready (e.g. `settings put` before the settings provider was up), the race is the bug — make the step wait for and verify its prerequisite.
-- **A focus failure after a targetSdk bump is usually an OS overlay, not app code** — check `dumpsys window` `mCurrentFocus` for system windows before editing the app.
+- **CI/emulator traps** (per-line `script:` blocks, infra-vs-code triage, step-timestamp races, focus-overlay): MEMORY.md "CI quirks".
 - **Gaps escalate** (1st: document · 2nd: automate · 3rd+: tool config); **verify "runs automatically" claims with a command**; **measure, don't estimate**.
 - **3 identical failures → stop and read the shadow/API source**, don't tweak-and-rerun. This applies to **any repeated tooling signal, not just test assertions**: the same message appearing N≥3 times across commands (e.g. `spotlessKotlinCheck FAILED`, "configuration cache cannot be reused") means a systemic cause — find and fix it, don't absorb it.
 - **Never read `window`/activity-scoped state in a field initializer** — `Activity.window` is only assigned during `attach()` (after the constructor), so a field initializer referencing it throws in Robolectric ("Window creation failed!") and NPEs on device. Use `by lazy` or a provider lambda; declare such fields with a default that defers the access.
-- **Push gates**: the full local gate list is run and logged, and **`git status --short` must be clean** before every push (local gates validate the working tree, not the commits).
-- **`scripts/__pycache__/` regenerates on every Python-script run** — `gate.py`/`spotless_apply.py` import `_gradle.py`, leaving a `scripts/__pycache__/`. Gitignored since Campaign 7 (bytecode is garbage) — no staging action needed.
 - **CI cadence**: one bounded run check (~3 min) after each push; if no run appears, document it and re-check at the next push rather than blocking.
 
 ### On tool error
@@ -178,17 +161,14 @@ configurations, update this section and the referenced config files.
 - **Suppressions**: every `@Suppress*` / `//noinspection` / `lint.xml` relaxation carries a reasoning comment or a recorded rationale in `MEMORY.md`.
 - **Tooling assumptions**: never assume tooling behaves intuitively — verify options against `--help`/docs/schema with a read-only probe; route complex arguments through a `.tmp/` file rather than inlining. (Shell-escaping differences, e.g. PowerShell vs bash: "Windows/PowerShell quirks".)
 - **Re-read `.md` diffs after mdformat**: line-start `+`/`-`/`*` mid-paragraph get reflowed into lists — never start a wrapped line with a list character.
-- **Documenting decisions**: `AGENTS.md` stores rules/constraints only — never rationale. A *decision* (problem → alternatives → why → out-of-scope) belongs in `DECISIONS.md`; a fact/quirk/retrospective belongs in `MEMORY.md`. Removing a documented rule changes agent behavior — only delete if provably wrong; relocate rationale, never drop it.
-- **Safe-updates mirror** (when removing content): would removing this change agent behavior? → keep it. Is the claim provably wrong? → only then delete/correct, verified against executable sources (config, workflow, code). Does it enforce a docs/structure contract? → keep structural-convention rules even when the wording looks generic.
-- **Merge, don't delete**: when replacing a section, merge old content into the new rather than deleting outright; confirm each deletion is intentional.
-- **Generalize, then extract**: on docs-drift review, read `AGENTS.md` top-to-bottom for generalization and push detail/rationale down to `MEMORY.md`.
-- **Progressive disclosure**: `AGENTS.md` = pointers, `MEMORY.md`/`DECISIONS.md` = on-demand detail; keep context small and focused.
+- **Documenting decisions**: `AGENTS.md` stores rules/constraints only — never rationale. A *decision* (problem → alternatives → why → out-of-scope) belongs in `DECISIONS.md`; a fact/quirk/retrospective belongs in `MEMORY.md`. Removing a documented rule changes agent behavior — only delete if provably wrong; relocate rationale, never drop it. Would removing this change agent behavior? → keep it. Is the claim provably wrong (verified against executable sources — config, workflow, code)? → only then delete/correct. Does it enforce a docs/structure contract? → keep structural-convention rules even when the wording looks generic.
+- **Merge, don't delete**: when replacing a section, merge old content into the new rather than deleting outright; confirm each deletion is intentional. On docs-drift review, read `AGENTS.md` top-to-bottom and push detail/rationale down to `MEMORY.md`/`DECISIONS.md` — `AGENTS.md` = pointers, the rest = on-demand detail; keep context small and focused.
 - **Session context is ephemeral**: persist decisions to `AGENTS.md`/`DECISIONS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
 - **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
 - **Code comments are first-level documentation**: re-validate comments when the surrounding code changes — a comment that describes a no-longer-true constraint or gives misleading advice is garbage (hit 2026-08-10: the NSC whitelist comment and the `main`-child-order comment both went stale within the same campaign). No stale or misleading comments; when in doubt, delete the comment rather than leave a wrong one.
 - **Machine-local workarounds never enter repo docs**: host-specific repo mirrors, init scripts, URLs and other local-host hacks live on the host in their corresponding places (e.g. the Gradle user-home), or in a gitignored `.tooling.md` if no other place exists — repo docs must not reference them.
 - **Verify toolchain/dependency-manager names against executable sources** (build files, lockfiles) before writing them into any doc.
-- **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`, pref/measure helpers, data-driven tables) instead of copy-pasting. The jscpd gate (in `scripts/gate.py` + CI) fails on new clones ≥ 50 tokens and `gate.py` prints the lizard token trend. **Dedup drives the token number, not table-ization**; a table row's expected value must not depend on an earlier row's state (reset the fixture per row). Rationale + details: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric" + TESTING.md "Test quality metrics".
+- **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`, pref/measure helpers, data-driven tables) instead of copy-pasting. **Dedup drives the token number, not table-ization**; a table row's expected value must not depend on an earlier row's state (reset the fixture per row). Rationale + details: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric" + TESTING.md "Test quality metrics".
 - **Mark dormant hooks**: a rule/hook that does not apply to the current phase must say so explicitly (e.g. PR-workflow hooks are dormant during the single-branch no-PR execution plan) — otherwise it silently misdirects agents into workflow artifacts that don't exist yet.
 
 ## Commands
@@ -212,10 +192,6 @@ Test-quality tooling (Campaign 6 — see TESTING.md "Test quality metrics"):
 uv sync                                       # (re)create .venv from pyproject.toml + uv.lock (dev deps: lizard, pre-commit, mdformat)
 npx -y jscpd app/src/test app/src/androidTest --config .jscpd.json   # hard duplication gate (fails on new clones >= 50 tokens; `paths` config key is ignored, positional dirs required)
 uv run lizard -l kotlin app/src/test app/src/androidTest --csv   # per-function token counts (summed = logical SLOC trend)
-```
-
-```sh
-uv sync                                      # one command: creates/refreshes repo-local .venv (gitignored) from pyproject.toml + uv.lock (dev deps: lizard, pre-commit, mdformat)
 uv run pre-commit run --all-files            # venv-agnostic (resolves .venv/bin on POSIX, .venv/Scripts on Windows)
 uvx mdformat <file>.md
 ```
@@ -237,7 +213,7 @@ rules.
 - **`gh` run commands take the run **id**, not a PowerShell run object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
 - **`gh run view --json ... --jq "<expr>"` with embedded quotes breaks under PowerShell** ("accepts at most 1 arg(s), received N") — the quoted `--jq` expression gets mangled in argument passing. Use plain `--json status,conclusion` or route the expression through a `.tmp/` file.
 - **PowerShell escaping differs from bash** (backticks, `-1` in `git commit -m`); route complex arguments through a `.tmp/` file rather than inlining.
-- **Cold Gradle daemon spawn hangs the caller until the daemon detaches (Windows handle inheritance)**: the build prints and finishes fast, but a freshly-spawned daemon inherits the tool's output handles, so the completion signal (pipe EOF) waits until the daemon releases them after startup (`jps -l` shows the orphan `GradleDaemon`). The `*> log` file redirect alone does **not** fix it — use `--no-daemon` for tool-driven Gradle probes. POSIX daemons detach cleanly (re-audit on the first POSIX box).
+- **Cold Gradle daemon spawn hangs the caller until the daemon detaches (Windows handle inheritance)**: the build prints and finishes fast, but a freshly-spawned daemon inherits the tool's output handles, so the completion signal (pipe EOF) waits until the daemon releases them after startup (`jps -l` shows the orphan `GradleDaemon`). Never pipe long-lived children (gradle/emulator) through Tee/Select — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) instead, and the file redirect alone still does **not** fix it — use `--no-daemon`/`--stop` for tool-driven Gradle probes. POSIX daemons detach cleanly (re-audit on the first POSIX box).
 
 ## Memory index
 

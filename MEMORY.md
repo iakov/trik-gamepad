@@ -255,6 +255,24 @@ Always measure the second run after a build-script change.
 Triage rule: check which job/step failed and whether the failure is at boot
 vs tests before touching code.
 
+**Workflow-editing + triage traps (moved from AGENTS.md 2026-08-10):**
+
+- **CI `script:` blocks run per-line.** `reactivecircus/android-emulator-runner`
+  splits `script:` into individual lines and runs each as its own `sh -c`
+  (comments dropped). Multi-line `if/fi` blocks, `\` continuations, and
+  `while` loops never work — any conditional must be a single line
+  (`cmd || { ...; }`). Validate every line with `sh -n` before pushing.
+- **Distinguish infra from code failures** (adb boot flake, GHA action-download)
+  — triage by job/step and boot-vs-tests; keep a note of the last known-good CI
+  run id.
+- **When a CI "fix" doesn't hold, read the step timestamps, not just the
+  failure**: if a setup/prerequisite step ran before its dependency was ready
+  (e.g. `settings put` before the settings provider was up), the race is the
+  bug — make the step wait for and verify its prerequisite.
+- **A focus failure after a targetSdk bump is usually an OS overlay, not app
+  code** — check `dumpsys window` `mCurrentFocus` for system windows before
+  editing the app.
+
 ## Workflows
 
 ### Branch/PR
