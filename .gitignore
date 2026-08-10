@@ -21,6 +21,9 @@ local.properties
 # Work-in-progress plan (contains local paths / account names; not for version control)
 .PLAN.md
 
+# Machine-local tooling notes (fallback for local-host hacks; see AGENTS.md)
+.tooling.md
+
 # Eclipse project files (machine-specific, contain local tool paths)
 .classpath
 .project

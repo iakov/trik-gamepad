@@ -121,6 +121,7 @@ configurations, update this section and the referenced config files.
 
 - From repo root: `./gradlew test` (Robolectric, no device needed); a single test via `./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.<method>"`.
 - Instrumented tests need a running emulator/device (hypervisor: Windows AEHD / Linux KVM / macOS Hypervisor.framework — verify with `emulator -accel-check`); boot with `-gpu host` (never `swiftshader_indirect`) and pre-empt the immersive-mode confirmation (`adb shell settings put secure immersive_mode_confirmations confirmed`). Full recipe + per-platform table: TESTING.md.
+- `connectedDebugAndroidTest` fails under the configuration cache with an AGP/UTP serialization error (`field __testRunnerFactory__ ... DefaultConfigurableFileCollection`) — run it with `--no-configuration-cache`.
 
 ### Operational rules (command hygiene)
 
@@ -130,7 +131,7 @@ configurations, update this section and the referenced config files.
 - **Single-branch CI cache trap**: `gradle/actions/setup-gradle` `cache-read-only: ${{ github.ref != 'refs/heads/master' }}` means the cache is **never written** when the workflow never pushes to `master` (single-branch no-PR) — every CI run is cold. Set `cache-read-only: false` and verify a follow-up run is faster. Measured here: build gate 4m27s → 1m05s (~4×).
 - **Measure the second CI run after a build change**: the first run after a `settings.gradle`/`build.gradle` change is polluted by config-cache invalidation — compare the second run on the same head, not the first.
 - **Async turns**: capture a process handle (`Start-Process -PassThru`), verify liveness immediately, then a single bounded readiness poll in the same working loop — a turn is not complete until the readiness result is recorded; never end a turn on a bare liveness check.
-- **Never pipe long-lived children (gradle/emulator) through Tee/Select** — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) and use `--no-daemon`/`--stop` for probes.
+- **Never pipe long-lived children (gradle/emulator) through Tee/Select (Windows-only — see "Windows/PowerShell quirks")** — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) and use `--no-daemon`/`--stop` for probes.
 - **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer loaded its config and analyzed sources before trusting green. Concrete trigger: a static-analysis task that shows `UP-TO-DATE` right after you added/renamed source files (e.g. detekt can stay UP-TO-DATE when new files arrive via an untracked path) — force one `./gradlew detekt --rerun-tasks` pass before trusting the gate.
 - **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries); **run the full 3-variant `test` suite twice** before pushing test changes.
 - **Format before you gate — automate, don't remember.** `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`; run them before the gate or `spotlessCheck` fails. Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` (it rewrites `.kt` while `test` compiles them — a race). Formatting is automated: pre-commit hooks (spotless-apply on `.kt` via `scripts/spotless_apply.py` — cross-platform; mdformat on `.md`) + `scripts/gate.py` (two invocations — see Commands).
@@ -182,6 +183,7 @@ configurations, update this section and the referenced config files.
 - **Progressive disclosure**: `AGENTS.md` = pointers, `MEMORY.md`/`DECISIONS.md` = on-demand detail; keep context small and focused.
 - **Session context is ephemeral**: persist decisions to `AGENTS.md`/`DECISIONS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
 - **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
+- **Machine-local workarounds never enter repo docs**: host-specific repo mirrors, init scripts, URLs and other local-host hacks live on the host in their corresponding places (e.g. the Gradle user-home), or in a gitignored `.tooling.md` if no other place exists — repo docs must not reference them.
 - **Verify toolchain/dependency-manager names against executable sources** (build files, lockfiles) before writing them into any doc.
 - **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`, pref/measure helpers, data-driven tables) instead of copy-pasting. The jscpd gate (in `scripts/gate.py` + CI) fails on new clones ≥ 50 tokens and `gate.py` prints the lizard token trend. **Dedup drives the token number, not table-ization**; a table row's expected value must not depend on an earlier row's state (reset the fixture per row). Rationale + details: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric" + TESTING.md "Test quality metrics".
 - **Mark dormant hooks**: a rule/hook that does not apply to the current phase must say so explicitly (e.g. PR-workflow hooks are dormant during the single-branch no-PR execution plan) — otherwise it silently misdirects agents into workflow artifacts that don't exist yet.
@@ -232,6 +234,7 @@ rules.
 - **`gh` run commands take the run **id**, not a PowerShell run object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
 - **`gh run view --json ... --jq "<expr>"` with embedded quotes breaks under PowerShell** ("accepts at most 1 arg(s), received N") — the quoted `--jq` expression gets mangled in argument passing. Use plain `--json status,conclusion` or route the expression through a `.tmp/` file.
 - **PowerShell escaping differs from bash** (backticks, `-1` in `git commit -m`); route complex arguments through a `.tmp/` file rather than inlining.
+- **Cold Gradle daemon spawn hangs the caller until the daemon detaches (Windows handle inheritance)**: the build prints and finishes fast, but a freshly-spawned daemon inherits the tool's output handles, so the completion signal (pipe EOF) waits until the daemon releases them after startup (`jps -l` shows the orphan `GradleDaemon`). The `*> log` file redirect alone does **not** fix it — use `--no-daemon` for tool-driven Gradle probes. POSIX daemons detach cleanly (re-audit on the first POSIX box).
 
 ## Memory index
 

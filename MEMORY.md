@@ -1333,3 +1333,64 @@ table (Windows AEHD / Linux KVM / macOS Hypervisor.framework, macOS unverified)
   `pyproject.toml`/`gate.py`/commit). Verify against `git status`/filesystem
   before trusting a state summary (existing "verify claims with a command"
   rule confirmed by incident).
+
+### [2026-08-10] Campaign 8 execution run — MJPEG video self-healing
+
+**Goal:** restore the video-stream safety net lost when the unconditional 30 s
+MJPEG restart was removed (Campaign 3 P1) — the user-facing regression (robot
+out of wifi range and back, robot not yet booted, foldable surface recreation)
+left the video black until the user left and re-entered. Plan + acceptance:
+`docs/ROADMAP.md` "Campaign 8". Commits `d1a956f` (roadmap) + `f68bce9`
+(README) + `0645316` (feat) + `efd3e3d` (tests, TDD).
+
+**What landed:** `VideoRetryController` (injectable, main-thread `Handler`
+tick, 5 s interval; reloads while resumed ∧ control `connectionState is Connected` — the keepalive proxy — ∧ video configured ∧ view not playing;
+immediate reload on the control-`Connected` edge; cancelled on pause) ·
+`VideoStreamLoader.load(url, onResult)` (a failed open is no longer silent —
+feeds `onLoadFailed`/`onLoadSuccess`) · `MjpegView.isPlaying()` ·
+`MainActivity` wiring (collector `Connected` branch → `onControlConnected`,
+`onStreamError` → controller, `onResume`/`onPause` arm/disarm). Acceptance:
+video resumes ≤10 s after the robot is reachable (5 s tick + ≤5 s connect).
+TDD: RED tests reproduced the regression first (missing API = compile red;
+integration `SyntheticMjpegServer` tests cover server-down → retry → server-up
+and mid-stream drop → reconnect), then GREEN.
+
+**Verification (measured):** full 3-variant `./gradlew test` ×2 green; `gate.py`
+GATE PASSED — jacoco 95/80 (line 0.9746, branch 0.8016), jscpd 0 clones, lizard
+11,839 tokens (< A0 baseline 12,659), pre-commit all hooks green; push CI run
+`31339960302` fully green (build + instrumented).
+
+**Tooling / process lessons:**
+
+- **`connectedDebugAndroidTest` fails under the configuration cache** with an
+  AGP/UTP serialization error (`field __testRunnerFactory__ of type DefaultConfigurableFileCollection`) — run it with `--no-configuration-cache`.
+- **Local instrumented suite verified:** `connectedDebugAndroidTest --no-configuration-cache --no-daemon` passes **9/9 on both emulators**
+  (Atd_API36 + Swiftshader_API36).
+- **Windows-only: cold Gradle daemon spawn hangs the caller until the daemon
+  detaches** (build output prints, but the tool's completion signal waits on the
+  daemon's inherited output handles; `jps -l` shows the orphan `GradleDaemon`).
+  The `*> log` file redirect alone does not fix it — use `--no-daemon` for
+  tool-driven Gradle probes. POSIX daemons detach cleanly. See AGENTS.md
+  "Windows/PowerShell quirks".
+- **A jacoco branch ratio that oscillates across runs is an async test, not
+  formatting:** ktfmt (spotlessKotlinApply) is whitespace-only and cannot change
+  bytecode branch structure. Root cause here: the `MainActivity` wiring test's
+  real-executor `load` posted `onResult` to the main looper after teardown,
+  racing the flush (0.7989 vs 0.8016). Fixed with a bounded "settle" loop
+  (`flushForegroundThreadScheduler() + Thread.sleep(20)` until deadline) so the
+  `onLoadFailed` path is deterministically covered.
+- **New feature branches must be covered or the 95/80 gate fails:** the retry
+  controller + MainActivity wiring added ~20 branches; covered via controller
+  unit tests (each gate combination: resumed/active × shouldReload) + one
+  `MainActivity` Connected test + an `onTick` simplification (main-thread-only
+  logic needs no `!active` liveness re-checks — dead branches, deleted).
+- **jscpd hard gate catches new test duplication:** the two integration tests
+  shared a controller-wiring block (127 tokens) and the loader tests a
+  load-and-collect block (51 tokens) → extracted shared helpers
+  (`retryController(view, loader, url)` returning the reload action;
+  `loadAndAssertResult(executor, url, expected)`), which also lowered the lizard
+  token trend.
+- **TDD on a missing API = compile red:** writing the tests against the intended
+  `load(url, onResult)`/`isPlaying()`/`VideoRetryController` API fails to
+  compile first; adding no-op production skeletons would make the behavior
+  tests fail for the right reason before implementing.
