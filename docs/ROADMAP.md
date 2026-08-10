@@ -390,7 +390,7 @@ execution run".
 
 | Estimated | Start | End | Actual |
 |-----------|-------|-----|--------|
-| ~10.5 h | 2026-08-10 | — | — |
+| ~10.5 h | 2026-08-10 | 2026-08-10 | ≈10 h (approximate; precise per-phase tracking from the next campaign) |
 
 - **Settings restructure** — root shows Basic categories inline (Robot
   connection / Video / Controls) + a nested "Advanced settings" sub-screen
@@ -420,3 +420,5 @@ execution run".
   9/9 on both API-36 emulators; detekt `TooManyFunctions` 25→31 (adapter/
   override rationale). Instrumented `SettingsTests` rewritten index→id-based
   with sub-screen navigation.
+  **CAMPAIGN 10 COMPLETE** (commits `e6f556a`, `60773e0`; retrospective in
+  MEMORY.md).
