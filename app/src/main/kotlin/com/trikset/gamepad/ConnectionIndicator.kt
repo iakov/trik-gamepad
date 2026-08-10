@@ -3,9 +3,9 @@ package com.trikset.gamepad
 import androidx.annotation.ColorRes
 
 /**
- * Maps the TCP [ConnectionState] to the gear-button border color (Campaign 9 A). Pure so the
- * mapping is directly unit-testable; [MainActivity] applies the color to the
- * `@+id/settingsButtonBg` stroke at runtime without adding a new touch surface.
+ * Maps the TCP [ConnectionState] to the gear-button border color. Pure so the mapping is directly
+ * unit-testable; [MainActivity] applies the color to the `@+id/settingsButtonBg` stroke at runtime
+ * without adding a new touch surface.
  */
 class ConnectionIndicator {
 

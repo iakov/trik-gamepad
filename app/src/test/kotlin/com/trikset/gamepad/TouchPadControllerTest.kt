@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Pure math tests for [TouchPadController] (ROADMAP Phase B4). */
+/** Pure math tests for [TouchPadController]. */
 class TouchPadControllerTest {
 
   private fun controller(): TouchPadController = TouchPadController()

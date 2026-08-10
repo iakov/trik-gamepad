@@ -5,11 +5,11 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Pure touch-coordinate math for the square gamepad pads. Extracted from [SquareTouchPadLayout]
- * (ROADMAP Phase B4) so the clamp and sensitivity rules are directly unit-testable. Maps a touch
- * point in pad coordinates (0..[maxX], 0..[maxY]) into the robot command space (-100..100) and
- * applies the hysteresis gate that suppresses tiny movements. The controller owns the previous
- * command (prevX/prevY) so [nextCoordinates] has a short signature.
+ * Pure touch-coordinate math for the square gamepad pads. Extracted from [SquareTouchPadLayout] so
+ * the clamp and sensitivity rules are directly unit-testable. Maps a touch point in pad coordinates
+ * (0..[maxX], 0..[maxY]) into the robot command space (-100..100) and applies the hysteresis gate
+ * that suppresses tiny movements. The controller owns the previous command (prevX/prevY) so
+ * [nextCoordinates] has a short signature.
  */
 class TouchPadController {
 

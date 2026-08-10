@@ -32,7 +32,7 @@ class RawSocketHttpStreamTest : RobolectricTestBase() {
       val port = server.start()
       // 127.0.0.1 is NOT the NSC-whitelisted default robot host, so a cleartext
       // HttpURLConnection to it would be blocked on device. The raw socket must
-      // not care about NSC (Campaign 5).
+      // not care about NSC.
       val url = URL("http://127.0.0.1:$port/?action=stream")
       val stream = RawSocketHttpStream.open(url)
       try {

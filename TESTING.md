@@ -201,11 +201,11 @@ Every batch of changes touching `SenderService` or the tests should consider:
 - Instrumented: orientation (landscape-only activity), fullscreen/immersive UI,
   settings-driven host/port/video-URI changes.
 
-## Test quality metrics (Campaign 6)
+## Test quality metrics
 
 Tests are code: keep logical SLOC low and re-use what is similar. Two metrics
-(Campaign 6; rationale + alternatives: `DECISIONS.md` "[2026-08-09] Test logical
-SLOC metric"):
+(rationale + alternatives: `DECISIONS.md` "[2026-08-09] Test logical SLOC
+metric"):
 
 - **Logical SLOC = summed per-class `token_count`** from
   `lizard -l kotlin app/src/test app/src/androidTest` (a Halstead-N proxy:

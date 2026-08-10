@@ -16,7 +16,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * End-to-end MJPEG decode tests against a real HTTP [SyntheticMjpegServer] (Campaign 4). Runs under
+ * End-to-end MJPEG decode tests against a real HTTP [SyntheticMjpegServer]. Runs under
  * [GraphicsMode.Mode.NATIVE] so [BitmapFactory] does **real** JPEG decoding (the default
  * Robolectric graphics mode returns fake bitmaps, which would make the correctness + performance
  * assertions meaningless). The app's own [VideoStreamLoader.openStream] is the client, so this

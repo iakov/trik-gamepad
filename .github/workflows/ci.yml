@@ -56,9 +56,9 @@ jobs:
           -PpreDexEnable=false
           --build-cache
 
-      # Campaign 6 D1: hard test-duplication gate. Any cloned block >= 50 tokens
-      # in the unit/androidTest sources fails the build (import tokens excluded
-      # via .jscpd.json). The logical-SLOC token trend is local-only (gate.ps1).
+      # Hard test-duplication gate. Any cloned block >= 50 tokens in the
+      # unit/androidTest sources fails the build (import tokens excluded via
+      # .jscpd.json). The logical-SLOC token trend is local-only (gate.py).
       - name: Test duplication gate (jscpd)
         run: npx -y jscpd app/src/test app/src/androidTest --config .jscpd.json --reporters console
 
@@ -104,12 +104,12 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2.38.0
         with:
           api-level: 36
-          # aosp_atd retry (Phase 1 experiment 2): the original "aosp_atd +
-          # swiftshader NEVER grants focus" finding predates the immersive
-          # pre-empt + focus-wait fixes (ci.yml pre-empt, FocusAwareActivityTestRule),
-          # so re-test aosp_atd now that focus handling exists. aosp_atd is the
-          # headless-optimized image (smaller boot + less render load than
-          # pixel_5 default), which also probes the swiftshader render-load theory.
+          # aosp_atd retry: the original "aosp_atd + swiftshader NEVER grants
+          # focus" finding predates the immersive pre-empt + focus-wait fixes
+          # (ci.yml pre-empt, FocusAwareActivityTestRule), so re-test aosp_atd now
+          # that focus handling exists. aosp_atd is the headless-optimized image
+          # (smaller boot + less render load than pixel_5 default), which also
+          # probes the swiftshader render-load theory.
           target: aosp_atd
           arch: x86_64
           cores: 4

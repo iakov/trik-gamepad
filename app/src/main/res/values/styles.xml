@@ -17,8 +17,8 @@
         <!-- All customizations that are NOT specific to a particular API-level can go here. -->
     </style>
 
-    <!-- Campaign 9 E: Settings matches the main screen's dark full-screen look
-         (the old Light variant clashed with the gamepad's dark immersive UI). -->
+    <!-- Settings matches the main screen's dark full-screen look (the old Light
+         variant clashed with the gamepad's dark immersive UI). -->
     <style name="Theme.AppCompat.NoActionBar.FullScreen" parent="@style/Theme.AppCompat.NoActionBar">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowActionBar">false</item>

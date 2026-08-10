@@ -1,8 +1,7 @@
 """Shared cross-platform Gradle wrapper resolution for trik-gamepad scripts.
 
 Picks `gradlew.bat` on Windows and `./gradlew` elsewhere so the Python tooling
-(gate.py, spotless_apply.py) runs unchanged on Windows / Linux / macOS
-(Campaign 7).
+(gate.py, spotless_apply.py) runs unchanged on Windows / Linux / macOS.
 """
 
 from __future__ import annotations

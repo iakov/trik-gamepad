@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
-/** Pure math tests for [WheelController] (ROADMAP Phase 2-F). */
+/** Pure math tests for [WheelController]. */
 class WheelControllerTest {
 
   private val controller = WheelController()

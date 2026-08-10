@@ -12,10 +12,10 @@ import org.apache.commons.io.input.BoundedInputStream
 
 /**
  * Opens an HTTP response body over a raw [Socket], bypassing Network Security Config so plain-HTTP
- * MJPEG streams work for any user-configured robot host (Campaign 5 — see DECISIONS.md). Sends the
- * GET request, parses the response head (status line + headers), and exposes a stream positioned at
- * the body, handling `Content-Length`, chunked transfer-encoding, and the connection-until-close
- * case MJPEG servers actually use. Closing the stream closes the socket.
+ * MJPEG streams work for any user-configured robot host. Sends the GET request, parses the response
+ * head (status line + headers), and exposes a stream positioned at the body, handling
+ * `Content-Length`, chunked transfer-encoding, and the connection-until-close case MJPEG servers
+ * actually use. Closing the stream closes the socket.
  */
 class RawSocketHttpStream
 private constructor(

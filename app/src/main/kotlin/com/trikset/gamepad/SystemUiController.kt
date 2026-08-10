@@ -9,10 +9,10 @@ import androidx.core.view.WindowInsetsControllerCompat
 
 /**
  * Owns the immersive system-bar visibility and the delayed auto-hide for the gamepad. Extracted
- * from MainActivity (ROADMAP Phase B2) so the window/insets plumbing is isolated from the activity
- * lifecycle. The [Window], the main view and the action bar are injected as providers so the
- * controller can be constructed before the view hierarchy exists (fields initialize before
- * `onCreate`'s `setContentView`).
+ * from MainActivity so the window/insets plumbing is isolated from the activity lifecycle. The
+ * [Window], the main view and the action bar are injected as providers so the controller can be
+ * constructed before the view hierarchy exists (fields initialize before `onCreate`'s
+ * `setContentView`).
  */
 class SystemUiController(
     private val window: Window,

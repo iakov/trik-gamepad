@@ -15,7 +15,7 @@ import java.util.Locale
  * Owns [MainActivity]'s preference-change handling: retargets the [sender] on host/port changes,
  * rewrites the video URI when the host changes, animates pad opacity, parses the video URL, clamps
  * the wheel step and validates the keepalive timeout. Extracted from MainActivity's inline listener
- * (ROADMAP Phase 2-E) so the logic is directly testable without reflection.
+ * so the logic is directly testable without reflection.
  */
 class MainActivitySettingsController(
     context: Context,
@@ -100,7 +100,7 @@ class MainActivitySettingsController(
     }
 
     val defAlpha = PADS_ALPHA_DEFAULT
-    // SeekBarPreference (Campaign 9 C) stores Int; legacy String values are still honored.
+    // SeekBarPreference stores Int; legacy String values are still honored.
     val padsAlpha = readInt(sharedPreferences, SettingsFragment.SK_SHOW_PADS, defAlpha)
     val alpha = Math.max(0, Math.min(ALPHA_MAX, padsAlpha)) / ALPHA_MAX.toFloat()
     ui.animatePadsAlpha(alpha, prevAlpha)

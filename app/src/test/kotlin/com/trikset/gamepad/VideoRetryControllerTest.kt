@@ -15,9 +15,9 @@ import org.robolectric.annotation.LooperMode
 import org.robolectric.annotation.LooperMode.Mode.PAUSED
 
 /**
- * Campaign 8: deterministic retry-loop tests under the PAUSED main looper. The tick interval is
- * shortened to 1000 ms and the retry-gate predicates are injected, so "control connection connected
- * / not playing" is simulated without sockets.
+ * Deterministic retry-loop tests under the PAUSED main looper. The tick interval is shortened to
+ * 1000 ms and the retry-gate predicates are injected, so "control connection connected / not
+ * playing" is simulated without sockets.
  */
 @RunWith(RobolectricTestRunner::class)
 @LooperMode(PAUSED)

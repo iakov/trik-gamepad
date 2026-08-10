@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Campaign 9 E: night-mode variants of the brand greens keep contrast on dark backgrounds. -->
+    <!-- Night-mode variants of the brand greens keep contrast on dark backgrounds. -->
     <color name="greenlight">#8BD866</color>
     <color name="greendark">#6FA855</color>
 </resources>

@@ -9,10 +9,10 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * One-shot test TCP server for the unit suite (Campaign 6 B1). Binds an **ephemeral** port (each of
- * the 3 parallel unit-test JVMs gets its own — never a fixed port, TESTING.md), accepts a single
- * client, and records every received line until the socket is closed. Merges the old nested
- * `DummyServer` (SenderServiceTest) and `ReadUntilStopServer` (SenderServiceAdvancedTest).
+ * One-shot test TCP server for the unit suite. Binds an **ephemeral** port (each of the 3 parallel
+ * unit-test JVMs gets its own — never a fixed port, TESTING.md), accepts a single client, and
+ * records every received line until the socket is closed. Merges the old nested `DummyServer`
+ * (SenderServiceTest) and `ReadUntilStopServer` (SenderServiceAdvancedTest).
  *
  * Asserts on *server-received content* must use the bounded [awaitReceived] poll (draining the
  * test's executor/looper), never a bare assert right after `runAll()` — TESTING.md "Why awaits are

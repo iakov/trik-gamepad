@@ -1,11 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Cleartext policy (Campaign 3 P3): base-config stays cleartext-off. The
-     MJPEG video stream is served by the robot over plain HTTP (no TLS on the
-     robot); since Campaign 5 the app's http URLs go through the raw-socket
-     client (RawSocketHttpStream), which bypasses Network Security Config
-     entirely — so this 192.168.77.1 cleartext whitelist is DEFENSIVE only, for
-     any platform-HTTP path (e.g. the https fallback in VideoStreamLoader).
-     Rationale: MEMORY.md "Campaign 3" + DECISIONS.md "Campaign 5". -->
+<!-- Cleartext policy: base-config stays cleartext-off. The MJPEG video stream is
+     served by the robot over plain HTTP (no TLS on the robot); the app's http URLs go
+     through the raw-socket client (RawSocketHttpStream), which bypasses Network
+     Security Config entirely — so this 192.168.77.1 cleartext whitelist is DEFENSIVE
+     only, for any platform-HTTP path (e.g. the https fallback in VideoStreamLoader). -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
     <domain-config cleartextTrafficPermitted="true">

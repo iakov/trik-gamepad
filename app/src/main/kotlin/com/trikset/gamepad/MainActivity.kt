@@ -99,8 +99,8 @@ class MainActivity :
     }
 
     getSenderService().setShowTextCallback { message ->
-      // Campaign 9 D/N: the gear border is the persistent status; surface only connection
-      // *errors* as feedback, using a Snackbar (Material) instead of a transient Toast.
+      // The gear border is the persistent status; surface only connection *errors* as feedback,
+      // using a Snackbar (Material) instead of a transient Toast.
       if (message.endsWith(ERROR_SUFFIX)) {
         runOnUiThread { connectionFeedback.error(message) }
       }
@@ -127,11 +127,11 @@ class MainActivity :
     mSettingsController = MainActivitySettingsController(this, getSenderService(), this)
     mSettingsController?.register()
 
-    // Campaign 8: bounded video-stream retry, gated on the control connection's keepalive
-    // (connectionState is Connected == the same robot is reachable). Reloads only while the view is
-    // not playing, so a healthy stream is never disturbed; a failed open / silent stall / foldable
-    // surface recreation all leave the view not-playing and are recovered by the 5 s tick or by the
-    // control-Connected edge (see VideoRetryController).
+    // Bounded video-stream retry, gated on the control connection's keepalive (connectionState is
+    // Connected == the same robot is reachable). Reloads only while the view is not playing, so a
+    // healthy stream is never disturbed; a failed open / silent stall / foldable surface recreation
+    // all leave the view not-playing and are recovered by the 5 s tick or by the control-Connected
+    // edge (see VideoRetryController).
     videoRetryController =
         VideoRetryController(
             shouldReload = {
@@ -224,8 +224,8 @@ class MainActivity :
       // Show the loading indicator while the stream opens/reconnects; it stays
       // up until the first frame renders (robot video disabled -> keeps cycling).
       showVideoLoading()
-      // Feed the load outcome back into the retry controller (Campaign 8): a failed open arms
-      // the bounded retry loop, a success disarms it.
+      // Feed the load outcome back into the retry controller: a failed open arms the bounded
+      // retry loop, a success disarms it.
       VideoStreamLoader(video).load(mVideoURL) { ok ->
         if (ok) videoRetryController?.onLoadSuccess() else videoRetryController?.onLoadFailed()
       }
@@ -277,9 +277,9 @@ class MainActivity :
 
   override fun setVideoUrl(url: URL?) {
     mVideoURL = url
-    // Campaign 9 G: no URL -> show a hint instead of a silent black area. The
-    // placeholder stays hidden while a URL is configured, even if the stream is
-    // down (the loading spinner + gear border convey that state).
+    // No URL -> show a hint instead of a silent black area. The placeholder stays hidden while a
+    // URL is configured, even if the stream is down (the loading spinner + gear border convey that
+    // state).
     findViewById<android.widget.TextView>(R.id.videoPlaceholder)?.visibility =
         if (url == null) View.VISIBLE else View.GONE
   }

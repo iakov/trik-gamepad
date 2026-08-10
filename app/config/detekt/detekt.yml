@@ -18,26 +18,26 @@ complexity:
     # read markers / match sequences and nest try/for/if/if naturally); a
     # faithful port keeps the recovery structure. Detekt's default is 4; this
     # stays 5 because those two parser/render functions cannot flatten without
-    # a rewrite (Phase 2-J reverted the 5->4 tightening on that evidence).
+    # a rewrite (a tightening attempt was reverted on that evidence).
     threshold: 5
   CyclomaticComplexMethod:
     # Legacy Android lifecycle methods (MainActivity.onCreate wires pads, menu,
     # settings listeners and the sensor/video paths) are inherently complex; the
     # Java equivalents passed checkstyle/pmd with the same shapes. Tightened
-    # from 25 to 20 in Phase 2-J after the settings/wheel extraction moved the
-    # biggest branches into MainActivitySettingsController / WheelController.
+    # from 25 to 20 after the settings/wheel extraction moved the biggest
+    # branches into MainActivitySettingsController / WheelController.
     threshold: 20
   LongMethod:
     # Same rationale as CyclomaticComplexMethod: faithful ports of large Android
-    # lifecycle wiring methods. Tightened from 200 to 150 in Phase 2-J.
+    # lifecycle wiring methods. Tightened from 200 to 150.
     threshold: 150
   TooManyFunctions:
     # Android protocol/activity classes legitimately expose a large method
     # surface (SenderService, MainActivity); the Java equivalents passed the
     # checkstyle/pmd gates with the same shapes. MainActivity additionally
-    # implements SettingsUi (6 thin view/actionbar overrides) since Phase 2-E;
-    # Campaign 9 C/I/H added 3 more thin overrides (wheel-enabled getter/setter,
-    # keep-screen-on), so 25 -> 27 keeps that adapter pattern within a class.
+    # implements many thin SettingsUi overrides (wheel/keep-screen-on getters
+    # and setters, video URL, title, alpha), so the threshold keeps that adapter
+    # pattern within a class.
     thresholdInClasses: 27
 
 style:

@@ -19,11 +19,10 @@ import org.robolectric.annotation.LooperMode
 import org.robolectric.annotation.LooperMode.Mode.PAUSED
 
 /**
- * Campaign 8 end-to-end: a real
- * [SyntheticMjpegServer] + [VideoStreamLoader] + [VideoRetryController] reproduces the user-visible
- * regression (video stays black after the robot leaves wifi range and comes back) and proves the
- * bounded retry recovers it. Real sockets on the PAUSED main looper; the retry tick and the
- * onResult posts are driven deterministically via `idleFor`/`idle`.
+ * End-to-end: a real [SyntheticMjpegServer] + [VideoStreamLoader] + [VideoRetryController]
+ * reproduces the user-visible regression (video stays black after the robot leaves wifi range and
+ * comes back) and proves the bounded retry recovers it. Real sockets on the PAUSED main looper; the
+ * retry tick and the onResult posts are driven deterministically via `idleFor`/`idle`.
  */
 @RunWith(RobolectricTestRunner::class)
 @LooperMode(PAUSED)

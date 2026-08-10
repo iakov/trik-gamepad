@@ -8,7 +8,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/** Direct tests for [MagicButtonPanel] (ROADMAP Phase B1). */
+/** Direct tests for [MagicButtonPanel]. */
 @RunWith(RobolectricTestRunner::class)
 class MagicButtonPanelTest : RobolectricTestBase() {
 

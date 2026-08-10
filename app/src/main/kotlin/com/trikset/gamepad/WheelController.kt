@@ -2,8 +2,8 @@ package com.trikset.gamepad
 
 /**
  * Pure wheel-angle math for the accelerometer-driven gamepad wheel. Extracted from [MainActivity]'s
- * `processSensor` (ROADMAP Phase 2-F) so the floor, dead-zone, clamp and hysteresis-step rules are
- * directly unit-testable.
+ * `processSensor` so the floor, dead-zone, clamp and hysteresis-step rules are directly
+ * unit-testable.
  */
 class WheelController {
 

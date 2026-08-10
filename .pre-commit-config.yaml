@@ -11,13 +11,12 @@ repos:
     hooks:
       - id: mdformat
   # Format Kotlin at commit time so spotlessCheck never fails the gate on
-  # formatting (AGENTS.md "Format before you gate"). Cross-platform since
-  # Campaign 7: `python scripts/spotless_apply.py` (language: system) picks
-  # gradlew.bat vs ./gradlew by OS. The old `cmd /c gradlew.bat` entry was
-  # Windows-only (language: system has no shell lookup for .bat, but python.exe
-  # resolves fine -- probed on Windows 2026-08-08). pass_filenames=false +
-  # files \.kt$ so the hook fires only when a Kotlin file changes but formats
-  # the whole tree.
+  # formatting (AGENTS.md "Format before you gate"). Cross-platform:
+  # `python scripts/spotless_apply.py` (language: system) picks gradlew.bat vs
+  # ./gradlew by OS. The old `cmd /c gradlew.bat` entry was Windows-only
+  # (language: system has no shell lookup for .bat, but python.exe resolves fine
+  # -- probed on Windows 2026-08-08). pass_filenames=false + files \.kt$ so the
+  # hook fires only when a Kotlin file changes but formats the whole tree.
   - repo: local
     hooks:
       - id: spotless-apply

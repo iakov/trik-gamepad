@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """spotless_apply.py - run Gradle's spotlessApply from the pre-commit hook.
 
-Cross-platform (Windows / Linux / macOS, Campaign 7): picks `gradlew.bat` vs
-`./gradlew` by OS. Used by .pre-commit-config.yaml (language: system) so the
-hook no longer needs `cmd /c gradlew.bat` on Windows.
+Cross-platform (Windows / Linux / macOS): picks `gradlew.bat` vs `./gradlew` by
+OS. Used by .pre-commit-config.yaml (language: system) so the hook no longer
+needs `cmd /c gradlew.bat` on Windows.
 """
 
 from __future__ import annotations

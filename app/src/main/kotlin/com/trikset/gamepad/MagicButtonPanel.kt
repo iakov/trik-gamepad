@@ -9,8 +9,8 @@ import android.widget.Button
 
 /**
  * Builds the magic buttons (`1..count`) into a container and sends `btn N down` with haptic
- * feedback on tap. Extracted from MainActivity (ROADMAP Phase B1) so the button construction and
- * command mapping are directly testable without reflection.
+ * feedback on tap. Extracted from MainActivity so the button construction and command mapping are
+ * directly testable without reflection.
  */
 class MagicButtonPanel(
     private val context: Context,
@@ -29,7 +29,7 @@ class MagicButtonPanel(
       btn.setBackgroundResource(R.drawable.button_shape)
       btn.setOnClickListener {
         send("btn $name down")
-        // Respect the system haptics setting (Campaign 9 B): no FLAG_IGNORE_GLOBAL_SETTING.
+        // Respect the system haptics setting: no FLAG_IGNORE_GLOBAL_SETTING.
         btn.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
       }
       container.addView(btn)

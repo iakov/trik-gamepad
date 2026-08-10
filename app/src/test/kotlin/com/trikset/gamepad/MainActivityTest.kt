@@ -89,7 +89,7 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun onSharedPreferenceChangedShouldNotRewriteVideoUriOnHostChange() {
-    // Campaign 9 C: no implicit video-URI copy on host change; the user resets it explicitly.
+    // No implicit video-URI copy on host change; the user resets it explicitly.
     setPref(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
     setPref(SettingsFragment.SK_HOST_ADDRESS, "192.168.1.42")
     assertEquals(
@@ -178,8 +178,8 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun magicButtonRowShouldNotClipAtLargeFontScale() {
-    // Campaign 9 J: the row is wrap_content + minHeight 50dp, so it grows with the
-    // font scale instead of clipping the magic buttons. Measure at FONT_SCALE 1.3.
+    // The row is wrap_content + minHeight 50dp, so it grows with the font scale instead of
+    // clipping the magic buttons. Measure at FONT_SCALE 1.3.
     val resources = activity.resources
     val config = android.content.res.Configuration(resources.configuration)
     config.fontScale = 1.3f
@@ -285,8 +285,8 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun connectionConnectedWithVideoConfiguredShouldDriveRetryReload() {
-    // Campaign 8 wiring: control connection Connected + video configured + not playing must arm a
-    // reload through the retry controller (here it fast-fails to an unreachable address and the
+    // Wiring: control connection Connected + video configured + not playing must arm a reload
+    // through the retry controller (here it fast-fails to an unreachable address and the
     // onLoadFailed path runs). Exercises the collector's Connected branch and the shouldReload
     // gate.
     setField(activity, "mVideo", MjpegView(activity))
@@ -305,8 +305,8 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun connectionConnectedWithNullVideoUrlShouldNotReload() {
-    // Campaign 8 gate: Connected with no video URL configured -> shouldReload
-    // short-circuits at mVideoURL != null (false) and nothing is armed.
+    // Gate: Connected with no video URL configured -> shouldReload short-circuits at
+    // mVideoURL != null (false) and nothing is armed.
     val sender = activity.getSenderService()
     awaitControlConnection(sender)
     org.robolectric.Robolectric.flushForegroundThreadScheduler()

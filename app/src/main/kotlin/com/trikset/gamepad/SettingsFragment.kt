@@ -29,7 +29,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
   }
 
-  /** Campaign 9 L: one-tap copy of the configured robot IP (debugging convenience). */
+  /** One-tap copy of the configured robot IP (debugging convenience). */
   private fun initializeCopyRobotIpField() {
     val myActivity = activity ?: return
     val copy = findPreference<Preference>(SK_COPY_ROBOT_IP) ?: return
@@ -48,9 +48,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
   }
 
-  /**
-   * Fills the video URI from the configured robot host (Campaign 9 C); explicit, never implicit.
-   */
+  /** Fills the video URI from the configured robot host; explicit, never implicit. */
   private fun initializeResetVideoUriField() {
     val myActivity = activity ?: return
     val reset = findPreference<Preference>(SK_RESET_VIDEO_URI) ?: return

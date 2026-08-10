@@ -16,12 +16,12 @@ import java.net.Socket
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Synthetic MJPEG-over-HTTP server for the unit suite (Campaign 4). Binds an **ephemeral** port
- * (each of the 3 parallel unit-test JVMs gets its own; or a caller-chosen port via [port], used by
- * the Campaign 8 "robot offline on a known address, then back" simulation), serves
- * `multipart/x-mixed-replace` frames generated from a small cycling set of JPEG images (solid color
- * → gradient → second color), and can **drop the connection after N frames** before resuming the
- * accept loop — emulating a real robot stream dying and coming back (R12 reconnect-on-error).
+ * Synthetic MJPEG-over-HTTP server for the unit suite. Binds an **ephemeral** port (each of the 3
+ * parallel unit-test JVMs gets its own; or a caller-chosen port via [port], used by the "robot
+ * offline on a known address, then back" simulation), serves `multipart/x-mixed-replace` frames
+ * generated from a small cycling set of JPEG images (solid color → gradient → second color), and
+ * can **drop the connection after N frames** before resuming the accept loop — emulating a real
+ * robot stream dying and coming back (reconnect-on-error).
  *
  * The test MUST run under `@GraphicsMode(NATIVE)` so [Bitmap.compress] here and
  * [BitmapFactory.decodeStream] on the client side do real JPEG work instead of fake bitmaps.

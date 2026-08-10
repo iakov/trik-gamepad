@@ -6,8 +6,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Schedules the keepalive command on a daemon [ScheduledExecutorService] while the TCP connection
- * is open. Extracted from [SenderService]'s private inner class (ROADMAP Phase B3) so the timer
- * plumbing has its own file; it delegates command posting back to the owning [SenderService].
+ * is open. Extracted from [SenderService]'s private inner class so the timer plumbing has its own
+ * file; it delegates command posting back to the owning [SenderService].
  */
 internal class KeepAliveTimer(
     private val sender: SenderService,

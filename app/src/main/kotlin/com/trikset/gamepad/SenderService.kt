@@ -23,9 +23,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * All network/keepalive collaborators are injected via the constructor (defaults preserved) so
  * tests substitute a
  * [PausedExecutorService][org.robolectric.android.util.concurrent.PausedExecutorService] for
- * [executor] without touching static state (ROADMAP Phase 3; the former `@JvmField` statics
+ * [executor] without touching static state (the former `@JvmField` statics
  * `mExecutor`/`keepaliveTimeout`/`mConnectTask` are gone). The connection and keepalive helpers
- * live in [ConnectRunnable] / [KeepAliveTimer] (ROADMAP Phase B3).
+ * live in [ConnectRunnable] / [KeepAliveTimer].
  */
 class SenderService(
     executor: Executor = Executors.newSingleThreadExecutor(),

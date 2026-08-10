@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """gate.py - canonical local quality gate for trik-gamepad.
 
-Cross-platform replacement for the old scripts/gate.ps1 (Campaign 7).
+Cross-platform replacement for the old scripts/gate.ps1.
 
 TWO phases, deliberately (AGENTS.md "Format before you gate"):
   1. spotlessApply first - rewrites .kt files (ktfmt).
@@ -30,7 +30,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(ROOT, ".tmp")
 LOG = os.path.join(LOG_DIR, "gate.log")
 
-# Campaign 6 A0 baseline for the logical-SLOC token trend (see TESTING.md
+# A0 baseline for the logical-SLOC token trend (see TESTING.md
 # "Test quality metrics"). Reported as a trend, not a gate.
 A0_BASELINE = 12659
 

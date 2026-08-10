@@ -9,7 +9,7 @@ import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 
-/** Direct tests for [SystemUiController] (ROADMAP Phase B2). */
+/** Direct tests for [SystemUiController]. */
 @RunWith(RobolectricTestRunner::class)
 class SystemUiControllerTest : RobolectricTestBase() {
 

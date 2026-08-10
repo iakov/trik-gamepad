@@ -4,9 +4,9 @@ import android.app.Activity
 import androidx.preference.PreferenceManager
 
 /**
- * Sets the network preferences used by the instrumented tests (Campaign 6 B8): the robot host,
- * port, and a keepalive large enough that no keepalive message interferes with the assertions.
- * Shared by the MainWindowTests inner classes.
+ * Sets the network preferences used by the instrumented tests: the robot host, port, and a
+ * keepalive large enough that no keepalive message interferes with the assertions. Shared by the
+ * MainWindowTests inner classes.
  */
 fun initNetworkSettings(activity: Activity) {
   val preferenceEditor = PreferenceManager.getDefaultSharedPreferences(activity).edit()

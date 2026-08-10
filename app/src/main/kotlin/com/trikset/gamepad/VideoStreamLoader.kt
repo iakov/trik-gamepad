@@ -26,8 +26,8 @@ constructor(
   /**
    * Opens the stream and wires it into the view. [onResult] is invoked on the main thread once the
    * attempt settles: `true` when a stream was opened and playback started, `false` when the URL was
-   * null or the stream could not be opened (the Campaign 8 retry loop keys off this — today a
-   * failed open was silent, so the video never recovered after the robot came back into range).
+   * null or the stream could not be opened (the retry loop keys off this — today a failed open was
+   * silent, so the video never recovered after the robot came back into range).
    */
   fun load(url: URL?, onResult: (Boolean) -> Unit = {}) {
     executor.execute {
@@ -45,7 +45,7 @@ constructor(
     if (url == null) return null
     return try {
       // Plain-HTTP MJPEG streams go over a raw socket so any user-configured
-      // robot host works regardless of the NSC cleartext whitelist (Campaign 5).
+      // robot host works regardless of the NSC cleartext whitelist.
       val stream =
           if (url.protocol.equals("http", ignoreCase = true)) {
             RawSocketHttpStream.open(url)

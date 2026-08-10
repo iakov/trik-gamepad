@@ -57,9 +57,9 @@ android {
             minifyEnabled false
             debuggable true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
-            // Installable CI artifact for early adopters (Campaign 3): the debug
-            // keystore is auto-generated per machine/CI, so this stays installable
-            // while the real release keystore never enters CI (R4).
+            // Installable CI artifact for early adopters: the debug keystore is
+            // auto-generated per machine/CI, so this stays installable while the
+            // real release keystore never enters CI (R4).
             signingConfig = signingConfigs.debug
         }
     }
@@ -174,13 +174,9 @@ jacoco {
 }
 
 // Coverage is measured on the debug unit tests; the report is always produced
-// and a verification gate enforces a minimum. The gate is a ratchet: raised to
-// 85% line / 60% branch by the Phase 12 coverage drive, then to 90% line / 70%
-// branch after the Kotlin migration (Phase 3), which made the render logic
-// testable. Ratcheted again to 92% line / 71% branch after ROADMAP Phases 2-E/
-// 2-F/3 (controller + WheelController extraction and constructor injection —
-// measured 93% / 72%), then to 95% line / 80% branch after Campaign 2 (B4 pure
-// TouchPadController extraction + coverage push; measured 97.3% / 81.9%).
+// and a verification gate enforces a minimum (95% line / 80% branch). The gate is
+// a ratchet — it has been raised over time as the render logic became testable
+// (extraction + constructor injection); ratchet history lives in MEMORY.md.
 // MjpegView's render-thread plumbing is excluded (see coverageExcludes) with
 // the rationale recorded in MEMORY.md.
 def coverageExcludes = [

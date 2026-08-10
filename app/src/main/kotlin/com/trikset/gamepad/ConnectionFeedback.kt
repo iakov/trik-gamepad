@@ -9,9 +9,9 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
 
 /**
- * Owns the connection-state feedback chrome (Campaign 9 A/D/N): recolors the settings-button border
- * by [ConnectionState] and shows Material [Snackbar]s for connection errors. The views are injected
- * as providers so the object can be constructed before the view hierarchy exists (like
+ * Owns the connection-state feedback chrome: recolors the settings-button border by
+ * [ConnectionState] and shows Material [Snackbar]s for connection errors. The views are injected as
+ * providers so the object can be constructed before the view hierarchy exists (like
  * [SystemUiController]). Recoloring the existing gear border adds no new touch surface.
  */
 class ConnectionFeedback(

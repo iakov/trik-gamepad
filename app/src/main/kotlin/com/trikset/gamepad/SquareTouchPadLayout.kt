@@ -51,14 +51,14 @@ class SquareTouchPadLayout : RelativeLayout {
   }
 
   private fun init() {
-    // Campaign 9 E: draw the pad indicator with the theme accent (was hardcoded RED).
+    // Draw the pad indicator with the theme accent (was hardcoded RED).
     paint.color = ContextCompat.getColor(context, R.color.greenlight)
     paint.strokeWidth = 0f
     paint.style = Paint.Style.STROKE
     paint.alpha = OPAQUE_ALPHA
     setOnTouchListener(TouchPadListener())
     setOnClickListener {
-      // Respect the system haptics setting (Campaign 9 B): no FLAG_IGNORE_GLOBAL_SETTING.
+      // Respect the system haptics setting: no FLAG_IGNORE_GLOBAL_SETTING.
       performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
     }
     setWillNotDraw(false)
@@ -106,7 +106,7 @@ class SquareTouchPadLayout : RelativeLayout {
     val currentSender = sender
     if (currentSender != null) {
       currentSender.send("$padName $command")
-      // Respect the system haptics setting (Campaign 9 B): no FLAG_IGNORE_GLOBAL_SETTING.
+      // Respect the system haptics setting: no FLAG_IGNORE_GLOBAL_SETTING.
       performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
     }
   }

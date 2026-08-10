@@ -5,7 +5,7 @@ import java.io.InputStream
 /**
  * Reads a raw HTTP request/response head from [input] until the terminating CRLF CRLF, discarding
  * the bytes (the client's write must not block the server). Shared by [SyntheticMjpegServer] and
- * the RawSocketHttpStreamTest fixture (Campaign 6 B2).
+ * the RawSocketHttpStreamTest fixture.
  */
 object HttpRequestHead {
   private val crlfCrlf =

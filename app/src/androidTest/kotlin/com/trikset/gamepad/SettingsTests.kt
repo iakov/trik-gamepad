@@ -45,10 +45,9 @@ class SettingsTests {
   fun settingsShouldWorkCorrectly() {
     openSettings()
 
-    // Preference rows (Campaign 9 C/I/H added wheel + keep-screen-on switches at the
-    // top and turned pads-opacity/wheel-sensitivity into sliders, shifting the
-    // EditText rows): 0 wheel, 1 keepScreenOn, 2 host, 3 port, 4 pads slider,
-    // 5 wheel slider, 6 keepalive, 7 video URI, 8 reset URI, 9 copy IP, 10 about.
+    // Preference rows: wheel + keep-screen-on switches at the top and pads-opacity/wheel-
+    // sensitivity sliders shift the EditText rows): 0 wheel, 1 keepScreenOn, 2 host, 3 port,
+    // 4 pads slider, 5 wheel slider, 6 keepalive, 7 video URI, 8 reset URI, 9 copy IP, 10 about.
     editPreference(2, "localhost") // host address
     editPreference(3, "12345") // port
     editPreference(6, "3000") // keepalive

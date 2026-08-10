@@ -14,7 +14,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.android.util.concurrent.PausedExecutorService
 
-/** Direct tests for [MainActivitySettingsController] (ROADMAP Phase 2-E, coverage push). */
+/** Direct tests for [MainActivitySettingsController]. */
 @RunWith(RobolectricTestRunner::class)
 class MainActivitySettingsControllerTest : RobolectricTestBase() {
 
@@ -119,7 +119,7 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
 
   @Test
   fun onPreferenceChangedWithIntSliderValuesShouldClamp() {
-    // SeekBarPreference stores Int (Campaign 9 C) — the readInt helper must handle it.
+    // SeekBarPreference stores Int — the readInt helper must handle it.
     prefs.edit().putInt(SettingsFragment.SK_SHOW_PADS, 255).commit()
     controller.onPreferenceChanged(prefs)
     assertEquals("max alpha", 1f, ui.lastAlpha, 0.001f)

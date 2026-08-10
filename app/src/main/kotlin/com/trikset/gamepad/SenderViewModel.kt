@@ -4,9 +4,9 @@ import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.StateFlow
 
 /**
- * Activity-scoped owner of the [SenderService] (Campaign 3 P2). Survives configuration changes so
- * the TCP connection and keepalive timer are not torn down and rebuilt on rotation, and closes the
- * socket in [onCleared] instead of relying on the Activity's onDestroy. Settings already live in
+ * Activity-scoped owner of the [SenderService]. Survives configuration changes so the connection
+ * and keepalive timer are not torn down and rebuilt on rotation, and closes the socket in
+ * [onCleared] instead of relying on the Activity's onDestroy. Settings already live in
  * SharedPreferences, so a process death re-derives the target for free. No DI framework: the
  * service is created here and injected into the views by [MainActivity].
  */

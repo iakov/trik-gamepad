@@ -4,16 +4,16 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * Bounded MJPEG video-stream retry (Campaign 8). While the activity is resumed, the control
- * connection is Connected (the TCP keepalive proxy — same robot, same wifi) and the video view is
- * not playing, reloads the stream on a fixed interval, and also immediately when the control
- * connection flips to Connected (a pad touch reconnects the control connection → instant video
- * reload instead of waiting for the next tick).
+ * Bounded MJPEG video-stream retry. While the activity is resumed, the control connection is
+ * Connected (the TCP keepalive proxy — same robot, same wifi) and the video view is not playing,
+ * reloads the stream on a fixed interval, and also immediately when the control connection flips to
+ * Connected (a pad touch reconnects the control connection → instant video reload instead of
+ * waiting for the next tick).
  *
- * Replaces the safety net lost when the original unconditional 30 s MJPEG restart was removed
- * (Campaign 3 P1 socket-leak driver): a failed open / a silently-stalled stream no longer leaves
- * the video black until the user leaves and re-enters. Unlike the 30 s loop, a healthy stream is
- * never touched (ticks are gated by [shouldReload], which includes "not playing").
+ * Replaces the safety net lost when the original unconditional 30 s MJPEG restart was removed (the
+ * socket-leak driver): a failed open / a silently-stalled stream no longer leaves the video black
+ * until the user leaves and re-enters. Unlike the 30 s loop, a healthy stream is never touched
+ * (ticks are gated by [shouldReload], which includes "not playing").
  *
  * All timers are main-thread [Handler] callbacks, cancelled on pause/destroy (no leaks). The
  * [shouldReload] / [reload] functions are injected so the loop is unit-testable without sockets.
