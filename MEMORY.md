@@ -1394,3 +1394,43 @@ GATE PASSED — jacoco 95/80 (line 0.9746, branch 0.8016), jscpd 0 clones, lizar
   `load(url, onResult)`/`isPlaying()`/`VideoRetryController` API fails to
   compile first; adding no-op production skeletons would make the behavior
   tests fail for the right reason before implementing.
+
+### [2026-08-10] Cleanup campaign — branch-coverage margin + video loading indicator
+
+**What landed:** (1) branch coverage raised **0.8016 → 0.8123** via parser
+error-path tests (`RawSocketHttpStream`: non-HTTP status line, status without
+code, until-close body, default port; `MjpegInputStream`: empty `Content-Length`
+recovery), `MainActivity` gate tests (control-`Connected` with null video URL),
+`MjpegView` stop-with-null-source, plus a **coverage-exclusion addition**
+(Kotlin-inline synthetics `**/*$special$$inlined$*.class` — `by viewModels()`
+generates `MainActivity$special$$inlined$viewModels$default$N` *inside the app
+package*, so an `androidx/**` exclusion cannot match them). (2) **Video loading
+indicator** (`feat: video loading indicator`): centered circular `ProgressBar`
+(`@+id/videoLoading`, `video_loading_background.xml` contrast backing) shown by
+`restartVideoStream()` (initial resume / reconnect / control-`Connected`
+reload), hidden by `MjpegView.OnFirstFrameListener` + `onPause`/`onDestroy`;
+robot video disabled → keeps cycling; no URL → hidden. Commits `496ca7f`
+(coverage) + `2b98450` (indicator).
+
+**Lessons:**
+
+- **`MjpegView` first-frame signal must fire on *decode*, not canvas draw:**
+  `SurfaceHolder.lockCanvas()` returns null/unreliable under Robolectric, so a
+  first-frame callback gated on `canvas != null` was flaky (failed one run,
+  passed the next). Firing when `renderer.extractFrame` yields a `destRect`
+  (before `lockCanvas`) is deterministic and matches the UX intent ("a frame is
+  coming").
+- **Kotlin inline-synthetic classes land in the calling package:** `by viewModels()` produces `MainActivity$special$$inlined$viewModels$default$N`
+  under `com/trikset/`, not `androidx/` — an `androidx/**` coverage exclusion is
+  a no-op for them; exclude `**/*$special$$inlined$*.class` instead (rationale
+  in `app/build.gradle` + "Coverage" design decisions).
+- **jscpd flags every new test clone immediately** (a 96-token duplicate between
+  two `connectionConnected...` tests and two spinner tests) → extracted
+  `awaitControlConnection(sender)` and `restartVideoStreamWithConfiguredVideo()`
+  helpers. The hard duplication gate keeps the "tests are code" principle honest.
+- **`onPause()` is `protected`** in an Activity — drive it via the existing
+  `method(activity, "onPause").invoke(activity)` reflection helper, never a
+  direct call.
+- **Coverage margin matters:** 0.8016 left only ~2 branches of headroom (it
+  wobbled to 0.7989 once); 0.8123 gives ~4.6 branches of flake headroom while
+  keeping the 95/80 gate honest.

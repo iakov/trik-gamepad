@@ -259,6 +259,17 @@ stall with the socket kept open → `SO_TIMEOUT` → reconnect; control-`Connect
 edge reloads immediately. `VideoRetryControllerTest` drives the tick
 deterministically under the PAUSED looper.
 
+**Addendum (2026-08-10, cleanup campaign): video loading indicator.** A centered
+circular `ProgressBar` (`@+id/videoLoading`, subtle contrast backing) shows
+while the video is loading/reconnecting: it appears on every `restartVideoStream`
+(initial resume, stream-error reconnect, control-`Connected` reload) and hides
+on the first decoded frame of the playback cycle (`MjpegView.OnFirstFrameListener`,
+fired on decode, not canvas draw — `lockCanvas` is unreliable under Robolectric).
+Robot video disabled → no frame ever decodes → the indicator keeps cycling
+(indefinitely). No video URL configured → stays hidden. Branch coverage raised
+0.8016 → 0.8123 (parser error paths + `MainActivity` gates + `androidx`/
+Kotlin-inline-synthetic exclusion — see MEMORY "Coverage" design decisions).
+
 ## Phase 1 — Instrumented CI without macOS
 
 Decision: **no macOS/GPU runner** — rationale and alternatives in `DECISIONS.md`
