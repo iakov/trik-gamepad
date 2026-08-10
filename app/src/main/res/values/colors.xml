@@ -4,4 +4,5 @@
     <color name="greendark">#559540</color>
     <color name="amber">#FFC107</color>
     <color name="red">#E53935</color>
+    <color name="status_orange">#FF9800</color>
 </resources>

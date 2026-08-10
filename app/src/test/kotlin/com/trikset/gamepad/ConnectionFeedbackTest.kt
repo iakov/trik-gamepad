@@ -1,5 +1,6 @@
 package com.trikset.gamepad
 
+import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import org.junit.Assert.assertEquals
@@ -16,7 +17,6 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
 
   private fun feedback(
       statusTextProvider: () -> TextView?,
-      addressProvider: () -> String? = { null },
       connectAction: () -> Unit = {},
   ): ConnectionFeedback =
       ConnectionFeedback(
@@ -24,7 +24,6 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
           settingsButtonProvider = { null },
           rootViewProvider = { null },
           statusTextProvider = statusTextProvider,
-          addressProvider = addressProvider,
           connectAction = connectAction,
       )
 
@@ -32,14 +31,12 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
   private fun feedbackWith(
       btn: Button?,
       status: TextView?,
-      addressProvider: () -> String? = { null },
   ): ConnectionFeedback =
       ConnectionFeedback(
           context = context,
           settingsButtonProvider = { btn },
           rootViewProvider = { null },
           statusTextProvider = { status },
-          addressProvider = addressProvider,
           connectAction = {},
       )
 
@@ -74,7 +71,6 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
             settingsButtonProvider = { activity.findViewById(R.id.btnSettings) },
             rootViewProvider = { activity.findViewById(R.id.main) },
             statusTextProvider = { activity.findViewById(R.id.connectionStatus) },
-            addressProvider = { "192.168.77.1:4444" },
             connectAction = {},
         )
     val app = org.robolectric.RuntimeEnvironment.getApplication()
@@ -93,16 +89,19 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
     val btn = Button(context)
     btn.setBackgroundResource(R.drawable.btn_settings)
     val status = TextView(context)
-    val feedback = feedbackWith(btn, status, addressProvider = { "10.0.0.7:4444" })
+    val feedback = feedbackWith(btn, status)
 
     feedback.update(ConnectionState.Connecting)
     assertEquals("Connecting…", status.text.toString())
+    assertEquals(View.VISIBLE, status.visibility)
 
     feedback.update(ConnectionState.Connected)
-    assertEquals("Connected to 10.0.0.7:4444", status.text.toString())
+    // Connected -> the pill is hidden; the video / gear border conveys the state.
+    assertEquals(View.GONE, status.visibility)
 
     feedback.update(ConnectionState.Disconnected("x"))
-    assertEquals("Disconnected — tap to connect", status.text.toString())
+    assertEquals("Tap to connect…", status.text.toString())
+    assertEquals(View.VISIBLE, status.visibility)
   }
 
   @Test
@@ -120,16 +119,6 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
   fun attachShouldBeSafeWithoutStatusView() {
     feedback({ null }).attach()
     // No crash when the status line is not in the hierarchy.
-  }
-
-  @Test
-  fun connectedStatusShouldTolerateMissingAddress() {
-    val btn = Button(context)
-    btn.setBackgroundResource(R.drawable.btn_settings)
-    val status = TextView(context)
-    feedbackWith(btn, status).update(ConnectionState.Connected)
-    // No address -> the format argument is empty rather than "null".
-    assertEquals("Connected to ", status.text.toString())
   }
 
   private fun borderStrokeColor(activity: MainActivity): Int {

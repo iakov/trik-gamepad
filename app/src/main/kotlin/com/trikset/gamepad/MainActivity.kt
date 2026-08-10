@@ -62,10 +62,6 @@ class MainActivity :
         settingsButtonProvider = { findViewById(R.id.btnSettings) },
         rootViewProvider = { findViewById(R.id.main) },
         statusTextProvider = { findViewById(R.id.connectionStatus) },
-        addressProvider = {
-          val host = getSenderService().getHostAddr()
-          if (host == null) null else "$host:${getSenderService().getHostPort()}"
-        },
         connectAction = { getSenderService().connect() },
     )
   }
@@ -253,9 +249,12 @@ class MainActivity :
     // main thread before touching the view hierarchy / opening the stream.
     runOnUiThread {
       val video = mVideo ?: return@runOnUiThread
-      // Show the loading indicator while the stream opens/reconnects; it stays
-      // up until the first frame renders (robot video disabled -> keeps cycling).
-      showVideoLoading()
+      // Show the loading indicator only while a URL is configured AND the control connection is
+      // up (no spinner when disconnected / no stream URL); it stays up until the first frame
+      // renders (robot video disabled -> keeps cycling).
+      if (mVideoURL != null && senderViewModel.connectionState.value is ConnectionState.Connected) {
+        showVideoLoading()
+      }
       // Feed the load outcome back into the retry controller: a failed open arms the bounded
       // retry loop, a success disarms it.
       VideoStreamLoader(video).load(mVideoURL) { ok ->

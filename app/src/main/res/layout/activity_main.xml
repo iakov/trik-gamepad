@@ -84,31 +84,6 @@
 
     </LinearLayout>
 
-    <!-- Persistent connection status: "Connected to host:port" / "Connecting…" /
-         "Disconnected — tap to connect". Tapping it retries the connection
-         (ConnectionFeedback.attach). Kept AFTER the gear button in the child
-         list per the defensive convention below. -->
-    <TextView
-        android:id="@+id/connectionStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_above="@id/btnSettings"
-        android:layout_alignParentStart="true"
-        android:layout_marginStart="12dp"
-        android:layout_marginBottom="8dp"
-        android:background="@drawable/connection_status_background"
-        android:clickable="true"
-        android:contentDescription="@string/connection_status_description"
-        android:focusable="true"
-        android:maxLines="1"
-        android:paddingStart="8dp"
-        android:paddingEnd="8dp"
-        android:paddingTop="4dp"
-        android:paddingBottom="4dp"
-        android:textColor="@android:color/white"
-        android:textIsSelectable="true"
-        android:textSize="12sp" />
-
     <!-- Kept as the LAST child of main (defensive convention): MainActivity calls
          controlsOverlay.bringToFront(), which reorders the children at runtime
          (video, btnSettings, buttons, ..., controlsOverlay) — keep new children
@@ -120,11 +95,36 @@
     <ProgressBar
         android:id="@+id/videoLoading"
         style="?android:attr/progressBarStyle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="@dimen/video_loading_size"
+        android:layout_height="@dimen/video_loading_size"
         android:layout_centerInParent="true"
         android:background="@drawable/video_loading_background"
         android:padding="14dp"
+        android:visibility="gone" />
+
+    <!-- Connection status pill ("Tap to connect…" / "Connecting…"), hidden once
+         connected (ConnectionFeedback.setStatusText). Centered, drawn over the
+         video-loading spinner center; kept AFTER videoLoading in the child list so
+         the pill renders on top (both are brought-to-front together with the
+         controls overlay — see above). -->
+    <TextView
+        android:id="@+id/connectionStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:background="@drawable/connection_status_background"
+        android:clickable="true"
+        android:contentDescription="@string/connection_status_description"
+        android:focusable="true"
+        android:maxLines="1"
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
+        android:textColor="@color/status_orange"
+        android:textIsSelectable="true"
+        android:textSize="@dimen/connection_status_text_size"
+        android:textStyle="bold"
         android:visibility="gone" />
 
 

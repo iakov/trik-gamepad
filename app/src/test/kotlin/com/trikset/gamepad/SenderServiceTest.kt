@@ -78,13 +78,6 @@ class SenderServiceTest : RobolectricTestBase() {
   }
 
   @Test
-  fun getHostPortShouldReturnConfiguredPort() {
-    client = SenderService(mExecutor)
-    client!!.setTarget("someaddr-test", 1234)
-    assertEquals(1234, client!!.getHostPort())
-  }
-
-  @Test
   fun connectShouldEstablishConnectionWithoutSending() {
     TestTcpServer().use { server -> establishConnection(server) }
   }

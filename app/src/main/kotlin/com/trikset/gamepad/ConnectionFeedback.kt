@@ -11,18 +11,17 @@ import com.google.android.material.snackbar.Snackbar
 
 /**
  * Owns the connection-state feedback chrome: recolors the settings-button border by
- * [ConnectionState], shows Material [Snackbar]s for connection errors, and renders a persistent
- * status line ("Connected to host:port" / "Connecting…" / "Disconnected — tap to connect") whose
- * tap retries the connection. The views are injected as providers so the object can be constructed
- * before the view hierarchy exists (like [SystemUiController]); recoloring the existing gear border
- * adds no new touch surface, and the status line is the single tappable status affordance.
+ * [ConnectionState], shows Material [Snackbar]s for connection errors, and renders a centered
+ * status pill ("Tap to connect…" / "Connecting…", hidden once connected) whose tap retries the
+ * connection. The views are injected as providers so the object can be constructed before the view
+ * hierarchy exists (like [SystemUiController]); recoloring the existing gear border adds no new
+ * touch surface, and the status pill is the single tappable status affordance.
  */
 class ConnectionFeedback(
     private val context: Context,
     private val settingsButtonProvider: () -> Button?,
     private val rootViewProvider: () -> View?,
     private val statusTextProvider: () -> TextView?,
-    private val addressProvider: () -> String?,
     private val connectAction: () -> Unit,
 ) {
   private val indicator = ConnectionIndicator()
@@ -50,18 +49,19 @@ class ConnectionFeedback(
 
   private fun setStatusText(state: ConnectionState) {
     val status = statusTextProvider() ?: return
-    status.text =
-        when (state) {
-          is ConnectionState.Connecting -> context.getString(R.string.connection_status_connecting)
-          is ConnectionState.Connected ->
-              context.getString(
-                  R.string.connection_status_connected,
-                  addressProvider().orEmpty(),
-              )
-          is ConnectionState.Disconnected ->
-              context.getString(R.string.connection_status_disconnected)
-        }
-    status.visibility = View.VISIBLE
+    when (state) {
+      is ConnectionState.Connecting -> {
+        status.text = context.getString(R.string.connection_status_connecting)
+        status.visibility = View.VISIBLE
+      }
+      // Connected -> no pill: the video stream / gear border conveys the state, and the
+      // centered text would sit over the video.
+      is ConnectionState.Connected -> status.visibility = View.GONE
+      is ConnectionState.Disconnected -> {
+        status.text = context.getString(R.string.connection_status_disconnected)
+        status.visibility = View.VISIBLE
+      }
+    }
   }
 
   fun error(message: String) {

@@ -14,8 +14,7 @@
     <string name="video_description">Robot video stream</string>
     <string name="video_placeholder">No video stream — configure a video URI in Settings</string>
     <string name="connection_status_connecting">Connecting…</string>
-    <string name="connection_status_connected">Connected to %1$s</string>
-    <string name="connection_status_disconnected">Disconnected — tap to connect</string>
+    <string name="connection_status_disconnected">Tap to connect…</string>
     <string name="connection_status_description">Connection status; tap to connect</string>
     <string name="preset_name_required">Preset name cannot be empty</string>
     <string name="preset_saved">Preset “%1$s” saved</string>

@@ -332,6 +332,8 @@ class MainActivityTest : RobolectricTestBase() {
 
   /** Sets a configured video and triggers a reload (the common spinner-test setup). */
   private fun restartVideoStreamWithConfiguredVideo() {
+    // The spinner gate (restartVideoStream) requires a live control connection — connect first.
+    awaitControlConnection(activity.getSenderService())
     setField(activity, "mVideo", MjpegView(activity))
     setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
     method(activity, "restartVideoStream").invoke(activity)
@@ -343,6 +345,36 @@ class MainActivityTest : RobolectricTestBase() {
     restartVideoStreamWithConfiguredVideo()
     val indicator = activity.findViewById<android.widget.ProgressBar>(R.id.videoLoading)
     assertEquals(android.view.View.VISIBLE, indicator!!.visibility)
+  }
+
+  @Test
+  fun restartVideoStreamWhenDisconnectedShouldNotShowLoading() {
+    // Gate: not Connected -> the spinner stays hidden even with a URL configured.
+    assertSpinnerHiddenAfterRestart(URL("http://127.0.0.1:1/nope"), connectFirst = false)
+  }
+
+  @Test
+  fun restartVideoStreamWithoutVideoUrlShouldNotShowLoading() {
+    // Gate: no URL configured -> the spinner stays hidden even while Connected. An unset URI pref
+    // defaults to a real URL (MainActivitySettingsController), so set it to "" to get mVideoURL
+    // null.
+    setPref(SettingsFragment.SK_VIDEO_URI, "")
+    assertSpinnerHiddenAfterRestart(null, connectFirst = true)
+  }
+
+  /** Restarts the stream and asserts the loading spinner stays hidden (spinner-gate coverage). */
+  private fun assertSpinnerHiddenAfterRestart(videoUrl: URL?, connectFirst: Boolean) {
+    if (connectFirst) {
+      awaitControlConnection(activity.getSenderService())
+    }
+    setField(activity, "mVideo", MjpegView(activity))
+    if (videoUrl != null) {
+      setField(activity, "mVideoURL", videoUrl)
+    }
+    method(activity, "restartVideoStream").invoke(activity)
+    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    val indicator = activity.findViewById<android.widget.ProgressBar>(R.id.videoLoading)
+    assertEquals(android.view.View.GONE, indicator!!.visibility)
   }
 
   @Test
