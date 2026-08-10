@@ -1469,7 +1469,7 @@ robot video disabled → keeps cycling; no URL → hidden. Commits `496ca7f`
 
 Scope: Material/accessibility alignment (ROADMAP Campaign 9, A–E + G–J +
 marginal batch; F/K deferred by user decision). Full record in ROADMAP;
-user-visible gaps and decisions in the session. Commits `…`..`…`.
+user-visible gaps and decisions in the session. Commit `ffef353`.
 
 **Highlights:**
 
