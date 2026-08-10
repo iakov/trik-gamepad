@@ -91,6 +91,7 @@ configurations, update this section and the referenced config files.
   single-branch no-PR execution plan — applies once the within-fork
   PR workflow resumes.*
 - Re-validate from repo root: `./gradlew test` and `./gradlew lint`.
+- **Docs pushes (`.md`-only changes): never wait for green CI** — if a docs push spoils CI, fix it before the next campaign (campaigns start only from green CI).
 - If `AGENTS.md` changed: `git diff HEAD -- AGENTS.md`, check every added/removed line against the boundary test (see Guardrails — Documenting decisions).
 
 ### After push (retrospective)
@@ -163,6 +164,7 @@ configurations, update this section and the referenced config files.
 ### Before release
 
 - Gates: green CI, 0 open PRs, 0 security alerts.
+- Run an **upstream comparison + user-facing downside audit** (diff the app vs upstream from the user's point of view; report regressions/downgrades). Use it for PR/release descriptions written from the user's perspective.
 - Bump `appMinorVersion` in `app/build.gradle`; signing is local-only (the keystore never enters CI).
 - Commit the release APK to `_apk/`; generate notes via the release-notes skill; review the draft, never auto-publish.
 

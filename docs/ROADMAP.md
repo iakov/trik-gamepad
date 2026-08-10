@@ -244,6 +244,10 @@ callback (today a failed open returns null silently) and `MjpegView` exposes
 `isPlaying()` — one "not playing" predicate covers silent stall, failed first
 open, and surface recreation.
 
+Idle recovery is bounded by user interaction: the retry is gated on the control
+connection, which only reconnects on the next pad touch — accepted by design
+(user decision 2026-08-10).
+
 **Process (user decision 2026-08-10): TDD** — failing tests first that simulate
 the problem (server down → load fails → retry → server up → playing; mid-stream
 drop → reconnect), then the implementation, then the full 3-variant suite ×2 +

@@ -62,6 +62,14 @@ Local instrumented run (per-platform acceleration prerequisites):
    `adb shell settings put secure immersive_mode_confirmations confirmed`.
 1. `./gradlew connectedDebugAndroidTest`.
 
+> **Local invocation quirk:** under the configuration cache,
+> `connectedDebugAndroidTest` fails with an AGP/UTP serialization error
+> (`field __testRunnerFactory__ ... DefaultConfigurableFileCollection`). Run it
+> with `--no-configuration-cache`; on Windows also add `--no-daemon` for
+> tool-driven runs (daemon handle-inheritance hang — see AGENTS.md
+> "Windows/PowerShell quirks"). Verified invocation on this machine (two
+> emulators, Atd_API36 + Swiftshader_API36): `./gradlew connectedDebugAndroidTest --no-configuration-cache --no-daemon` → 9/9 pass.
+
 > **Do NOT use `-gpu swiftshader_indirect` locally.** Verified: with the
 > software GPU the app window never receives focus and the same suite fails
 > 8/8 with `RootViewWithoutFocusException` — the exact failure CI saw (decision
