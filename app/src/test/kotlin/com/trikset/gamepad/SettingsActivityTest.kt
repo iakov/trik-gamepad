@@ -2,9 +2,11 @@ package com.trikset.gamepad
 
 import android.content.ClipboardManager
 import android.content.Context
+import android.os.Bundle
 import androidx.preference.EditTextPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
+import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -190,5 +192,40 @@ class SettingsActivityTest : RobolectricTestBase() {
     assertNotNull(delete)
     // With no presets saved the delete tap shows a toast and does not open a dialog.
     delete!!.onPreferenceClickListener!!.onPreferenceClick(delete)
+  }
+
+  @Test
+  fun onPreferenceStartScreenShouldPushNestedFragment() {
+    val manager = PreferenceManager(activity)
+    val screen = manager.createPreferenceScreen(activity)
+    screen.key = SettingsFragment.SK_ADVANCED
+    assertTrue(activity.onPreferenceStartScreen(fragment, screen))
+    activity.supportFragmentManager.executePendingTransactions()
+    val top = activity.supportFragmentManager.fragments.last()
+    assertTrue("the nested screen must push a new SettingsFragment", top is SettingsFragment)
+    assertEquals(
+        SettingsFragment.SK_ADVANCED,
+        top.arguments?.getString(PreferenceFragmentCompat.ARG_PREFERENCE_ROOT),
+    )
+  }
+
+  @Test
+  fun nestedFragmentWithAdvancedRootShouldLoadAdvancedPrefs() {
+    // The sub-screen fragment runs onCreatePreferences with rootKey="advancedSettings", so its
+    // tree is the Advanced subtree (About + keepalive) and the init helpers resolve within it.
+    val sub = SettingsFragment()
+    val args = Bundle()
+    args.putString(PreferenceFragmentCompat.ARG_PREFERENCE_ROOT, SettingsFragment.SK_ADVANCED)
+    sub.arguments = args
+    activity.supportFragmentManager.beginTransaction().add(sub, "advanced-sub").commitNow()
+
+    assertNotNull(
+        "About must resolve inside the Advanced subtree",
+        sub.findPreference<Preference>(SettingsFragment.SK_ABOUT_SYSTEM),
+    )
+    assertNotNull(
+        "keepalive must resolve inside the Advanced subtree",
+        sub.findPreference<Preference>(SettingsFragment.SK_KEEPALIVE),
+    )
   }
 }

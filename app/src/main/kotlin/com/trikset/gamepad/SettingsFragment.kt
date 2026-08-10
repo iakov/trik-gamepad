@@ -32,6 +32,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val SK_HIDE_CONTROLS = "hideControls"
     const val SK_SHOW_FPS = "showFps"
     const val SK_GAMEPAD_SWAP = "gamepadSwap"
+    const val SK_ADVANCED = "advancedSettings"
     const val SK_MAGIC_BUTTON_COUNT = "magicButtonCount"
     const val SK_SAVE_PRESET = "saveRobotPreset"
     const val SK_DELETE_PRESET = "deleteRobotPreset"
@@ -123,8 +124,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
       true
     }
 
+    // Root screen: host/port/keepalive all resolve; the Advanced sub-screen only contains
+    // keepalive, so missing prefs are skipped (findPreference is null-safe).
     for (preferenceKey in arrayOf(SK_HOST_ADDRESS, SK_HOST_PORT, SK_KEEPALIVE)) {
-      val preference = requireNotNull(findPreference<Preference>(preferenceKey))
+      val preference = findPreference<Preference>(preferenceKey) ?: continue
       preference.summary = requireNotNull(preference.sharedPreferences).getString(preferenceKey, "")
       preference.onPreferenceChangeListener = listener
     }
