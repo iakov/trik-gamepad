@@ -70,11 +70,14 @@
 
     </LinearLayout>
 
-    <!-- Kept as the LAST child of main: MainActivity calls controlsOverlay.bringToFront(),
-         which reorders the children at runtime (video, btnSettings, buttons, ...,
-         controlsOverlay). Index-based Espresso matchers (SettingsTests.openSettings) rely on
-         btnSettings staying the rendered child #1, so nothing may precede it. The spinner is
-         centered via layout params and stays under the brought-to-front controls overlay. -->
+    <!-- Kept as the LAST child of main (defensive convention): MainActivity calls
+         controlsOverlay.bringToFront(), which reorders the children at runtime
+         (video, btnSettings, buttons, ..., controlsOverlay) — keep new children
+         after the gear button so nothing nudges it out of its rendered position
+         (instrumented tests locate it by id, but a stable order keeps manual
+         inspection and any index-based tooling predictable). The spinner is
+         centered via layout params and stays under the brought-to-front controls
+         overlay. -->
     <ProgressBar
         android:id="@+id/videoLoading"
         style="?android:attr/progressBarStyle"

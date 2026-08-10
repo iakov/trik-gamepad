@@ -27,7 +27,7 @@ Each note follows the same shape:
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-09] Dev tooling is cross-platform via uv (Python gate) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-06] Coverage drive to 85% |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel | [2026-08-08] Campaign 5: raw-socket MJPEG HTTP client |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry | [2026-08-10] Campaign 8: bounded, control-gated video retry |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-09] Why .PLAN.md exists |
 
@@ -630,6 +630,40 @@ ______________________________________________________________________
   called from `onCreate`, not a lifecycle callback like `onStart`
   (`RepeatOnLifecycleWrongUsage` fails the build). Process death still kills the
   socket — settings live in SharedPreferences so re-derivation is free.
+
+### [2026-08-10] Campaign 8 — bounded, control-gated video retry (MJPEG self-healing)
+
+- **Problem:** the original app's unconditional 30 s MJPEG restart was removed
+  as the socket-leak driver (Campaign 3 P1) and replaced with
+  `reconnect-on-error`, which only fires on a real `IOException`. The user-facing
+  regression (found 2026-08-10 by comparing against upstream): a silently
+  stalled / not-yet-reachable / surface-recreated stream leaves the video black
+  until the user leaves and re-enters (robot out of wifi range and back, robot
+  booting later, foldable hinge).
+- **Alternatives considered:** (a) restore the unconditional 30 s restart —
+  rejected: it was the socket-leak driver and blips healthy streams; (b) a
+  video-side stall watchdog on the render thread — rejected: the thread blocks
+  in `read()`; the socket `SO_TIMEOUT` already covers pure stalls, so the real
+  gap is a failed open/reconnect that nobody retries; (c) **bounded retry gated
+  on the TCP control-connection keepalive** (chosen).
+- **Chosen solution:** `VideoRetryController` (injectable, main-thread
+  `Handler` tick, 5 s interval) reloads the stream while activity resumed ∧
+  control `connectionState is Connected` (the keepalive proxy — same
+  robot/wifi) ∧ video configured ∧ `!view.isPlaying()`; immediate reload on the
+  control-`Connected` edge (a pad touch reconnects control → instant video);
+  cancelled on pause. `VideoStreamLoader.load(url, onResult)` makes a failed
+  open observable; `MjpegView.isPlaying()` gates the ticks. Plus the video
+  loading indicator (spinner shown on load/reconnect, hidden on the first
+  decoded frame via `MjpegView.OnFirstFrameListener`).
+- **Why:** `Connected` is a free reachability probe (keepalive already flows to
+  the same robot), so retries never hammer a robot that is clearly down; the
+  5 s tick + ≤5 s connect keeps the ≤10 s recovery budget; a healthy stream is
+  never touched. TDD: failing tests reproduced the regression first.
+- **Out of scope / consequences:** idle recovery is bounded by user interaction
+  (control reconnects on the next pad touch) — accepted by design. The retry is
+  control-gated, so it cannot recover an idle gamepad after a robot reboot until
+  the user interacts. Coverage gate restored after the new branches (see
+  TESTING.md measured numbers).
 
 ______________________________________________________________________
 

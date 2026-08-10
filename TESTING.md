@@ -259,6 +259,11 @@ almost entirely from **dedup** (B-block, shared `TestTcpServer`/`HttpRequestHead
 literals are the test. Expect dedup to cut tokens; don't chase the number with
 table-ization.
 
+**Re-measure (Campaign 8 + cleanup, 2026-08-10):** **12,412** (11,839 after the
+Campaign 8 tests, then 12,412 after the coverage-margin + loading-indicator
+tests). Still below the 12,659 A0 baseline; new tests are shared-helper based so
+jscpd stays at 0 clones.
+
 **Stateful-table trap:** a table row's expected value must not depend on state an
 earlier row set (e.g. a non-numeric wheel step *keeps* the current step, so after
 a `"42"` row the expected default became 42). Reset the fixture per row where a
@@ -271,10 +276,14 @@ row's outcome depends on prior state (`ui.step = 7` before each case).
   post-migration coverage push, then to 92/71 after the ROADMAP Phase 2-E/2-F/3
   extractions, then to 95/80 after Campaign 2's coverage push);
   `jacocoTestReport` always produces the full
-  report. Measured 97.3% line / 81.9% branch. MjpegView's render-thread
+  report. Measured **97.45% line / 81.23% branch** (Campaign 8 + cleanup,
+  2026-08-10; raised from 97.3 / 81.9 — the new retry/spinner branches were
+  covered as they landed). MjpegView's render-thread
   plumbing (`MjpegView$MjpegRenderThread`/`MjpegViewThread`) is excluded from
   the gate with a recorded rationale (untestable thread lifecycle; the render
-  logic lives in the covered `MjpegFrameRenderer`).
+  logic lives in the covered `MjpegFrameRenderer`); so are Kotlin-inline
+  synthetics (`**/*$special$$inlined$*.class` — the `by viewModels()` delegate
+  boilerplate, see MEMORY "Coverage" design decisions).
 - Instrumented tests exercise only what runs on the emulator; real TRIK robot
   interaction is never in CI.
 - Espresso tests drive the settings UI through extracted helpers

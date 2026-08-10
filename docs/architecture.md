@@ -20,7 +20,10 @@ Single Gradle module `app/` (pure Kotlin, 0 `.java`). Two activities:
   `SenderService`, implements the `SettingsUi` view callbacks, and is the only
   place the app's UI lives. UI helpers extracted (Campaign 2): `MagicButtonPanel`
   builds the `btn N down` buttons; `SystemUiController` owns the immersive
-  system-bar toggle + delayed auto-hide.
+  system-bar toggle + delayed auto-hide. Campaign 8 wiring: owns a
+  `VideoRetryController` (bounded video-stream retry, see "MJPEG video
+  pipeline") and the video-loading indicator (`@+id/videoLoading` spinner shown
+  on load/reconnect, hidden on the first decoded frame).
 - **`MainActivitySettingsController`** — the preference-change handling
   extracted from `MainActivity` (ROADMAP Phase 2-E); see "Settings" below.
 - **`SettingsActivity`** — a thin shell that hosts the `SettingsFragment`
@@ -34,9 +37,12 @@ constants in `SettingsFragment`.
 ### Packages
 
 - `com.trikset.gamepad` — app logic: `MainActivity`, `SettingsActivity`,
-  `SettingsFragment`, `SenderService` (TCP), `SquareTouchPadLayout` (pads),
-  `VideoStreamLoader` (MJPEG HTTP opener), `WheelController`, `MagicButtonPanel`,
-  `SystemUiController`, `MainActivitySettingsController`.
+  `SettingsFragment`, `SenderService` (TCP) + its helpers `ConnectRunnable`,
+  `KeepAliveTimer`, `ConnectionState`, `SenderViewModel`, `SquareTouchPadLayout`
+  (pads) + `TouchPadController` (pad math), `VideoStreamLoader` (MJPEG HTTP
+  opener), `RawSocketHttpStream` (raw-socket HTTP client), `VideoRetryController`
+  (bounded retry), `WheelController`, `MagicButtonPanel`, `SystemUiController`,
+  `MainActivitySettingsController`.
 - `com.trikset.gamepad.mjpeg` — the MJPEG player (vendored origin, renamed
   from `com.demo.mjpeg` in Phase 5): `MjpegView` (SurfaceView + render
   thread), `MjpegInputStream` (frame parser), `MjpegFrameRenderer` (decoding
@@ -93,24 +99,39 @@ timer. The timeout is configurable via `SK_KEEPALIVE`.
 ## MJPEG video pipeline
 
 ```
-HttpURLConnection (5 s connect/read timeouts)
+RawSocketHttpStream (http; bypasses NSC) / HttpURLConnection (https fallback)
+  5 s connect/read timeouts
   -> MjpegInputStream   parses the multipart stream into JPEG frames
   -> MjpegFrameRenderer decodes a frame, computes the letterboxed Rect, draws
   -> MjpegView          SurfaceView; its render thread owns the loop + lockCanvas
 ```
 
 - **`VideoStreamLoader`** (AsyncTask successor) opens the HTTP stream off the
-  main thread and hands it to `MjpegView`. Executor + main handler are
-  injectable for deterministic tests.
+  main thread and hands it to `MjpegView`; it reports open success/failure via
+  an `onResult` callback (a failed open is no longer silent). Executor + main
+  handler are injectable for deterministic tests.
 - **`MjpegView.MjpegRenderThread`** loops `readMjpegFrame()`; on `IOException`
-  it stops and fires `OnStreamErrorListener`.
+  it stops and fires `OnStreamErrorListener`; on the first decoded frame of each
+  playback cycle it fires `OnFirstFrameListener` (the loading indicator hides
+  here — fired on decode, not canvas draw).
 - **Reconnect-on-error** (no forced periodic restart): `MainActivity` registers
   the listener in `onResume`; it marshals to the main thread and calls
   `restartVideoStream()`, which re-runs `VideoStreamLoader`. See `DECISIONS.md`
   "MJPEG: reconnect-on-error" for the rationale.
+- **Bounded retry (Campaign 8)** — `VideoRetryController`: while the activity is
+  resumed ∧ control `connectionState is Connected` (the keepalive proxy) ∧ a
+  video is configured ∧ `!view.isPlaying()`, reloads the stream on a 5 s tick,
+  and immediately on the control-`Connected` edge. Gated on the control
+  connection so a dead robot is never hammered; idle recovery is bounded by user
+  interaction. Decision + rationale: `DECISIONS.md` "Campaign 8 — bounded,
+  control-gated video retry". **Loading indicator:** a centered spinner
+  (`@+id/videoLoading`) shows while loading/reconnecting and stays up while the
+  robot's video is disabled (no frame ever decodes).
 - Default URI is `http://<host>:8080/?action=stream`; changing the host
-  preference rewrites `SK_VIDEO_URI` to match. Cleartext HTTP is allowed via
-  `android:usesCleartextTraffic="true"`.
+  preference rewrites `SK_VIDEO_URI` to match. Cleartext HTTP is handled by the
+  raw-socket client (Campaign 5), which bypasses Network Security Config, so the
+  NSC `192.168.77.1` cleartext whitelist is defensive only (for any platform-HTTP
+  path); see `res/xml/network_security_config.xml`.
 
 `MjpegFrameRenderer` is deliberately separate from the view so the decode /
 letterbox / FPS logic is testable under Robolectric (inject a decoder + plain
