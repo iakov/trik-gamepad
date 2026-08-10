@@ -27,7 +27,7 @@ Each note follows the same shape:
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-09] Dev tooling is cross-platform via uv (Python gate) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-06] Coverage drive to 85% |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry | [2026-08-10] Campaign 8: bounded, control-gated video retry |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry | [2026-08-10] Connection status pill + spinner gating |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-09] Why .PLAN.md exists |
 
@@ -664,6 +664,42 @@ ______________________________________________________________________
   control-gated, so it cannot recover an idle gamepad after a robot reboot until
   the user interacts. Coverage gate restored after the new branches (see
   TESTING.md measured numbers).
+
+### [2026-08-10] Connection status pill + spinner gating (Campaign 10 follow-up — LANDED 2026-08-11)
+
+- **Problem:** the Campaign 10 status line is a small white-on-dark pill pinned
+  above the gear, **always visible** in every connection state. Reviewing a
+  screenshot, the maintainer found it cluttered: the state is already carried by
+  the gear border (green/amber/red) and the live video, so a permanent pill on
+  the pad area is redundant noise. Separately, the video-loading spinner can
+  show even when nothing is loading (no stream URL, or control not yet
+  connected), which is misleading.
+- **Alternatives considered:** hide-on-connected only (text for Connecting +
+  Disconnected, gone on Connected) vs always-visible (status quo); spinner gated
+  on `Connected ∧ URL configured` vs hidden by timer vs left as-is; a text
+  color reusing the existing `amber` border color vs a dedicated alert orange.
+- **Chosen solution (user decision 2026-08-10):** a **centered orange pill**
+  with the text `Tap to connect…` (text ≈5% of landscape height; orange on a
+  dark rounded pill for contrast). `Connecting` → `Connecting…`, `Connected` →
+  pill hidden, `Disconnected` → `Tap to connect…` and still tappable
+  (`SenderService.connect()`). The loading spinner grows to ≈30% of landscape
+  height and is shown **only while `Connected` and a stream URL is configured**
+  (no spinner when not connected or no URL). The pill is drawn over the spinner
+  center (z-order) but the two never co-display because of the gating.
+- **Why:** hiding on `Connected` removes the redundant overlay the moment the
+  state is obvious (gear + video); a centered orange pill is the clearest
+  call-to-action for the one case that needs a tap; gating the spinner keeps it
+  honest — a spinner implies loading, which the control-gated retry only does
+  while connected and configured.
+- **Out of scope / consequences:** implemented 2026-08-11 (commits, gate green
+  ×2, instrumented 9/9 both emulators). Cleanups shipped as decided: dropped
+  `ConnectionFeedback.addressProvider`, dropped the dead
+  `SenderService.getHostPort()` (+ its test), deleted the unused
+  `connection_status_connected` string, gated `showVideoLoading()` on
+  `mVideoURL != null && connectionState is Connected`. `status_orange`
+  (`#FF9800`) added; `connection_status_text_size` = 20sp;
+  `video_loading_size` = 120dp. `Tap to connect` uses the real ellipsis
+  character (`…`) — lint `TypographyEllipsis` rejects `...`.
 
 ______________________________________________________________________
 

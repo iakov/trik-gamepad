@@ -165,6 +165,12 @@ window focus is never granted under the software GPU), wait for
 `sys.boot_completed=1`, pre-empt the immersive confirmation (`adb shell settings put secure immersive_mode_confirmations confirmed`), then
 `./gradlew connectedDebugAndroidTest`. See TESTING.md for the full recipe.
 
+**Screencap quirk (2026-08-10):** `Atd_API36` (host GPU) `adb screencap` /
+`exec-out screencap` returns a **pure-black** framebuffer for *every* app (the
+launcher too — avg brightness 0.0) — a capture-path artifact, not an app defect.
+`Swiftshader_API36` captures correctly. For `.tmp` screenshot proofs (AGENTS.md
+"UI changes ship with a screenshot proof"), use the swiftshader AVD.
+
 ## App protocol
 
 ### SenderService
@@ -1620,3 +1626,53 @@ BRANCH, jscpd 0 clones, detekt/spotbugs/lint green; instrumented **9/9 on both
 API-36 emulators** (Atd_API36 + Swiftshader_API36). Test logical-SLOC trend
 17,361 tokens (A0 baseline 12,659) — the growth is new tested components
 (controller/store/symbols + their tests); jscpd stays at 0 clones.
+
+### [2026-08-11] Campaign 11 execution run - connection status pill + spinner gating
+
+Campaign 10 follow-up (decided 2026-08-10, implemented this session). Full
+record in ROADMAP "Campaign 10 follow-up"; commits `feat` + `docs`. Per the
+time-tracking protocol, docs update was the LAST step before commit.
+
+**What landed:**
+
+- **Centered orange pill**: `connectionStatus` moved from above-the-gear to
+  `layout_centerInParent`, `textColor=@color/status_orange` (`#FF9800`),
+  bold `20sp` (`connection_status_text_size`), pill padding, default
+  `visibility="gone"`, and is now the LAST child (drawn over the spinner
+  center). `ConnectionFeedback` dropped `addressProvider`; `setStatusText`
+  shows `Connecting…` (VISIBLE), hides on `Connected` (GONE), shows
+  `Tap to connect…` (VISIBLE) on `Disconnected`.
+- **Spinner gating**: `videoLoading` fixed at `video_loading_size` = 120dp
+  (≈30% landscape height); `MainActivity.restartVideoStream` calls
+  `showVideoLoading()` only when `mVideoURL != null && connectionState is Connected`. No spinner when disconnected / no URL.
+- **Cleanups**: `connection_status_connected` string deleted; dead
+  `SenderService.getHostPort()` removed (+ its test).
+
+**Traps hit / lessons:**
+
+- **lint `TypographyEllipsis` rejects `...`** in string resources — use the
+  real ellipsis `…` (matches the existing `Connecting…`). The decided copy
+  `Tap to connect...` had to become `Tap to connect…`; the test + docs were
+  updated to match.
+- **"No URL" premise trap (MainActivityTest):** a fresh activity's `mVideoURL`
+  is **never null** — `MainActivitySettingsController.onPreferenceChanged`
+  defaults an unset video-URI pref to `http://<host>:8080/?action=stream`. The
+  new no-URL spinner-gate test only works if the pref is explicitly set to `""`
+  first (same pattern as the existing `nullVideoUrlShouldShowPlaceholder`).
+- **jscpd flagged the two new gate tests** (62-token clone) → extracted an
+  `assertSpinnerHiddenAfterRestart(videoUrl, connectFirst)` helper. The hard
+  duplication gate keeps "tests are code" honest.
+- **Screenshot proof again via pixel sampling** (this model cannot view
+  images): the pill was confirmed by scanning for `#FF9800`-hue pixels —
+  **1,303 orange pixels in the center ±400×±80 region** over a dark video
+  background on a fresh disconnected launch (2340×1080).
+  `Atd_API36` host-GPU screencap is black; used `Swiftshader_API36` (5556) as
+  documented.
+
+**Verification (measured):** canonical gate green (jacoco **0.95 LINE /
+0.80 BRANCH** — measured **96.7% line / 83.1% branch**, up from 82.05% thanks
+to the new spinner-gate branches), jscpd 0 clones, detekt/spotbugs/lint green;
+full 3-variant `test` suite ×2 green (`--rerun-tasks` on the second pass —
+UP-TO-DATE would have executed nothing); instrumented **9/9 on both emulators**
+(Atd_API36 + Swiftshader_API36). Test logical-SLOC 17,442 tokens. Screenshot
+proof: `.tmp/status_line_final.png` (orange cluster verified at screen center).

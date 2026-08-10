@@ -422,3 +422,34 @@ execution run".
   with sub-screen navigation.
   **CAMPAIGN 10 COMPLETE** (commits `e6f556a`, `60773e0`; retrospective in
   MEMORY.md).
+
+## Campaign 10 follow-up (implemented 2026-08-11)
+
+Connection-status pill + loading-spinner gating. Decided by user (2026-08-10);
+spec was recorded here and in `.PLAN.md`, then executed this session.
+Rationale/alternatives: DECISIONS.md "Connection status pill + spinner
+gating". Retrospective + timing: MEMORY.md "Campaign 11 execution run".
+
+- **Status text** becomes a centered orange pill: text `Tap to connect…`
+  (20sp ≈5% of landscape height), `@color/status_orange` on the dark rounded
+  pill, centered on screen. `Connecting` shows `Connecting…`; `Connected`
+  hides the pill (`visibility=gone` — the green gear carries that state);
+  `Disconnected` shows `Tap to connect…` and stays tappable (tap →
+  `SenderService.connect()`). The pill is the last child, drawn over the
+  spinner center (z-order) but the two never co-display.
+- **Loading spinner gating**: the spinner (`video_loading_size` = 120dp ≈30%
+  of landscape height, up from the default size) shows only while the control
+  connection is `Connected` **and** a stream URL is configured. No spinner
+  when not connected or when no URL is set.
+- Implied changes: dropped `addressProvider` from `ConnectionFeedback`; dropped
+  the now-dead `SenderService.getHostPort()` (+ its test); deleted the unused
+  `connection_status_connected` string; `MainActivity.restartVideoStream`
+  gates `showVideoLoading()` on `mVideoURL != null && connectionState is Connected`; `ConnectionFeedbackTest` + `MainActivityTest` updated
+  (spinner-visible tests connect the sender first; new gate tests cover
+  disconnected / no-URL spinner-hidden).
+- **Verification**: full gate green (`0.95 LINE / 0.80 BRANCH`, jscpd 0 clones,
+  detekt/spotbugs/lint clean), full 3-variant `test` suite ×2 green,
+  instrumented 9/9 on both emulators. Screenshot proof (centered orange pill
+  on a fresh disconnected launch): `.tmp/status_line_final.png` (orange pixel
+  cluster verified at screen center).
+  **CAMPAIGN 11 COMPLETE**.

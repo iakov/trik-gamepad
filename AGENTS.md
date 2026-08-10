@@ -134,6 +134,7 @@ configurations, update this section and the referenced config files.
 - **3 identical failures → stop and read the shadow/API source**, don't tweak-and-rerun. This applies to **any repeated tooling signal, not just test assertions**: the same message appearing N≥3 times across commands (e.g. `spotlessKotlinCheck FAILED`, "configuration cache cannot be reused") means a systemic cause — find and fix it, don't absorb it.
 - **Never read `window`/activity-scoped state in a field initializer** — `Activity.window` is only assigned during `attach()` (after the constructor), so a field initializer referencing it throws in Robolectric ("Window creation failed!") and NPEs on device. Use `by lazy` or a provider lambda; declare such fields with a default that defers the access.
 - **CI cadence**: one bounded run check (~3 min) after each push; if no run appears, document it and re-check at the next push rather than blocking.
+- **UI changes ship with a screenshot proof**: before pushing any change that alters the UI, capture a `.tmp` screenshot (on an emulator whose screencap works — see MEMORY "Emulator prerequisites"; `Atd_API36` host-GPU screencap returns pure black) as feature proof and report its path after push. If told to stop before push, stop with the screenshot already saved — never push past a stop request.
 
 ### On tool error
 
@@ -213,6 +214,7 @@ rules.
 - **`gh` run commands take the run **id**, not a PowerShell run object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
 - **`gh run view --json ... --jq "<expr>"` with embedded quotes breaks under PowerShell** ("accepts at most 1 arg(s), received N") — the quoted `--jq` expression gets mangled in argument passing. Use plain `--json status,conclusion` or route the expression through a `.tmp/` file.
 - **PowerShell escaping differs from bash** (backticks, `-1` in `git commit -m`); route complex arguments through a `.tmp/` file rather than inlining.
+- **PS 5.1 `>` on a native command's stdout corrupts binary output**: `adb exec-out screencap -p > shot.png` writes the raw bytes as text (UTF-16/translated), breaking the PNG ("FromFile ... Out of memory"). Capture on-device (`adb shell screencap -p /sdcard/x.png`) then `adb pull`, or redirect via `cmd /c "... > file"`.
 - **Cold Gradle daemon spawn hangs the caller until the daemon detaches (Windows handle inheritance)**: the build prints and finishes fast, but a freshly-spawned daemon inherits the tool's output handles, so the completion signal (pipe EOF) waits until the daemon releases them after startup (`jps -l` shows the orphan `GradleDaemon`). Never pipe long-lived children (gradle/emulator) through Tee/Select — the daemon inherits the pipe handles and the pipeline never sees EOF; redirect to a file (`*> log`) instead, and the file redirect alone still does **not** fix it — use `--no-daemon`/`--stop` for tool-driven Gradle probes. POSIX daemons detach cleanly (re-audit on the first POSIX box).
 
 ## Memory index
