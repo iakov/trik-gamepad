@@ -174,10 +174,12 @@ class MainActivity :
     mSensorManager?.unregisterListener(this)
     getSenderService().disconnect("Inactive gamepad")
     videoRetryController?.onPause()
+    hideVideoLoading()
     val video = mVideo
     if (video != null) {
       video.stopPlayback()
       video.setOnStreamErrorListener(null)
+      video.setOnFirstFrameListener(null)
     }
     super.onPause()
   }
@@ -191,6 +193,8 @@ class MainActivity :
       // drop the HTTP connection and restart it (R12; see DECISIONS.md
       // "MJPEG: reconnect-on-error").
       video.setOnStreamErrorListener { videoRetryController?.onStreamError() }
+      // Hide the loading indicator once the first frame of this playback cycle renders.
+      video.setOnFirstFrameListener { runOnUiThread { hideVideoLoading() } }
       restartVideoStream()
     }
     val sensorManager = mSensorManager
@@ -208,12 +212,23 @@ class MainActivity :
     // main thread before touching the view hierarchy / opening the stream.
     runOnUiThread {
       val video = mVideo ?: return@runOnUiThread
+      // Show the loading indicator while the stream opens/reconnects; it stays
+      // up until the first frame renders (robot video disabled -> keeps cycling).
+      showVideoLoading()
       // Feed the load outcome back into the retry controller (Campaign 8): a failed open arms
       // the bounded retry loop, a success disarms it.
       VideoStreamLoader(video).load(mVideoURL) { ok ->
         if (ok) videoRetryController?.onLoadSuccess() else videoRetryController?.onLoadFailed()
       }
     }
+  }
+
+  private fun showVideoLoading() {
+    findViewById<android.widget.ProgressBar>(R.id.videoLoading)?.visibility = View.VISIBLE
+  }
+
+  private fun hideVideoLoading() {
+    findViewById<android.widget.ProgressBar>(R.id.videoLoading)?.visibility = View.GONE
   }
 
   override fun onSensorChanged(event: SensorEvent) {
@@ -273,10 +288,12 @@ class MainActivity :
 
   override fun onDestroy() {
     mSensorManager?.unregisterListener(this)
+    hideVideoLoading()
     val video = mVideo
     if (video != null) {
       video.stopPlayback()
       video.setOnStreamErrorListener(null)
+      video.setOnFirstFrameListener(null)
       mVideo = null
     }
     systemUiController.detach()

@@ -1,9 +1,12 @@
 package com.trikset.gamepad.mjpeg
 
 import com.trikset.gamepad.RobolectricTestBase
+import com.trikset.gamepad.VideoStreamLoader
 import java.io.ByteArrayInputStream
 import java.net.ServerSocket
 import java.net.Socket
+import java.net.URL
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -13,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 class MjpegViewTest : RobolectricTestBase() {
@@ -74,6 +78,57 @@ class MjpegViewTest : RobolectricTestBase() {
     assertTrue(view.isPlaying())
     view.stopPlayback()
     assertFalse(view.isPlaying())
+  }
+
+  @Test
+  fun firstFrameListenerShouldNotFireOnEmptyStream() {
+    val view = MjpegView(RuntimeEnvironment.getApplication())
+    val fired = AtomicInteger(0)
+    view.setOnFirstFrameListener { fired.incrementAndGet() }
+    // The empty stream hits EOF immediately: an error, never a decoded frame.
+    view.setSource(MjpegInputStream(ByteArrayInputStream(ByteArray(0))))
+    view.startPlayback()
+    Thread.sleep(200)
+    view.stopPlayback()
+    assertEquals(0, fired.get())
+  }
+
+  @Test
+  @GraphicsMode(GraphicsMode.Mode.NATIVE)
+  fun firstFrameListenerShouldFireOncePerPlaybackAfterFrameDecoded() {
+    val server = SyntheticMjpegServer(framesPerConnection = 10, frameIntervalMs = 10)
+    val port = server.start()
+    val view = MjpegView(RuntimeEnvironment.getApplication())
+    view.surfaceCreated(view.holder)
+    val fired = AtomicInteger(0)
+    view.setOnFirstFrameListener { fired.incrementAndGet() }
+    val url = URL("http://127.0.0.1:$port/?action=stream")
+    try {
+      val stream = requireNotNull(VideoStreamLoader(view).openStream(url))
+      view.setSource(stream)
+      view.startPlayback()
+      val deadline = System.currentTimeMillis() + 10000
+      while (fired.get() < 1 && System.currentTimeMillis() < deadline) {
+        Thread.sleep(20)
+      }
+      assertTrue("a decoded frame must report first-frame once", fired.get() >= 1)
+      // A second playback cycle reports again (spinner re-shows on reconnect).
+      view.stopPlayback()
+      view.setSource(requireNotNull(VideoStreamLoader(view).openStream(url)))
+      view.startPlayback()
+      assertTrue(
+          "reconnect must open a fresh connection",
+          server.acceptedConnections.get() >= 2,
+      )
+      val secondDeadline = System.currentTimeMillis() + 10000
+      while (fired.get() < 2 && System.currentTimeMillis() < secondDeadline) {
+        Thread.sleep(20)
+      }
+      assertTrue("a new playback cycle must report first-frame again", fired.get() >= 2)
+    } finally {
+      view.stopPlayback()
+      server.stop()
+    }
   }
 
   @Test

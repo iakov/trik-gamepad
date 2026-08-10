@@ -19,6 +19,11 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
     fun onStreamError()
   }
 
+  /** Invoked from the render thread once per playback cycle when the first frame is decoded. */
+  fun interface OnFirstFrameListener {
+    fun onFirstFrame()
+  }
+
   private val fpsTextPaint = Paint()
   private var viewThread: MjpegViewThread? = null
   @Volatile private var input: MjpegInputStream? = null
@@ -28,6 +33,8 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
   @Volatile private var dispWidth = 0
   @Volatile private var dispHeight = 0
   private var onStreamErrorListener: OnStreamErrorListener? = null
+  private var onFirstFrameListener: OnFirstFrameListener? = null
+  @Volatile private var frameReported = false
 
   constructor(context: Context) : super(context) {
     init()
@@ -39,6 +46,11 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
 
   fun setOnStreamErrorListener(listener: OnStreamErrorListener?) {
     onStreamErrorListener = listener
+  }
+
+  fun setOnFirstFrameListener(listener: OnFirstFrameListener?) {
+    onFirstFrameListener = listener
+    frameReported = false
   }
 
   private fun init() {
@@ -64,6 +76,7 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
   fun startPlayback() {
     if (input != null) {
       running = true
+      frameReported = false
       viewThread?.start()
     }
   }
@@ -161,6 +174,12 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
           frame = stream
           val destRect = renderer.extractFrame(stream, dispWidth, dispHeight)
           if (destRect != null) {
+            // A frame is decoded: report the first one of this playback cycle
+            // (the loading indicator hides here, before the canvas draw).
+            if (!frameReported) {
+              frameReported = true
+              onFirstFrameListener?.onFirstFrame()
+            }
             canvas = holder.lockCanvas()
             if (canvas != null) {
               renderer.drawFrame(canvas, destRect, dispWidth, fpsTextPaint)

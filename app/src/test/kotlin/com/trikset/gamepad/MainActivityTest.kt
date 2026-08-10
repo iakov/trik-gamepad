@@ -232,25 +232,13 @@ class MainActivityTest : RobolectricTestBase() {
     setField(activity, "mVideo", MjpegView(activity))
     setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
     val sender = activity.getSenderService()
-    TestTcpServer().use { server ->
-      sender.setTarget(TestTcpServer.HOST, server.port)
-      sender.send("")
-      val deadline = System.currentTimeMillis() + 5000
-      while (
-          sender.connectionState.value !is ConnectionState.Connected &&
-              System.currentTimeMillis() < deadline
-      ) {
-        org.robolectric.Robolectric.flushForegroundThreadScheduler()
-        Thread.sleep(10)
-      }
-      assertTrue(sender.connectionState.value is ConnectionState.Connected)
-      // The reload's load() runs on a real executor; give the fast-failing open + its onResult
-      // post time to reach the main looper so the onLoadFailed path is deterministically covered.
-      val settleDeadline = System.currentTimeMillis() + 2000
-      while (System.currentTimeMillis() < settleDeadline) {
-        org.robolectric.Robolectric.flushForegroundThreadScheduler()
-        Thread.sleep(20)
-      }
+    awaitControlConnection(sender)
+    // The reload's load() runs on a real executor; give the fast-failing open + its onResult
+    // post time to reach the main looper so the onLoadFailed path is deterministically covered.
+    val settleDeadline = System.currentTimeMillis() + 2000
+    while (System.currentTimeMillis() < settleDeadline) {
+      org.robolectric.Robolectric.flushForegroundThreadScheduler()
+      Thread.sleep(20)
     }
     sender.disconnect("test done")
   }
@@ -260,6 +248,13 @@ class MainActivityTest : RobolectricTestBase() {
     // Campaign 8 gate: Connected with no video URL configured -> shouldReload
     // short-circuits at mVideoURL != null (false) and nothing is armed.
     val sender = activity.getSenderService()
+    awaitControlConnection(sender)
+    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    sender.disconnect("test done")
+  }
+
+  /** Connects [sender] to an ephemeral server and waits until the state flips to Connected. */
+  private fun awaitControlConnection(sender: SenderService) {
     TestTcpServer().use { server ->
       sender.setTarget(TestTcpServer.HOST, server.port)
       sender.send("")
@@ -272,9 +267,30 @@ class MainActivityTest : RobolectricTestBase() {
         Thread.sleep(10)
       }
       assertTrue(sender.connectionState.value is ConnectionState.Connected)
-      org.robolectric.Robolectric.flushForegroundThreadScheduler()
     }
-    sender.disconnect("test done")
+  }
+
+  /** Sets a configured video and triggers a reload (the common spinner-test setup). */
+  private fun restartVideoStreamWithConfiguredVideo() {
+    setField(activity, "mVideo", MjpegView(activity))
+    setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
+    method(activity, "restartVideoStream").invoke(activity)
+    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+  }
+
+  @Test
+  fun restartVideoStreamShouldShowLoadingIndicator() {
+    restartVideoStreamWithConfiguredVideo()
+    val indicator = activity.findViewById<android.widget.ProgressBar>(R.id.videoLoading)
+    assertEquals(android.view.View.VISIBLE, indicator!!.visibility)
+  }
+
+  @Test
+  fun onPauseShouldHideLoadingIndicator() {
+    restartVideoStreamWithConfiguredVideo()
+    method(activity, "onPause").invoke(activity)
+    val indicator = activity.findViewById<android.widget.ProgressBar>(R.id.videoLoading)
+    assertEquals(android.view.View.GONE, indicator!!.visibility)
   }
 
   @Test
