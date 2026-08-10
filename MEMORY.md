@@ -1434,3 +1434,15 @@ robot video disabled → keeps cycling; no URL → hidden. Commits `496ca7f`
 - **Coverage margin matters:** 0.8016 left only ~2 branches of headroom (it
   wobbled to 0.7989 once); 0.8123 gives ~4.6 branches of flake headroom while
   keeping the 95/80 gate honest.
+- **`bringToFront()` reorders the parent's children at runtime — index-based
+  Espresso matchers break on any layout insertion:** `MainActivity` calls
+  `controlsOverlay.bringToFront()`, so `main`'s *rendered* child order is
+  `video, btnSettings, buttons, …, controlsOverlay`, not the XML order. The
+  spinner's `ProgressBar` inserted at XML child index 1 landed at rendered index
+  1 — exactly where `SettingsTests.openSettings` expected `btnSettings`
+  (`childAtPosition(…, 1)`) → CI instrumented red. Fixed by (a) keeping new
+  `main` children after the gear button (spinner is now the last child; the
+  XML comment explains why) and (b) hardening `openSettings` to
+  `allOf(withId(R.id.btnSettings), isDisplayed())` (unique id, no index).
+  Lesson: prefer id-based matchers; never assert a child index against a view
+  that may be reordered by `bringToFront`.

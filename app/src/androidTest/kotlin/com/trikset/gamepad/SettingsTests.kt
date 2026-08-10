@@ -80,17 +80,10 @@ class SettingsTests {
 
   /** From the gamepad: reveal + tap the action-bar Settings item. */
   private fun openSettings() {
-    onView(
-            allOf(
-                withId(R.id.btnSettings),
-                childAtPosition(
-                    allOf(withId(R.id.main), childAtPosition(withId(android.R.id.content), 0)),
-                    1,
-                ),
-                isDisplayed(),
-            )
-        )
-        .perform(click())
+    // The gear button is unique, so no child-index matcher is needed; index-based
+    // locators break on any layout reorder (MainActivity's controlsOverlay.bringToFront()
+    // and new children moving btnSettings from rendered child #1).
+    onView(allOf(withId(R.id.btnSettings), isDisplayed())).perform(click())
 
     onView(
             allOf(
