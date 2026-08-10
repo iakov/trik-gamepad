@@ -256,6 +256,28 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun connectionConnectedWithNullVideoUrlShouldNotReload() {
+    // Campaign 8 gate: Connected with no video URL configured -> shouldReload
+    // short-circuits at mVideoURL != null (false) and nothing is armed.
+    val sender = activity.getSenderService()
+    TestTcpServer().use { server ->
+      sender.setTarget(TestTcpServer.HOST, server.port)
+      sender.send("")
+      val deadline = System.currentTimeMillis() + 5000
+      while (
+          sender.connectionState.value !is ConnectionState.Connected &&
+              System.currentTimeMillis() < deadline
+      ) {
+        org.robolectric.Robolectric.flushForegroundThreadScheduler()
+        Thread.sleep(10)
+      }
+      assertTrue(sender.connectionState.value is ConnectionState.Connected)
+      org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    }
+    sender.disconnect("test done")
+  }
+
+  @Test
   fun createPadShouldWireSender() {
     val m = method(activity, "createPad", Int::class.javaPrimitiveType!!, String::class.java)
     m.invoke(activity, R.id.leftPad, "1")

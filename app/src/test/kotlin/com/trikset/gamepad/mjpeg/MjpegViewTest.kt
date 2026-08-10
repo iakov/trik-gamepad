@@ -76,6 +76,30 @@ class MjpegViewTest : RobolectricTestBase() {
     assertFalse(view.isPlaying())
   }
 
+  @Test
+  fun stopPlaybackWhenRunningWithNullSourceShouldNotCrash() {
+    // Render thread is blocked in a socket read (running=true), then the source
+    // is cleared before stop: stopPlayback's close-guard must handle input==null.
+    val server = ServerSocket(0)
+    try {
+      val client = Socket("127.0.0.1", server.localPort)
+      try {
+        val view = MjpegView(RuntimeEnvironment.getApplication())
+        view.surfaceCreated(view.holder)
+        view.setSource(MjpegInputStream(client.getInputStream()))
+        view.startPlayback()
+        Thread.sleep(100)
+        view.setSource(null)
+        view.stopPlayback()
+        assertFalse(view.isPlaying())
+      } finally {
+        client.close()
+      }
+    } finally {
+      server.close()
+    }
+  }
+
   /**
    * Runs stopPlayback against a render thread blocked in a socket read and asserts the stream was
    * closed so the read unblocks.

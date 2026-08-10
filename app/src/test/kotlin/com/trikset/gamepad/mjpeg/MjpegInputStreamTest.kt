@@ -160,4 +160,20 @@ class MjpegInputStreamTest : RobolectricTestBase() {
     val result = stream.readMjpegFrame()
     result?.close()
   }
+
+  @Test
+  fun readMjpegFrameWithEmptyContentLengthShouldRecover() {
+    // "Content-Length:" with no value parses to null, so contentLength stays
+    // -1 and the "Skipping to recover" path drops the frame instead of throwing.
+    val stream =
+        MjpegInputStream(
+            ByteArrayInputStream(
+                frameWithHeaders(
+                    "Content-Type: image/jpeg\r\nContent-Length:\r\n",
+                    byteArrayOf(0xFF.toByte(), 0xD8.toByte()) + jpegBytes(50),
+                )
+            )
+        )
+    assertNull(stream.readMjpegFrame())
+  }
 }

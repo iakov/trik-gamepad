@@ -186,6 +186,41 @@ class RawSocketHttpStreamTest : RobolectricTestBase() {
     }
   }
 
+  @Test
+  fun throwsOnNonHttpStatusLine() {
+    // A status line that does not start with HTTP/1.x is rejected, even with a 2xx code.
+    withRawResponse("HTTP/2.0 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n") { url ->
+      assertThrows(IOException::class.java) { RawSocketHttpStream.open(url) }
+    }
+  }
+
+  @Test
+  fun throwsOnStatusLineWithoutStatusCode() {
+    // "HTTP/1.1" has no code token: parseHead falls back to 0, out of the 2xx range.
+    withRawResponse("HTTP/1.1\r\n\r\n") { url ->
+      assertThrows(IOException::class.java) { RawSocketHttpStream.open(url) }
+    }
+  }
+
+  @Test
+  fun responseWithoutContentLengthReadsUntilClose() {
+    // No Content-Length and no transfer-encoding: the body is the socket-until-close stream.
+    withRawResponse("HTTP/1.1 200 OK\r\nConnection: close\r\n\r\nhello") { url ->
+      RawSocketHttpStream.open(url).use { stream ->
+        assertEquals("hello", String(stream.readBytes(), Charsets.US_ASCII))
+      }
+    }
+  }
+
+  @Test
+  fun defaultPortUsedWhenUrlHasNone() {
+    // No explicit port -> url.port is -1 -> the client falls back to the default
+    // HTTP port 80 (nothing listens there locally -> connection refused).
+    assertThrows(IOException::class.java) {
+      RawSocketHttpStream.open(URL("http://127.0.0.1/stream"))
+    }
+  }
+
   /** Serves [response] to a single GET request and runs [block] with the URL. */
   private fun withRawResponse(response: String, block: (URL) -> Unit) {
     val serverSocket = ServerSocket(0)
