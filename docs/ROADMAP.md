@@ -376,3 +376,47 @@ emulators** (`connectedDebugAndroidTest --no-configuration-cache`); the wheel
 menu removal broke `SettingsTests.openSettings`' index-based matcher
 (`childAtPosition(...,1)` assumed the wheel item) — fixed to id+text+displayed.
 **CAMPAIGN 9 COMPLETE.**
+
+## Campaign 10 — hardware & connection UX
+
+Scope (user decision 2026-08-10): end-user UX for hardware gamepads (mapping,
+swap toggle), connection clarity (persistent status + explicit connect), magic
+button symbols/count, a manual hide-controls toggle, robot presets, and a
+settings restructure into a Basic root + "Advanced settings" sub-screen.
+Time-tracking protocol (campaign-level only): the header table is filled at
+kickoff (Estimated/Start) and finalized as the docs LAST step (End/Actual +
+MEMORY retrospective). Full execution record: MEMORY.md "Campaign 10
+execution run".
+
+| Estimated | Start | End | Actual |
+|-----------|-------|-----|--------|
+| ~10.5 h | 2026-08-10 | — | — |
+
+- **Settings restructure** — root shows Basic categories inline (Robot
+  connection / Video / Controls) + a nested "Advanced settings" sub-screen
+  (Wheel / Pads & video / Hardware gamepad / Network / Magic buttons / Robot
+  presets / About). `SettingsFragment.init*` helpers follow their prefs;
+  `findPreference` traverses the nested hierarchy.
+- **A** FPS overlay toggle — `SK_SHOW_FPS` (default off); `MjpegView.showFps`
+  volatile, the render thread skips the `drawText` when off.
+- **B** Connection status + explicit connect — a status `TextView` above the
+  gear (`Connected to host:port` / `Connecting…` / `Disconnected — tap to connect`); tap calls public `SenderService.connect()`; logic in
+  `ConnectionFeedback` (zero new MainActivity methods).
+- **G** Magic buttons — `SK_MAGIC_BUTTON_COUNT` (0–5, default 3) +
+  `SK_MAGIC_SYMBOL_1..5` (defaults ▲ ■ ● ✕ ◆); glyphs display-only, the
+  protocol stays numeric `btn N down`; `contentDescription` = "Button N";
+  pure `MagicButtonSymbols` helper.
+- **H** Hide pads & buttons — `SK_HIDE_CONTROLS` (default off, manual);
+  `controlsOverlay` + button row → `GONE` (removed from hit-testing);
+  Advanced > Pads & video.
+- **D** Robot presets — pure `RobotPresetStore` (SharedPreferences + `org.json`):
+  save/load/all/delete; dynamic category rows; apply = single `edit { }` of
+  host/port/videoURI.
+- **E** Hardware gamepad — pure `HardwareGamepadController`: D-pad/left
+  stick→pad1, right stick→pad2, A/B/X/Y→magic 1–4, L1/R1→magic 5 (within
+  count); `SK_GAMEPAD_SWAP` swaps sticks; MainActivity overrides
+  `dispatchKeyEvent`/`onGenericMotionEvent`.
+- **Verification** — full gate ×2 (`--rerun-tasks` on pass 2), instrumented
+  9/9 on both API-36 emulators; detekt `TooManyFunctions` 25→31 (adapter/
+  override rationale). Instrumented `SettingsTests` rewritten index→id-based
+  with sub-screen navigation.
