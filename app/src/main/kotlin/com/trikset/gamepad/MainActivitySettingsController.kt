@@ -43,6 +43,12 @@ class MainActivitySettingsController(
     fun setWheelEnabled(enabled: Boolean)
 
     fun setKeepScreenOn(enabled: Boolean)
+
+    fun setMagicButtons(count: Int, symbols: List<String>)
+
+    fun setControlsVisible(visible: Boolean)
+
+    fun setShowFps(enabled: Boolean)
   }
 
   private val context = context.applicationContext
@@ -132,6 +138,24 @@ class MainActivitySettingsController(
     val keepScreenOn = sharedPreferences.getBoolean(SettingsFragment.SK_KEEP_SCREEN_ON, true)
     ui.setKeepScreenOn(keepScreenOn)
 
+    // Magic buttons: count (0 hides the row; capped at the maximum) + a display glyph per button
+    // (defaults ▲ ■ ● ✕ ◆); the protocol command stays numeric `btn N down`.
+    val magicCount = readMagicButtonCount(sharedPreferences)
+    val symbols =
+        (1..SettingsFragment.MAX_MAGIC_BUTTONS).map { n ->
+          MagicButtonSymbols.resolve(
+              n,
+              sharedPreferences.getString(SettingsFragment.magicSymbolKey(n), null),
+          )
+        }
+    ui.setMagicButtons(magicCount, symbols)
+
+    val hideControls = sharedPreferences.getBoolean(SettingsFragment.SK_HIDE_CONTROLS, false)
+    ui.setControlsVisible(!hideControls)
+
+    val showFps = sharedPreferences.getBoolean(SettingsFragment.SK_SHOW_FPS, false)
+    ui.setShowFps(showFps)
+
     try {
       val timeout =
           sharedPreferences
@@ -162,7 +186,7 @@ class MainActivitySettingsController(
     }
   }
 
-  private companion object {
+  internal companion object {
     const val TAG = "SettingsController"
     const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
     const val DEFAULT_HOST_PORT = "4444"
@@ -171,5 +195,17 @@ class MainActivitySettingsController(
     const val ALPHA_MAX = 255
     const val WHEEL_STEP_MIN = 1
     const val WHEEL_STEP_MAX = 100
+    const val DEFAULT_MAGIC_BUTTON_COUNT = 3
+
+    /** Reads the configured magic-button count (0..MAX), honoring both Int and String storage. */
+    fun readMagicButtonCount(prefs: SharedPreferences): Int {
+      val parsed =
+          when (val value = prefs.all[SettingsFragment.SK_MAGIC_BUTTON_COUNT]) {
+            is Int -> value
+            is String -> value.toIntOrNull()
+            else -> null
+          }
+      return (parsed ?: DEFAULT_MAGIC_BUTTON_COUNT).coerceIn(0, SettingsFragment.MAX_MAGIC_BUTTONS)
+    }
   }
 }

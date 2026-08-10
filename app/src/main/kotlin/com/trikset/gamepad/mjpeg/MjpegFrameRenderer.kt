@@ -94,6 +94,7 @@ class MjpegFrameRenderer(
       destRect: Rect,
       dispWidth: Int,
       fpsTextPaint: Paint,
+      showFps: Boolean = true,
   ): String {
     frameCounter++
     val now = System.currentTimeMillis()
@@ -110,7 +111,9 @@ class MjpegFrameRenderer(
     if (current != null) {
       canvas.drawBitmap(current, null, destRect, null)
     }
-    canvas.drawText(fpsString, (dispWidth - 1).toFloat(), -fpsTextPaint.ascent(), fpsTextPaint)
+    if (showFps) {
+      canvas.drawText(fpsString, (dispWidth - 1).toFloat(), -fpsTextPaint.ascent(), fpsTextPaint)
+    }
     return fpsString
   }
 }

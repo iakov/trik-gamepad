@@ -13,4 +13,15 @@
     <string name="right_pad_description">Right pad</string>
     <string name="video_description">Robot video stream</string>
     <string name="video_placeholder">No video stream — configure a video URI in Settings</string>
+    <string name="connection_status_connecting">Connecting…</string>
+    <string name="connection_status_connected">Connected to %1$s</string>
+    <string name="connection_status_disconnected">Disconnected — tap to connect</string>
+    <string name="connection_status_description">Connection status; tap to connect</string>
+    <string name="preset_name_required">Preset name cannot be empty</string>
+    <string name="preset_saved">Preset “%1$s” saved</string>
+    <string name="preset_deleted">Preset “%1$s” deleted</string>
+    <string name="preset_applied">Preset “%1$s” applied</string>
+    <string name="preset_row_summary">%1$s:%2$s · tap to apply</string>
+    <string name="no_presets_saved">No presets saved yet</string>
+    <string name="delete_preset_dialog_title">Delete preset</string>
 </resources>

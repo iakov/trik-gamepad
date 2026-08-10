@@ -8,8 +8,11 @@ import android.os.Bundle
 import android.util.DisplayMetrics
 import android.widget.Toast
 import androidx.core.content.edit
+import androidx.preference.EditTextPreference
 import androidx.preference.Preference
+import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.PreferenceManager
 import java.util.Locale
 
 class SettingsFragment : PreferenceFragmentCompat() {
@@ -26,7 +29,18 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val SK_COPY_ROBOT_IP = "copyRobotIp"
     const val SK_WHEEL_ENABLED = "wheelEnabled"
     const val SK_KEEP_SCREEN_ON = "keepScreenOn"
+    const val SK_HIDE_CONTROLS = "hideControls"
+    const val SK_SHOW_FPS = "showFps"
+    const val SK_GAMEPAD_SWAP = "gamepadSwap"
+    const val SK_MAGIC_BUTTON_COUNT = "magicButtonCount"
+    const val SK_SAVE_PRESET = "saveRobotPreset"
+    const val SK_DELETE_PRESET = "deleteRobotPreset"
+    const val SK_ROBOT_PRESETS = "robotPresets"
+    const val MAX_MAGIC_BUTTONS = 5
     private const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
+    private const val DEFAULT_HOST_PORT = "4444"
+
+    fun magicSymbolKey(buttonNumber: Int): String = "magicSymbol$buttonNumber"
   }
 
   /** One-tap copy of the configured robot IP (debugging convenience). */
@@ -116,6 +130,99 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
   }
 
+  /**
+   * Wires the Robot-presets category: "Save current robot as preset" stores the current host/port/
+   * video URI under a name; "Delete a preset" lists the saved names in a dialog; dynamic rows (one
+   * per saved preset) apply the preset on tap. Dynamic rows are rebuilt on save/delete.
+   */
+  private fun initializeRobotPresets() {
+    val category = findPreference<PreferenceCategory>(SK_ROBOT_PRESETS) ?: return
+    val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
+    val store = RobotPresetStore(prefs)
+
+    val save = findPreference<EditTextPreference>(SK_SAVE_PRESET)
+    save?.setOnPreferenceChangeListener { _, newValue ->
+      val name = newValue?.toString()?.trim().orEmpty()
+      if (name.isEmpty()) {
+        Toast.makeText(requireContext(), R.string.preset_name_required, Toast.LENGTH_SHORT).show()
+        false
+      } else {
+        val host = prefs.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
+        val port = prefs.getString(SK_HOST_PORT, DEFAULT_HOST_PORT) ?: DEFAULT_HOST_PORT
+        val videoUri = prefs.getString(SK_VIDEO_URI, "") ?: ""
+        store.save(name, host, port, videoUri)
+        refreshPresetRows(category, store)
+        Toast.makeText(
+                requireContext(),
+                getString(R.string.preset_saved, name),
+                Toast.LENGTH_SHORT,
+            )
+            .show()
+        true
+      }
+    }
+
+    val delete = findPreference<Preference>(SK_DELETE_PRESET)
+    delete?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+      val myActivity = activity ?: return@OnPreferenceClickListener true
+      val names = store.all().values.map { it.name }.sorted()
+      if (names.isEmpty()) {
+        Toast.makeText(requireContext(), R.string.no_presets_saved, Toast.LENGTH_SHORT).show()
+      } else {
+        androidx.appcompat.app.AlertDialog.Builder(myActivity)
+            .setTitle(R.string.delete_preset_dialog_title)
+            .setItems(names.toTypedArray()) { _, which ->
+              store.delete(names[which])
+              refreshPresetRows(category, store)
+              Toast.makeText(
+                      requireContext(),
+                      getString(R.string.preset_deleted, names[which]),
+                      Toast.LENGTH_SHORT,
+                  )
+                  .show()
+            }
+            .show()
+      }
+      true
+    }
+
+    refreshPresetRows(category, store)
+  }
+
+  /** Rebuilds the dynamic "apply preset" rows; the static Save/Delete prefs stay in place. */
+  private fun refreshPresetRows(category: PreferenceCategory, store: RobotPresetStore) {
+    for (i in category.preferenceCount - 1 downTo 0) {
+      val pref = category.getPreference(i)
+      if (pref.key != SK_SAVE_PRESET && pref.key != SK_DELETE_PRESET) {
+        category.removePreference(pref)
+      }
+    }
+    val myActivity = activity ?: return
+    for (preset in store.all().values.sortedBy { it.name }) {
+      val row = Preference(myActivity)
+      row.title = preset.name
+      row.summary = getString(R.string.preset_row_summary, preset.host, preset.port)
+      row.isPersistent = false
+      row.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+        val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
+        prefs.edit {
+          putString(SK_HOST_ADDRESS, preset.host)
+          putString(SK_HOST_PORT, preset.port)
+          putString(SK_VIDEO_URI, preset.videoUri)
+        }
+        initializeDynamicPreferenceSummary()
+        Toast.makeText(
+                requireContext(),
+                getString(R.string.preset_applied, preset.name),
+                Toast.LENGTH_SHORT,
+            )
+            .show()
+        true
+      }
+      category.addPreference(row)
+    }
+  }
+
   override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
     setPreferencesFromResource(R.xml.pref_general, rootKey)
 
@@ -123,5 +230,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
     initializeDynamicPreferenceSummary()
     initializeResetVideoUriField()
     initializeCopyRobotIpField()
+    initializeRobotPresets()
   }
 }

@@ -84,6 +84,31 @@
 
     </LinearLayout>
 
+    <!-- Persistent connection status: "Connected to host:port" / "Connecting…" /
+         "Disconnected — tap to connect". Tapping it retries the connection
+         (ConnectionFeedback.attach). Kept AFTER the gear button in the child
+         list per the defensive convention below. -->
+    <TextView
+        android:id="@+id/connectionStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@id/btnSettings"
+        android:layout_alignParentStart="true"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="8dp"
+        android:background="@drawable/connection_status_background"
+        android:clickable="true"
+        android:contentDescription="@string/connection_status_description"
+        android:focusable="true"
+        android:maxLines="1"
+        android:paddingStart="8dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:textColor="@android:color/white"
+        android:textIsSelectable="true"
+        android:textSize="12sp" />
+
     <!-- Kept as the LAST child of main (defensive convention): MainActivity calls
          controlsOverlay.bringToFront(), which reorders the children at runtime
          (video, btnSettings, buttons, ..., controlsOverlay) — keep new children

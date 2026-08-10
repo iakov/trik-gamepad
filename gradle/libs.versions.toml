@@ -34,6 +34,7 @@ androidxTestRunner = { module = "androidx.test:runner", version.ref = "androidxT
 androidxTestOrchestrator = { module = "androidx.test:orchestrator", version.ref = "androidxTestOrchestrator" }
 androidxTestRules = { module = "androidx.test:rules", version.ref = "androidxTestRules" }
 espressoCore = { module = "androidx.test.espresso:espresso-core", version.ref = "espressoCore" }
+espressoContrib = { module = "androidx.test.espresso:espresso-contrib", version.ref = "espressoCore" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

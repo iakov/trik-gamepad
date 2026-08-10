@@ -469,4 +469,113 @@ class MainActivityTest : RobolectricTestBase() {
     activity.setSenderService(replacement)
     assertSame(replacement, activity.getSenderService())
   }
+
+  @Test
+  fun setShowFpsShouldToggleVideoOverlay() {
+    val video = MjpegView(activity)
+    setField(activity, "mVideo", video)
+    activity.setShowFps(true)
+    assertTrue(video.showFps)
+    activity.setShowFps(false)
+    assertFalse(video.showFps)
+  }
+
+  @Test
+  fun setShowFpsWithoutVideoShouldBeSafe() {
+    setField(activity, "mVideo", null)
+    activity.setShowFps(true)
+  }
+
+  @Test
+  fun setControlsVisibleShouldHideAndShowPads() {
+    activity.setControlsVisible(false)
+    assertEquals(View.GONE, activity.findViewById<View>(R.id.controlsOverlay)?.visibility)
+    assertEquals(View.GONE, activity.findViewById<View>(R.id.buttons)?.visibility)
+    activity.setControlsVisible(true)
+    assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.controlsOverlay)?.visibility)
+  }
+
+  @Test
+  fun setMagicButtonsShouldPopulateTheRow() {
+    activity.setMagicButtons(3, listOf("▲", "■", "●"))
+    val row = activity.findViewById<android.view.ViewGroup>(R.id.buttons)!!
+    assertEquals(3, row.childCount)
+    assertEquals("▲", (row.getChildAt(0) as android.widget.Button).text.toString())
+  }
+
+  @Test
+  fun dispatchKeyEventShouldRouteGamepadKeys() {
+    assertTrue(
+        activity.dispatchKeyEvent(
+            android.view.KeyEvent(
+                android.view.KeyEvent.ACTION_DOWN,
+                android.view.KeyEvent.KEYCODE_DPAD_UP,
+            )
+        )
+    )
+    assertTrue(
+        activity.dispatchKeyEvent(
+            android.view.KeyEvent(
+                android.view.KeyEvent.ACTION_UP,
+                android.view.KeyEvent.KEYCODE_DPAD_UP,
+            )
+        )
+    )
+  }
+
+  @Test
+  fun dispatchKeyEventWithUnmappedKeyShouldFallThrough() {
+    // Not a gamepad key -> the controller does not consume it and the activity
+    // lets the event fall through to super (no focus -> false).
+    assertFalse(
+        activity.dispatchKeyEvent(
+            android.view.KeyEvent(
+                android.view.KeyEvent.ACTION_DOWN,
+                android.view.KeyEvent.KEYCODE_VOLUME_UP,
+            )
+        )
+    )
+  }
+
+  private fun joystickMoveEvent(source: Int, x: Float): android.view.MotionEvent {
+    val coords = android.view.MotionEvent.PointerCoords()
+    coords.setAxisValue(android.view.MotionEvent.AXIS_X, x)
+    val props = android.view.MotionEvent.PointerProperties()
+    props.id = 0
+    val now = android.os.SystemClock.uptimeMillis()
+    return android.view.MotionEvent.obtain(
+        now,
+        now,
+        android.view.MotionEvent.ACTION_MOVE,
+        1,
+        arrayOf(props),
+        arrayOf(coords),
+        0,
+        0,
+        1f,
+        1f,
+        0,
+        0,
+        source,
+        0,
+    )
+  }
+
+  @Test
+  fun onGenericMotionEventShouldConsumeJoystickMoves() {
+    assertTrue(
+        activity.onGenericMotionEvent(
+            joystickMoveEvent(android.view.InputDevice.SOURCE_JOYSTICK, 0.5f)
+        )
+    )
+  }
+
+  @Test
+  fun onGenericMotionEventWithNonGamepadSourceShouldFallThrough() {
+    assertFalse(
+        activity.onGenericMotionEvent(
+            joystickMoveEvent(android.view.InputDevice.SOURCE_MOUSE, 0.5f)
+        )
+    )
+  }
 }

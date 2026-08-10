@@ -2,9 +2,12 @@ package com.trikset.gamepad
 
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.preference.EditTextPreference
 import androidx.preference.Preference
+import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceManager
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -123,5 +126,69 @@ class SettingsActivityTest : RobolectricTestBase() {
     val method = fragment.javaClass.getDeclaredMethod("initializeCopyRobotIpField")
     method.isAccessible = true
     method.invoke(fragment)
+  }
+
+  private fun presetRows(): List<Preference> {
+    val category = fragment.findPreference<PreferenceCategory>(SettingsFragment.SK_ROBOT_PRESETS)
+    assertNotNull("robot presets category must exist in the nested Advanced screen", category)
+    return (0 until category!!.preferenceCount).map { category.getPreference(it) }
+  }
+
+  @Test
+  fun savePresetShouldStoreAndRefreshRows() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
+    prefs.edit().putString(SettingsFragment.SK_HOST_PORT, "4444").commit()
+    val save = fragment.findPreference<EditTextPreference>(SettingsFragment.SK_SAVE_PRESET)
+    assertNotNull(save)
+    assertTrue(save!!.onPreferenceChangeListener!!.onPreferenceChange(save, "workshop"))
+
+    assertTrue(
+        "a dynamic row named 'workshop' must appear",
+        presetRows().any { it.title.toString() == "workshop" },
+    )
+    assertEquals("4444", RobotPresetStore(prefs).all()["workshop"]?.port)
+  }
+
+  @Test
+  fun savePresetWithEmptyNameShouldReject() {
+    val save = fragment.findPreference<EditTextPreference>(SettingsFragment.SK_SAVE_PRESET)
+    assertNotNull(save)
+    val accepted = save!!.onPreferenceChangeListener!!.onPreferenceChange(save, "   ")
+    assertFalse("blank names must be rejected", accepted)
+    assertTrue(presetRows().none { it.title.toString() == "" })
+  }
+
+  @Test
+  fun applyPresetShouldWriteHostPortAndUri() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
+    prefs.edit().putString(SettingsFragment.SK_HOST_PORT, "4444").commit()
+    prefs
+        .edit()
+        .putString(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.9:8080/?action=stream")
+        .commit()
+    val save = fragment.findPreference<EditTextPreference>(SettingsFragment.SK_SAVE_PRESET)!!
+    save.onPreferenceChangeListener!!.onPreferenceChange(save, "workshop")
+
+    // Change the live settings, then apply the preset back.
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "0.0.0.0").commit()
+    val row = presetRows().first { it.title.toString() == "workshop" }
+    row.onPreferenceClickListener!!.onPreferenceClick(row)
+
+    assertEquals("10.0.0.9", prefs.getString(SettingsFragment.SK_HOST_ADDRESS, ""))
+    assertEquals("4444", prefs.getString(SettingsFragment.SK_HOST_PORT, ""))
+    assertEquals(
+        "http://10.0.0.9:8080/?action=stream",
+        prefs.getString(SettingsFragment.SK_VIDEO_URI, ""),
+    )
+  }
+
+  @Test
+  fun deletePresetWithNoPresetsShouldBeSafe() {
+    val delete = fragment.findPreference<Preference>(SettingsFragment.SK_DELETE_PRESET)
+    assertNotNull(delete)
+    // With no presets saved the delete tap shows a toast and does not open a dialog.
+    delete!!.onPreferenceClickListener!!.onPreferenceClick(delete)
   }
 }

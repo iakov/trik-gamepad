@@ -128,4 +128,16 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
     val fps = renderer.drawFrame(Canvas(bitmap(320, 240)), rect, 320, Paint())
     assertEquals("", fps)
   }
+
+  @Test
+  fun drawFrameWithFpsHiddenStillComputesTheCounter() {
+    // showFps=false skips the drawText but the FPS counter still advances and
+    // the string is still returned (a toggle never changes the counting).
+    val renderer = MjpegFrameRenderer(decoder = stubDecoder(bitmap(100, 100)))
+    renderer.onRenderStarted(System.currentTimeMillis() - 6000)
+    val dest = renderer.extractFrame(emptyFrame(), 320, 240)
+    assertNotNull(dest)
+    val fps = renderer.drawFrame(Canvas(bitmap(320, 240)), dest!!, 320, Paint(), showFps = false)
+    assertTrue("expected a computed fps string, got '$fps'", fps.isNotEmpty())
+  }
 }

@@ -25,6 +25,8 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
   }
 
   private val fpsTextPaint = Paint()
+  /** When false (default) the render thread skips the FPS overlay; read on the render thread. */
+  @Volatile var showFps: Boolean = false
   private var viewThread: MjpegViewThread? = null
   @Volatile private var input: MjpegInputStream? = null
   @Volatile private var running = false
@@ -185,7 +187,7 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
             }
             canvas = holder.lockCanvas()
             if (canvas != null) {
-              renderer.drawFrame(canvas, destRect, dispWidth, fpsTextPaint)
+              renderer.drawFrame(canvas, destRect, dispWidth, fpsTextPaint, showFps)
             }
           }
         }

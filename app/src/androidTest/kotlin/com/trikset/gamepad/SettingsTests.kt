@@ -1,24 +1,21 @@
 package com.trikset.gamepad
 
-import android.view.View
-import android.view.ViewGroup
-import android.view.ViewParent
 import androidx.preference.PreferenceManager
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.espresso.Espresso
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.action.ViewActions.click
 import androidx.test.espresso.action.ViewActions.closeSoftKeyboard
 import androidx.test.espresso.action.ViewActions.replaceText
 import androidx.test.espresso.action.ViewActions.scrollTo
+import androidx.test.espresso.contrib.RecyclerViewActions
+import androidx.test.espresso.matcher.ViewMatchers.hasDescendant
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.filters.LargeTest
 import androidx.test.platform.app.InstrumentationRegistry
-import org.hamcrest.Description
-import org.hamcrest.Matcher
 import org.hamcrest.Matchers.allOf
-import org.hamcrest.TypeSafeMatcher
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -45,14 +42,16 @@ class SettingsTests {
   fun settingsShouldWorkCorrectly() {
     openSettings()
 
-    // Preference rows: wheel + keep-screen-on switches at the top and pads-opacity/wheel-
-    // sensitivity sliders shift the EditText rows): 0 wheel, 1 keepScreenOn, 2 host, 3 port,
-    // 4 pads slider, 5 wheel slider, 6 keepalive, 7 video URI, 8 reset URI, 9 copy IP, 10 about.
-    editPreference(2, "localhost") // host address
-    editPreference(3, "12345") // port
-    editPreference(6, "3000") // keepalive
-    editPreference(7, "http://localhost:8080/?action=stream") // video URI
+    // Basic (root) categories hold the connection + video + keep-screen-on prefs;
+    // keepalive moved into the nested "Advanced settings" sub-screen.
+    editPreference("Robot IP address", "localhost")
+    editPreference("Robot TCP port", "12345")
+    editPreference("URI for video stream to play", "http://localhost:8080/?action=stream")
+    openAdvanced()
+    editPreference("Keep-alive timeout, ms", "3000")
 
+    // Out of the Advanced sub-screen, then out of Settings.
+    Espresso.pressBack()
     Espresso.pressBack()
 
     val preferences = PreferenceManager.getDefaultSharedPreferences(mActivityTestRule.activity)
@@ -71,8 +70,10 @@ class SettingsTests {
         mActivityTestRule.activity.getSenderService().getKeepaliveTimeout()
 
     openSettings()
-    editPreference(6, "500") // keepalive below MINIMAL_KEEPALIVE
+    openAdvanced()
+    editPreference("Keep-alive timeout, ms", "500") // keepalive below MINIMAL_KEEPALIVE
 
+    Espresso.pressBack()
     Espresso.pressBack()
 
     assertEquals(
@@ -98,48 +99,28 @@ class SettingsTests {
         .perform(click())
   }
 
-  /** Opens the preference dialog at [row], sets its edit text to [value] and confirms. */
-  private fun editPreference(row: Int, value: String) {
-    onView(
-            allOf(
-                childAtPosition(
-                    allOf(
-                        withId(androidx.preference.R.id.recycler_view),
-                        childAtPosition(withId(android.R.id.list_container), 0),
-                    ),
-                    row,
-                ),
-                isDisplayed(),
-            )
-        )
-        .perform(click())
-
-    onView(allOf(withId(android.R.id.edit), isDisplayed()))
-        .perform(scrollTo(), replaceText(value), closeSoftKeyboard())
-
-    onView(
-            allOf(
-                withId(android.R.id.button1),
-                withText("OK"),
-                childAtPosition(childAtPosition(withId(androidx.appcompat.R.id.buttonPanel), 0), 3),
-            )
-        )
-        .perform(scrollTo(), click())
+  /** Navigates into the nested "Advanced settings" sub-screen. */
+  private fun openAdvanced() {
+    clickPreference("Advanced settings")
   }
 
-  private fun childAtPosition(parentMatcher: Matcher<View>, position: Int): Matcher<View> {
-    return object : TypeSafeMatcher<View>() {
-      override fun describeTo(description: Description) {
-        description.appendText("Child at position $position in parent ")
-        parentMatcher.describeTo(description)
-      }
+  /** Scrolls to and clicks the preference row titled [title]. */
+  private fun clickPreference(title: String) {
+    onView(withId(androidx.preference.R.id.recycler_view))
+        .perform(
+            RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(hasDescendant(withText(title)))
+        )
+    onView(allOf(withText(title), isDisplayed())).perform(click())
+  }
 
-      override fun matchesSafely(view: View): Boolean {
-        val parent: ViewParent = view.parent
-        return parent is ViewGroup &&
-            parentMatcher.matches(parent) &&
-            view == parent.getChildAt(position)
-      }
-    }
+  /** Opens the preference titled [title], sets its edit text to [value] and confirms. */
+  private fun editPreference(title: String, value: String) {
+    clickPreference(title)
+
+    onView(allOf(withId(android.R.id.edit), isDisplayed()))
+        .perform(replaceText(value), closeSoftKeyboard())
+
+    onView(allOf(withId(android.R.id.button1), withText("OK"), isDisplayed()))
+        .perform(scrollTo(), click())
   }
 }

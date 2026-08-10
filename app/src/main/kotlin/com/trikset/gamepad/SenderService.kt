@@ -143,6 +143,8 @@ class SenderService(
 
   fun getHostAddr(): String? = mHostAddr
 
+  fun getHostPort(): Int = mHostPort
+
   fun send(command: String) {
     if (mOut == null) {
       connectAsync() // synchronized on the same object as postCommand
@@ -152,6 +154,15 @@ class SenderService(
     }
     postCommand(command)
     keepAliveTimer.restart()
+  }
+
+  /**
+   * Establishes the TCP connection without sending a command (the "tap to connect" entry point).
+   */
+  fun connect() {
+    if (mOut == null) {
+      connectAsync()
+    }
   }
 
   fun setTarget(hostAddr: String, hostPort: Int) {

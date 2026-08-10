@@ -64,6 +64,24 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     override fun setKeepScreenOn(enabled: Boolean) {
       keepScreenOnState = enabled
     }
+
+    var magicCount = -1
+    var magicSymbols = listOf<String>()
+    var controlsVisibleState = true
+    var showFpsState = false
+
+    override fun setMagicButtons(count: Int, symbols: List<String>) {
+      magicCount = count
+      magicSymbols = symbols
+    }
+
+    override fun setControlsVisible(visible: Boolean) {
+      controlsVisibleState = visible
+    }
+
+    override fun setShowFps(enabled: Boolean) {
+      showFpsState = enabled
+    }
   }
 
   private lateinit var context: Context
@@ -197,5 +215,72 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
       setPref(SettingsFragment.SK_WHEEL_STEP, value)
       assertEquals("wheel step for '$value'", expected, ui.step)
     }
+  }
+
+  @Test
+  fun onPreferenceChangedWithDefaultMagicButtonsShouldApplyDefaults() {
+    controller.onPreferenceChanged(prefs)
+    assertEquals(3, ui.magicCount)
+    assertEquals(listOf("▲", "■", "●", "✕", "◆"), ui.magicSymbols)
+  }
+
+  @Test
+  fun onPreferenceChangedWithMagicButtonCountShouldClamp() {
+    prefs.edit().putInt(SettingsFragment.SK_MAGIC_BUTTON_COUNT, 5).commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals(5, ui.magicCount)
+
+    prefs.edit().putInt(SettingsFragment.SK_MAGIC_BUTTON_COUNT, 999).commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals("clamped to max", 5, ui.magicCount)
+
+    prefs.edit().putString(SettingsFragment.SK_MAGIC_BUTTON_COUNT, "0").commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals("zero hides the row", 0, ui.magicCount)
+  }
+
+  @Test
+  fun onPreferenceChangedShouldResolveStoredSymbols() {
+    prefs.edit().putString(SettingsFragment.magicSymbolKey(1), "★").commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals("★", ui.magicSymbols[0])
+    assertEquals("■", ui.magicSymbols[1]) // untouched -> default glyph
+  }
+
+  @Test
+  fun onPreferenceChangedWithHideControlsShouldDriveVisibility() {
+    controller.onPreferenceChanged(prefs)
+    assertTrue(ui.controlsVisibleState)
+    prefs.edit().putBoolean(SettingsFragment.SK_HIDE_CONTROLS, true).commit()
+    controller.onPreferenceChanged(prefs)
+    assertTrue(!ui.controlsVisibleState)
+  }
+
+  @Test
+  fun onPreferenceChangedWithShowFpsShouldToggle() {
+    controller.onPreferenceChanged(prefs)
+    assertTrue(!ui.showFpsState)
+    prefs.edit().putBoolean(SettingsFragment.SK_SHOW_FPS, true).commit()
+    controller.onPreferenceChanged(prefs)
+    assertTrue(ui.showFpsState)
+  }
+
+  @Test
+  fun readMagicButtonCountShouldHonorIntStringAndDefaults() {
+    assertEquals(
+        "empty prefs -> default",
+        3,
+        MainActivitySettingsController.readMagicButtonCount(prefs),
+    )
+    prefs.edit().putInt(SettingsFragment.SK_MAGIC_BUTTON_COUNT, 2).commit()
+    assertEquals(2, MainActivitySettingsController.readMagicButtonCount(prefs))
+    prefs.edit().putString(SettingsFragment.SK_MAGIC_BUTTON_COUNT, "7").commit()
+    assertEquals("clamped to max", 5, MainActivitySettingsController.readMagicButtonCount(prefs))
+    prefs.edit().putString(SettingsFragment.SK_MAGIC_BUTTON_COUNT, "garbage").commit()
+    assertEquals(
+        "garbage -> default",
+        3,
+        MainActivitySettingsController.readMagicButtonCount(prefs),
+    )
   }
 }

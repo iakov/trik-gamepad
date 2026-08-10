@@ -78,6 +78,41 @@ class SenderServiceTest : RobolectricTestBase() {
   }
 
   @Test
+  fun getHostPortShouldReturnConfiguredPort() {
+    client = SenderService(mExecutor)
+    client!!.setTarget("someaddr-test", 1234)
+    assertEquals(1234, client!!.getHostPort())
+  }
+
+  @Test
+  fun connectShouldEstablishConnectionWithoutSending() {
+    TestTcpServer().use { server -> establishConnection(server) }
+  }
+
+  @Test
+  fun connectWhenAlreadyConnectedShouldNotReconnect() {
+    TestTcpServer().use { server ->
+      establishConnection(server)
+      // A second connect while connected (mOut != null) must not drop/re-open.
+      client!!.connect()
+      mExecutor.runAll()
+      assertTrue(server.isConnected)
+    }
+  }
+
+  /** Connects [client] to [server] via the public connect() entry point and asserts the state. */
+  private fun establishConnection(server: TestTcpServer): SenderService {
+    client = SenderService(mExecutor)
+    client!!.setTarget(TestTcpServer.HOST, server.port)
+    client!!.connect()
+    mExecutor.runAll()
+    shadowOf(getMainLooper()).idle()
+    assertTrue(server.awaitConnection())
+    assertTrue(server.isConnected)
+    return client!!
+  }
+
+  @Test
   fun senderServiceShouldReturnCorrectKeepaliveTimeout() {
     client = SenderService(mExecutor)
     client!!.setKeepaliveTimeout(3453)

@@ -189,7 +189,21 @@ class MainWindowTests {
   @LargeTest
   @RunWith(JUnit4::class)
   class MagicButtonsTests {
-    @get:Rule val mActivityTestRule = FocusAwareActivityTestRule(MainActivity::class.java)
+    // The magic-button row renders at the configured count during onCreate; set it
+    // to 5 before the activity launches so the full row (buttons 1..5) is asserted.
+    @get:Rule
+    val mActivityTestRule =
+        object : FocusAwareActivityTestRule<MainActivity>(MainActivity::class.java) {
+          override fun beforeActivityLaunched() {
+            androidx.preference.PreferenceManager.getDefaultSharedPreferences(
+                    androidx.test.platform.app.InstrumentationRegistry.getInstrumentation()
+                        .targetContext
+                )
+                .edit()
+                .putInt(SettingsFragment.SK_MAGIC_BUTTON_COUNT, 5)
+                .commit()
+          }
+        }
 
     @Before
     fun initNetworkSettings() {

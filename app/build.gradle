@@ -257,6 +257,7 @@ dependencies {
     androidTestImplementation libs.androidxTestRunner
     androidTestUtil libs.androidxTestOrchestrator
     androidTestImplementation libs.espressoCore
+    androidTestImplementation libs.espressoContrib
     androidTestImplementation libs.androidxTestRules
     androidTestImplementation libs.junit
 }

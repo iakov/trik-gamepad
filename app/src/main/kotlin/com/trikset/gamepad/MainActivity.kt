@@ -8,8 +8,10 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AlphaAnimation
@@ -21,6 +23,7 @@ import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.preference.PreferenceManager
 import com.trikset.gamepad.mjpeg.MjpegView
 import java.net.URL
 import kotlinx.coroutines.launch
@@ -58,6 +61,24 @@ class MainActivity :
         context = this,
         settingsButtonProvider = { findViewById(R.id.btnSettings) },
         rootViewProvider = { findViewById(R.id.main) },
+        statusTextProvider = { findViewById(R.id.connectionStatus) },
+        addressProvider = {
+          val host = getSenderService().getHostAddr()
+          if (host == null) null else "$host:${getSenderService().getHostPort()}"
+        },
+        connectAction = { getSenderService().connect() },
+    )
+  }
+  private val hardwareGamepadController: HardwareGamepadController by lazy {
+    HardwareGamepadController(
+        send = { getSenderService().send(it) },
+        settings = {
+          val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+          HardwareGamepadController.Settings(
+              swapSticks = prefs.getBoolean(SettingsFragment.SK_GAMEPAD_SWAP, false),
+              magicButtonCount = MainActivitySettingsController.readMagicButtonCount(prefs),
+          )
+        },
     )
   }
 
@@ -81,6 +102,7 @@ class MainActivity :
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
     systemUiController.setVisibility(false)
+    connectionFeedback.attach()
     val actionBar = supportActionBar
     if (actionBar != null) {
       actionBar.setDisplayShowHomeEnabled(true)
@@ -92,11 +114,6 @@ class MainActivity :
     mSensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
     mVideo = findViewById(R.id.video)
-
-    val buttonsView = findViewById<ViewGroup>(R.id.buttons)
-    if (buttonsView != null) {
-      magicButtons.populate(buttonsView, MAGIC_BUTTON_COUNT)
-    }
 
     getSenderService().setShowTextCallback { message ->
       // The gear border is the persistent status; surface only connection *errors* as feedback,
@@ -178,6 +195,21 @@ class MainActivity :
         }
         else -> super.onOptionsItemSelected(item)
       }
+
+  override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    // A hardware gamepad maps to pad/button commands; unmapped keys fall through.
+    val handled =
+        when (event.action) {
+          KeyEvent.ACTION_DOWN ->
+              hardwareGamepadController.onKeyDown(event.keyCode, event.repeatCount)
+          KeyEvent.ACTION_UP -> hardwareGamepadController.onKeyUp(event.keyCode)
+          else -> false
+        }
+    return handled || super.dispatchKeyEvent(event)
+  }
+
+  override fun onGenericMotionEvent(event: MotionEvent): Boolean =
+      hardwareGamepadController.onMotionEvent(event) || super.onGenericMotionEvent(event)
 
   override fun onPause() {
     mSensorManager?.unregisterListener(this)
@@ -288,6 +320,22 @@ class MainActivity :
     findViewById<View>(R.id.main)?.keepScreenOn = enabled
   }
 
+  override fun setMagicButtons(count: Int, symbols: List<String>) {
+    val buttonsView = findViewById<ViewGroup>(R.id.buttons) ?: return
+    magicButtons.populate(buttonsView, count, symbols)
+  }
+
+  override fun setControlsVisible(visible: Boolean) {
+    // GONE removes the pads/buttons from the layout entirely (no hit-testing).
+    val visibility = if (visible) View.VISIBLE else View.GONE
+    findViewById<View>(R.id.controlsOverlay)?.visibility = visibility
+    findViewById<View>(R.id.buttons)?.visibility = visibility
+  }
+
+  override fun setShowFps(enabled: Boolean) {
+    mVideo?.showFps = enabled
+  }
+
   override fun getWheelStep(): Int = mWheelStep
 
   override fun setWheelStep(step: Int) {
@@ -336,7 +384,6 @@ class MainActivity :
 
   private companion object {
     const val TAG = "MainActivity"
-    const val MAGIC_BUTTON_COUNT = 5
     const val HIDE_DELAY_MS = 3000L
     const val ALPHA_ANIMATION_MS = 2000L
     const val WHEEL_STEP_DEFAULT = 7
