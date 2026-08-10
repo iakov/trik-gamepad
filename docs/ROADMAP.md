@@ -317,3 +317,51 @@ via `SenderService(mExecutor)`; the `mConnectTask` reflection and the
   imports + layout + spotbugs `onlyAnalyze`). Landed `e56a9af`.
 - ✅ Final retrospective → AGENTS.md / MEMORY.md / TESTING.md;
   last-known-good CI run id updated (`31232406163`, first fully-green run).
+
+## Campaign 9 — End-user UX (Material/accessibility alignment)
+
+User-visible gaps found 2026-08-10 while reviewing the app against Material
+Design / Android UX guidance from an end-user point of view (no Material
+theming, zero accessibility metadata, toast-only connection status, plain-text
+settings fields, unconditional keep-screen-on). Scope set by user decision:
+A–E + G–J + marginal batch; **deferred** F (first-run guidance) and K (pad
+graphics).
+
+- **A** ✅ Connection status = **gear-border recolor** (`btn_settings.xml` layer
+  rect gets `@+id/settingsButtonBg` + `<stroke>`; runtime
+  `GradientDrawable.setStroke` mutation). Pure `ConnectionState → color-resource`
+  mapper (`ConnectionIndicator`, unit-tested): `Connected` → greendark,
+  `Connecting` → amber (new), `Disconnected` → red (new). Wired into
+  MainActivity's `repeatOnLifecycle` collector. **No new view → no
+  touch-interception risk**; the id-based `SettingsTests` locator is immune to
+  the background change.
+- **B** Accessibility: `contentDescription` on the gear button (was "Button,
+  unlabeled"), both pads, and the MJPEG view; dropped
+  `FLAG_IGNORE_GLOBAL_SETTING` from `MagicButtonPanel` + `SquareTouchPadLayout`
+  (haptics now respect the system setting); reconciled `MjpegView` focusability
+  (XML `focusable=false` was overridden by code `isFocusable = true`).
+- **C** Settings UX: removed the implicit video-URI copy on host change
+  (`MainActivitySettingsController`); added an explicit **"Reset video URI to
+  robot default"** preference that fills `http://<host>:8080/?action=stream` on
+  tap; pads-alpha and wheel-sensitivity `EditTextPreference`s → `SeekBarPreference`
+  (0..255 / 1..100) with live summaries.
+- **I** Wheel toggle: `menu.xml` CheckBox action-view → `SwitchPreference` in
+  Settings; sensitivity summary clarifies "smaller = more sensitive".
+- **D** Feedback hygiene: with persistent gear status in place, gated toasts —
+  removed per-connect `onConnectionFinished` toast spam and the routine
+  "Inactive gamepad" pause disconnect toast; real errors still toast.
+- **G** Empty/degraded states: video-area placeholder text when no video URL is
+  configured; connection hint pairs with the gear color.
+- **H** Battery-aware screen: `android:keepScreenOn` no longer unconditional —
+  exposed as a Settings toggle ("Keep screen on") applied from the controller.
+- **J** Font-scale resilience: verified the magic-button row at `FONT_SCALE 1.3`
+  and fixed clipping.
+- **E** Material theming: brand greens wired into `colorPrimary`/`colorAccent`;
+  `values-night` added; Settings `Light` theme unified with the main dark theme;
+  pressed-state selector for magic buttons; hardcoded `Color.RED` pad circle →
+  theme color.
+- **L/M/N** Marginal batch: copy-robot-IP affordance (About system), a11y lint
+  rules confirmed not suppressed, error Snackbars replace error toasts.
+
+Deferred: **F** first-run guidance, **K** pad graphics — cosmetic/onboarding,
+parked for a future campaign.
