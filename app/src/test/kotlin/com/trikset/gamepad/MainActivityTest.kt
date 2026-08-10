@@ -88,10 +88,14 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun onSharedPreferenceChangedShouldRewriteVideoUriOnHostChange() {
+  fun onSharedPreferenceChangedShouldNotRewriteVideoUriOnHostChange() {
+    // Campaign 9 C: no implicit video-URI copy on host change; the user resets it explicitly.
+    setPref(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
     setPref(SettingsFragment.SK_HOST_ADDRESS, "192.168.1.42")
-    val uri = prefs().getString(SettingsFragment.SK_VIDEO_URI, "")
-    assertEquals("http://192.168.1.42:8080/?action=stream", uri)
+    assertEquals(
+        "http://10.0.0.7:8080/?action=stream",
+        prefs().getString(SettingsFragment.SK_VIDEO_URI, ""),
+    )
   }
 
   @Test
@@ -149,6 +153,58 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun keepScreenOnPreferenceShouldDriveMainView() {
+    val main = activity.findViewById<View>(R.id.main)!!
+    // Default true keeps the screen on.
+    assertTrue(main.keepScreenOn)
+    prefs().edit().putBoolean(SettingsFragment.SK_KEEP_SCREEN_ON, false).commit()
+    requireNotNull(activity.getSettingsController()).onPreferenceChanged(prefs())
+    assertFalse(main.keepScreenOn)
+  }
+
+  @Test
+  fun nullVideoUrlShouldShowPlaceholder() {
+    val placeholder = activity.findViewById<android.widget.TextView>(R.id.videoPlaceholder)!!
+    setPref(SettingsFragment.SK_VIDEO_URI, "")
+    assertEquals(View.VISIBLE, placeholder.visibility)
+  }
+
+  @Test
+  fun configuredVideoUrlShouldHidePlaceholder() {
+    val placeholder = activity.findViewById<android.widget.TextView>(R.id.videoPlaceholder)!!
+    setPref(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
+    assertEquals(View.GONE, placeholder.visibility)
+  }
+
+  @Test
+  fun magicButtonRowShouldNotClipAtLargeFontScale() {
+    // Campaign 9 J: the row is wrap_content + minHeight 50dp, so it grows with the
+    // font scale instead of clipping the magic buttons. Measure at FONT_SCALE 1.3.
+    val resources = activity.resources
+    val config = android.content.res.Configuration(resources.configuration)
+    config.fontScale = 1.3f
+    resources.updateConfiguration(config, resources.displayMetrics)
+
+    val row = activity.findViewById<android.view.ViewGroup>(R.id.buttons)!!
+    row.measure(
+        View.MeasureSpec.makeMeasureSpec(400, View.MeasureSpec.EXACTLY),
+        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+    )
+    val rowHeight = row.measuredHeight
+    for (i in 0 until row.childCount) {
+      val child = row.getChildAt(i)
+      child.measure(
+          View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+          View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+      )
+      assertTrue(
+          "child $i height ${child.measuredHeight} must fit row height $rowHeight at fontScale 1.3",
+          child.measuredHeight <= rowHeight,
+      )
+    }
+  }
+
+  @Test
   fun onSharedPreferenceChangedWithValidKeepaliveShouldApply() {
     setPref(SettingsFragment.SK_KEEPALIVE, "2000")
     // >= MINIMAL_KEEPALIVE -> applied to the sender.
@@ -196,15 +252,9 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun onOptionsItemSelectedShouldOpenSettingsOrToggleWheel() {
+  fun onOptionsItemSelectedShouldOpenSettingsOrFallThrough() {
     val menu = androidx.appcompat.view.menu.MenuBuilder(activity)
-    menu.add(0, R.id.wheel, 0, "wheel")
     menu.add(0, R.id.settings, 1, "settings")
-
-    // Toggle wheel off -> on.
-    val wheel = menu.findItem(R.id.wheel)
-    assertTrue(activity.onOptionsItemSelected(wheel!!))
-    assertTrue(field(activity, "mWheelEnabled") as Boolean)
 
     // Settings item starts the SettingsActivity.
     val settings = menu.findItem(R.id.settings)
@@ -213,6 +263,16 @@ class MainActivityTest : RobolectricTestBase() {
     // Unknown item falls through to super.
     menu.add(0, 9999, 2, "unknown")
     assertFalse(activity.onOptionsItemSelected(menu.findItem(9999)!!))
+  }
+
+  @Test
+  fun wheelEnabledPreferenceShouldDriveWheel() {
+    prefs().edit().putBoolean(SettingsFragment.SK_WHEEL_ENABLED, true).commit()
+    requireNotNull(activity.getSettingsController()).onPreferenceChanged(prefs())
+    assertTrue(activity.isWheelEnabled())
+    prefs().edit().putBoolean(SettingsFragment.SK_WHEEL_ENABLED, false).commit()
+    requireNotNull(activity.getSettingsController()).onPreferenceChanged(prefs())
+    assertFalse(activity.isWheelEnabled())
   }
 
   @Test

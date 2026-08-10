@@ -4,6 +4,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.preference.Preference
 import androidx.preference.PreferenceManager
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -75,6 +76,51 @@ class SettingsActivityTest : RobolectricTestBase() {
     // returns early via the `activity ?: return` guard.
     val fragment = SettingsFragment()
     val method = fragment.javaClass.getDeclaredMethod("initializeAboutSystemField")
+    method.isAccessible = true
+    method.invoke(fragment)
+  }
+
+  @Test
+  fun resetVideoUriClickShouldFillFromHost() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
+    val reset = fragment.findPreference<Preference>(SettingsFragment.SK_RESET_VIDEO_URI)
+    assertNotNull(reset)
+    reset!!.onPreferenceClickListener!!.onPreferenceClick(reset)
+
+    assertEquals(
+        "http://10.0.0.9:8080/?action=stream",
+        prefs.getString(SettingsFragment.SK_VIDEO_URI, ""),
+    )
+    assertTrue((reset.summary ?: "").toString().contains("http://10.0.0.9:8080"))
+  }
+
+  @Test
+  fun copyRobotIpClickShouldCopyHostToClipboard() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
+    val copy = fragment.findPreference<Preference>(SettingsFragment.SK_COPY_ROBOT_IP)
+    assertNotNull(copy)
+    copy!!.onPreferenceClickListener!!.onPreferenceClick(copy)
+
+    val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val primary = clipboard.primaryClip
+    assertNotNull(primary)
+    assertEquals("10.0.0.9", primary!!.getItemAt(0).text.toString())
+  }
+
+  @Test
+  fun resetVideoUriClickWithoutActivityShouldBeSafe() {
+    val fragment = SettingsFragment()
+    val method = fragment.javaClass.getDeclaredMethod("initializeResetVideoUriField")
+    method.isAccessible = true
+    method.invoke(fragment)
+  }
+
+  @Test
+  fun copyRobotIpClickWithoutActivityShouldBeSafe() {
+    val fragment = SettingsFragment()
+    val method = fragment.javaClass.getDeclaredMethod("initializeCopyRobotIpField")
     method.isAccessible = true
     method.invoke(fragment)
   }

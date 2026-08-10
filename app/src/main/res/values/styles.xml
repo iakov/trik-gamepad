@@ -5,11 +5,9 @@
         by AppBaseTheme from res/values-vXX/styles.xml on newer devices.
     -->
     <style name="AppBaseTheme" parent="Theme.AppCompat">
-        <!--
-            Theme customizations available in newer API levels can go in
-            res/values-vXX/styles.xml, while customizations related to
-            backward-compatibility can go here.
-        -->
+        <item name="colorPrimary">@color/greendark</item>
+        <item name="colorPrimaryDark">@color/greendark</item>
+        <item name="colorAccent">@color/greenlight</item>
     </style>
 
     <!-- Application theme. -->
@@ -19,11 +17,16 @@
         <!-- All customizations that are NOT specific to a particular API-level can go here. -->
     </style>
 
-    <style name="Theme.AppCompat.Light.NoActionBar.FullScreen" parent="@style/Theme.AppCompat.Light.NoActionBar">
+    <!-- Campaign 9 E: Settings matches the main screen's dark full-screen look
+         (the old Light variant clashed with the gamepad's dark immersive UI). -->
+    <style name="Theme.AppCompat.NoActionBar.FullScreen" parent="@style/Theme.AppCompat.NoActionBar">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowActionBar">false</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
+        <item name="colorPrimary">@color/greendark</item>
+        <item name="colorPrimaryDark">@color/greendark</item>
+        <item name="colorAccent">@color/greenlight</item>
     </style>
 
 </resources>

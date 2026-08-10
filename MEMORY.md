@@ -1464,3 +1464,75 @@ robot video disabled → keeps cycling; no URL → hidden. Commits `496ca7f`
   `allOf(withId(R.id.btnSettings), isDisplayed())` (unique id, no index).
   Lesson: prefer id-based matchers; never assert a child index against a view
   that may be reordered by `bringToFront`.
+
+### [2026-08-10] Campaign 9 execution run - end-user UX
+
+Scope: Material/accessibility alignment (ROADMAP Campaign 9, A–E + G–J +
+marginal batch; F/K deferred by user decision). Full record in ROADMAP;
+user-visible gaps and decisions in the session. Commits `…`..`…`.
+
+**Highlights:**
+
+- **Connection status = gear-border recolor** (A): `btn_settings.xml` layer
+  rect gets `@+id/settingsButtonBg` + `<stroke>`; `ConnectionFeedback` mutates
+  the `GradientDrawable` stroke at runtime via `ConnectionIndicator`
+  (`ConnectionState → color-resource`: Connected greendark / Connecting amber /
+  Disconnected red). No new view → zero touch-interception risk. This replaced
+  the originally-planned corner LED dot (user chose recolor over a new view).
+- **Accessibility** (B): `contentDescription` on gear/pads/video; dropped
+  `FLAG_IGNORE_GLOBAL_SETTING` from all 3 haptic call sites (haptics now follow
+  the system setting); fixed `MjpegView` focusability contradiction (code
+  `isFocusable=true` vs XML `focusable=false` → code now `false`).
+- **Settings** (C/I/H): sliders replace free-text for alpha (0..255) and wheel
+  step (1..100); wheel toggle moved from a menu CheckBox to a `SwitchPreference`;
+  keep-screen-on is a toggle now (was unconditional); **video URI is never
+  implicitly overwritten on host change** — an explicit "Reset video URI to
+  robot default" preference fills `http://<host>:8080/?action=stream` on tap
+  (user decision: "no implicit copying").
+- **Feedback hygiene** (D/N): the gear border is now the persistent status;
+  `onConnectionFinished` success toasts and the routine "Inactive gamepad"
+  pause toast are gone (errors surface via a Material `Snackbar`, which pulled
+  in `com.google.android.material:material:1.12.0`).
+- **Empty state** (G): `videoPlaceholder` text shows when no video URL is set.
+- **Theming** (E): brand greens → `colorPrimary`/`colorAccent`; `values-night`
+  added; Settings switched from the Light theme to a new dark full-screen
+  variant; magic buttons got a real pressed-state fill; pad circle `Color.RED`
+  → accent green.
+
+**Lessons:**
+
+- **detekt `TooManyFunctions` counts override implementations:** the 3 thin new
+  `SettingsUi` overrides pushed MainActivity to exactly 25 (the configured
+  threshold) → bumped to 27 with the adapter-pattern rationale in detekt.yml.
+  Plan for the method-count cost when adding interface overrides to a class at
+  the threshold.
+- **`SeekBarPreference` stores `Int`, not `String`:** a settings test that reads
+  `getString(key, "")` for the old `EditTextPreference` breaks on the switch.
+  The controller's `readInt` helper handles both Int (new) and String (legacy)
+  storage; tests must write `putInt` to exercise the `is Int` branch (it was
+  uncovered — found via the coverage gate dip to 0.799).
+- **Coverage gate is the real guardian of "did I test the new branches":**
+  mid-campaign branch coverage dipped 0.8123 → 0.799 (new code) and the gate
+  caught it; the fix was targeted tests (`readInt` Int path, `ConnectionFeedback`
+  null paths, wheel/keep-screen switches). Final 0.8063. Lesson already in
+  MEMORY ("coverage margin matters") — apply it *during* a campaign, not at the end.
+- **Menu-item removal breaks index-based Espresso matchers again:** the wheel
+  menu CheckBox was dropped, so the Settings action moved from action-bar child
+  index 1 → 0 and `SettingsTests.openSettings` (`childAtPosition(…,1)`) failed
+  on device. Fixed to id+text+isDisplayed (same lesson as the spinner incident:
+  id-based matchers, never child indices).
+- **`SwitchPreference` in `pref_general.xml` shifts every row index below it** —
+  instrumented `editPreference(row, …)` call sites must be re-derived
+  (0 wheel, 1 keepScreenOn, 2 host, 3 port, 4 pads slider, 5 wheel slider,
+  6 keepalive, 7 video URI, …). Comment the row layout in the test.
+- **`android:min` on a `SeekBarPreference` is API 26+** — use `app:min` (res-auto)
+  for minSdk 23 support; lint `UnusedAttribute` caught it.
+- **`*>` log redirect through PowerShell mangles Kotlin compiler output** —
+  the `e:` lines were truncated mid-path; `cmd /c "... 2>&1 > log"` gives clean
+  compiler errors. (Windows quirk, applies to any Kotlin compile debug.)
+- **`--rerun-tasks` matters for the "run the 3-variant suite twice" rule:** the
+  naive second `./gradlew test` was UP-TO-DATE and executed nothing; `--rerun-tasks`
+  forced a real re-run. "Exit 0 ≠ the tool ran" applies to test runs too.
+- **Material `Snackbar` needs `Theme.AppCompat` or Material descendant; the
+  existing AppCompat theme works** — no `Theme.MaterialComponents` migration was
+  required for the error Snackbars.

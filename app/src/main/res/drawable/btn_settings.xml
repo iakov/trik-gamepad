@@ -1,12 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/settingsButtonBg">
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/black" />
+            <stroke
+                android:width="3dp"
+                android:color="@color/greendark" />
+            <corners android:radius="10dp" />
+        </shape>
+    </item>
     <item>
-        <shape android:shape="rectangle" >
-			<solid android:color="@android:color/black" />
-			<corners android:radius="10dp"/>
-		</shape>
-	</item>
-	<item>
-    	<bitmap android:src="@android:drawable/ic_menu_preferences"/>
-	</item>
+        <bitmap android:src="@android:drawable/ic_menu_preferences" />
+    </item>
 </layer-list>

@@ -2,7 +2,6 @@ package com.trikset.gamepad
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.util.AttributeSet
 import android.util.Log
@@ -10,6 +9,7 @@ import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.widget.RelativeLayout
+import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import java.util.Locale
 import kotlin.math.max
@@ -51,16 +51,15 @@ class SquareTouchPadLayout : RelativeLayout {
   }
 
   private fun init() {
-    paint.color = Color.RED
+    // Campaign 9 E: draw the pad indicator with the theme accent (was hardcoded RED).
+    paint.color = ContextCompat.getColor(context, R.color.greenlight)
     paint.strokeWidth = 0f
     paint.style = Paint.Style.STROKE
     paint.alpha = OPAQUE_ALPHA
     setOnTouchListener(TouchPadListener())
     setOnClickListener {
-      performHapticFeedback(
-          HapticFeedbackConstants.LONG_PRESS,
-          HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING,
-      )
+      // Respect the system haptics setting (Campaign 9 B): no FLAG_IGNORE_GLOBAL_SETTING.
+      performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
     }
     setWillNotDraw(false)
     isHapticFeedbackEnabled = true
@@ -107,10 +106,8 @@ class SquareTouchPadLayout : RelativeLayout {
     val currentSender = sender
     if (currentSender != null) {
       currentSender.send("$padName $command")
-      performHapticFeedback(
-          HapticFeedbackConstants.VIRTUAL_KEY,
-          HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING,
-      )
+      // Respect the system haptics setting (Campaign 9 B): no FLAG_IGNORE_GLOBAL_SETTING.
+      performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
     }
   }
 

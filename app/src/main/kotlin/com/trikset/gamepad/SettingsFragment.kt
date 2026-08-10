@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.DisplayMetrics
 import android.widget.Toast
+import androidx.core.content.edit
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import java.util.Locale
@@ -21,6 +22,52 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val SK_WHEEL_STEP = "wheelSens"
     const val SK_ABOUT_SYSTEM = "aboutSystem"
     const val SK_KEEPALIVE = "keepaliveTimeout"
+    const val SK_RESET_VIDEO_URI = "resetVideoURI"
+    const val SK_COPY_ROBOT_IP = "copyRobotIp"
+    const val SK_WHEEL_ENABLED = "wheelEnabled"
+    const val SK_KEEP_SCREEN_ON = "keepScreenOn"
+    private const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
+  }
+
+  /** Campaign 9 L: one-tap copy of the configured robot IP (debugging convenience). */
+  private fun initializeCopyRobotIpField() {
+    val myActivity = activity ?: return
+    val copy = findPreference<Preference>(SK_COPY_ROBOT_IP) ?: return
+    copy.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+      val prefs = copy.sharedPreferences
+      val host = prefs?.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
+      val clipboard = myActivity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+      clipboard.setPrimaryClip(ClipData.newPlainText(SK_HOST_ADDRESS, host))
+      Toast.makeText(
+              myActivity.applicationContext,
+              getString(R.string.copied_to_clipboard),
+              Toast.LENGTH_SHORT,
+          )
+          .show()
+      true
+    }
+  }
+
+  /**
+   * Fills the video URI from the configured robot host (Campaign 9 C); explicit, never implicit.
+   */
+  private fun initializeResetVideoUriField() {
+    val myActivity = activity ?: return
+    val reset = findPreference<Preference>(SK_RESET_VIDEO_URI) ?: return
+    reset.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+      val prefs = reset.sharedPreferences
+      val host = prefs?.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
+      val uri = "http://$host:8080/?action=stream"
+      prefs?.edit { putString(SK_VIDEO_URI, uri) }
+      reset.summary = uri
+      Toast.makeText(
+              myActivity.applicationContext,
+              getString(R.string.video_uri_reset),
+              Toast.LENGTH_SHORT,
+          )
+          .show()
+      true
+    }
   }
 
   private fun initializeAboutSystemField() {
@@ -76,5 +123,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     initializeAboutSystemField()
     initializeDynamicPreferenceSummary()
+    initializeResetVideoUriField()
+    initializeCopyRobotIpField()
   }
 }

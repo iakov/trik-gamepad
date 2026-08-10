@@ -56,7 +56,10 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
   private fun init() {
     holder.addCallback(this)
     viewThread = MjpegViewThread()
-    isFocusable = true
+    // Decorative video surface: never focusable (the XML sets focusable=false; the code must not
+    // contradict it, or TalkBack/keyboard navigation stop on a surface with no interaction).
+    isFocusable = false
+    isFocusableInTouchMode = false
     fpsTextPaint.textAlign = Paint.Align.RIGHT
     fpsTextPaint.textSize = FPS_TEXT_SIZE
     fpsTextPaint.typeface = Typeface.DEFAULT

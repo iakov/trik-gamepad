@@ -50,6 +50,20 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     override fun setWheelStep(step: Int) {
       this.step = step
     }
+
+    var wheelEnabledState = false
+
+    override fun isWheelEnabled(): Boolean = wheelEnabledState
+
+    override fun setWheelEnabled(enabled: Boolean) {
+      wheelEnabledState = enabled
+    }
+
+    var keepScreenOnState = true
+
+    override fun setKeepScreenOn(enabled: Boolean) {
+      keepScreenOnState = enabled
+    }
   }
 
   private lateinit var context: Context
@@ -101,6 +115,32 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
       setPref(SettingsFragment.SK_SHOW_PADS, value)
       assertEquals("pads alpha for '$value' must clamp", expected, ui.lastAlpha, 0.001f)
     }
+  }
+
+  @Test
+  fun onPreferenceChangedWithIntSliderValuesShouldClamp() {
+    // SeekBarPreference stores Int (Campaign 9 C) — the readInt helper must handle it.
+    prefs.edit().putInt(SettingsFragment.SK_SHOW_PADS, 255).commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals("max alpha", 1f, ui.lastAlpha, 0.001f)
+
+    prefs.edit().putInt(SettingsFragment.SK_WHEEL_STEP, 999).commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals("wheel step clamped to 100", 100, ui.step)
+  }
+
+  @Test
+  fun onPreferenceChangedWithWheelEnabledSwitchShouldApply() {
+    prefs.edit().putBoolean(SettingsFragment.SK_WHEEL_ENABLED, true).commit()
+    controller.onPreferenceChanged(prefs)
+    assertTrue(ui.wheelEnabledState)
+  }
+
+  @Test
+  fun onPreferenceChangedWithKeepScreenOnSwitchShouldApply() {
+    prefs.edit().putBoolean(SettingsFragment.SK_KEEP_SCREEN_ON, false).commit()
+    controller.onPreferenceChanged(prefs)
+    assertTrue(!ui.keepScreenOnState)
   }
 
   @Test

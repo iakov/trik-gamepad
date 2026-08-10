@@ -29,10 +29,8 @@ class MagicButtonPanel(
       btn.setBackgroundResource(R.drawable.button_shape)
       btn.setOnClickListener {
         send("btn $name down")
-        btn.performHapticFeedback(
-            HapticFeedbackConstants.LONG_PRESS,
-            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING,
-        )
+        // Respect the system haptics setting (Campaign 9 B): no FLAG_IGNORE_GLOBAL_SETTING.
+        btn.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
       }
       container.addView(btn)
     }

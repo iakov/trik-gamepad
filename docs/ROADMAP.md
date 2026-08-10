@@ -365,3 +365,14 @@ graphics).
 
 Deferred: **F** first-run guidance, **K** pad graphics — cosmetic/onboarding,
 parked for a future campaign.
+
+**Verification (2026-08-10):** full gate green (test lint detekt spotbugs
+jacoco 95/80 spotlessCheck jscpd lizard) — branch coverage **0.8063** (new
+code pulled it under 0.80 mid-campaign; covered with `readInt` Int-storage
+tests + `ConnectionFeedback` null-path tests, see MEMORY retrospective).
+3-variant `test` suite run twice (`--rerun-tasks` on the second pass — an
+up-to-date second run silently skips). Instrumented **9/9 on both API-36
+emulators** (`connectedDebugAndroidTest --no-configuration-cache`); the wheel
+menu removal broke `SettingsTests.openSettings`' index-based matcher
+(`childAtPosition(...,1)` assumed the wheel item) — fixed to id+text+displayed.
+**CAMPAIGN 9 COMPLETE.**

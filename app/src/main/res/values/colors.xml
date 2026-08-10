@@ -2,4 +2,6 @@
 <resources>
     <color name="greenlight">#6FC555</color>
     <color name="greendark">#559540</color>
+    <color name="amber">#FFC107</color>
+    <color name="red">#E53935</color>
 </resources>

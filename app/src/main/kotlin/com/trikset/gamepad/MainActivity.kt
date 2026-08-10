@@ -14,11 +14,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AlphaAnimation
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.MenuItemCompat
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -53,6 +51,13 @@ class MainActivity :
         mainViewProvider = { findViewById(R.id.main) },
         actionBarProvider = { supportActionBar },
         hideDelayMs = HIDE_DELAY_MS,
+    )
+  }
+  private val connectionFeedback: ConnectionFeedback by lazy {
+    ConnectionFeedback(
+        context = this,
+        settingsButtonProvider = { findViewById(R.id.btnSettings) },
+        rootViewProvider = { findViewById(R.id.main) },
     )
   }
 
@@ -93,7 +98,13 @@ class MainActivity :
       magicButtons.populate(buttonsView, MAGIC_BUTTON_COUNT)
     }
 
-    getSenderService().setShowTextCallback { toast(it) }
+    getSenderService().setShowTextCallback { message ->
+      // Campaign 9 D/N: the gear border is the persistent status; surface only connection
+      // *errors* as feedback, using a Snackbar (Material) instead of a transient Toast.
+      if (message.endsWith(ERROR_SUFFIX)) {
+        runOnUiThread { connectionFeedback.error(message) }
+      }
+    }
 
     val btnSettings = findViewById<Button>(R.id.btnSettings)
     if (btnSettings != null) {
@@ -137,8 +148,13 @@ class MainActivity :
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
         senderViewModel.connectionState.collect { state ->
-          if (state is ConnectionState.Disconnected && state.reason.isNotEmpty()) {
-            toast("Disconnected." + state.reason)
+          connectionFeedback.update(state)
+          if (
+              state is ConnectionState.Disconnected &&
+                  state.reason.isNotEmpty() &&
+                  state.reason != PAUSE_DISCONNECT_REASON
+          ) {
+            connectionFeedback.error("Disconnected." + state.reason)
           }
           if (state is ConnectionState.Connected) {
             // Edge trigger: robot reachable again -> reload the video right away if it is dead.
@@ -151,8 +167,6 @@ class MainActivity :
 
   override fun onCreateOptionsMenu(menu: Menu): Boolean {
     menuInflater.inflate(R.menu.menu, menu)
-    val wheel = MenuItemCompat.getActionView(menu.findItem(R.id.wheel)) as CheckBox
-    wheel.text = getString(R.string.menu_wheel)
     return true
   }
 
@@ -162,17 +176,12 @@ class MainActivity :
           startActivity(Intent(this, SettingsActivity::class.java))
           true
         }
-        R.id.wheel -> {
-          mWheelEnabled = !mWheelEnabled
-          item.isChecked = mWheelEnabled
-          true
-        }
         else -> super.onOptionsItemSelected(item)
       }
 
   override fun onPause() {
     mSensorManager?.unregisterListener(this)
-    getSenderService().disconnect("Inactive gamepad")
+    getSenderService().disconnect(PAUSE_DISCONNECT_REASON)
     videoRetryController?.onPause()
     hideVideoLoading()
     val video = mVideo
@@ -268,12 +277,27 @@ class MainActivity :
 
   override fun setVideoUrl(url: URL?) {
     mVideoURL = url
+    // Campaign 9 G: no URL -> show a hint instead of a silent black area. The
+    // placeholder stays hidden while a URL is configured, even if the stream is
+    // down (the loading spinner + gear border convey that state).
+    findViewById<android.widget.TextView>(R.id.videoPlaceholder)?.visibility =
+        if (url == null) View.VISIBLE else View.GONE
+  }
+
+  override fun setKeepScreenOn(enabled: Boolean) {
+    findViewById<View>(R.id.main)?.keepScreenOn = enabled
   }
 
   override fun getWheelStep(): Int = mWheelStep
 
   override fun setWheelStep(step: Int) {
     mWheelStep = step
+  }
+
+  override fun isWheelEnabled(): Boolean = mWheelEnabled
+
+  override fun setWheelEnabled(enabled: Boolean) {
+    mWheelEnabled = enabled
   }
 
   fun getSenderService(): SenderService = senderViewModel.sender
@@ -316,5 +340,7 @@ class MainActivity :
     const val HIDE_DELAY_MS = 3000L
     const val ALPHA_ANIMATION_MS = 2000L
     const val WHEEL_STEP_DEFAULT = 7
+    const val PAUSE_DISCONNECT_REASON = "Inactive gamepad"
+    const val ERROR_SUFFIX = " error."
   }
 }

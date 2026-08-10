@@ -45,21 +45,25 @@ class SettingsTests {
   fun settingsShouldWorkCorrectly() {
     openSettings()
 
-    editPreference(0, "localhost") // host address
-    editPreference(1, "12345") // port
-    editPreference(2, "50") // pads opacity
-    editPreference(3, "5") // wheel step
-    editPreference(4, "3000") // keepalive
-    editPreference(5, "http://localhost:8080/?action=stream") // video URI
+    // Preference rows (Campaign 9 C/I/H added wheel + keep-screen-on switches at the
+    // top and turned pads-opacity/wheel-sensitivity into sliders, shifting the
+    // EditText rows): 0 wheel, 1 keepScreenOn, 2 host, 3 port, 4 pads slider,
+    // 5 wheel slider, 6 keepalive, 7 video URI, 8 reset URI, 9 copy IP, 10 about.
+    editPreference(2, "localhost") // host address
+    editPreference(3, "12345") // port
+    editPreference(6, "3000") // keepalive
+    editPreference(7, "http://localhost:8080/?action=stream") // video URI
 
     Espresso.pressBack()
 
     val preferences = PreferenceManager.getDefaultSharedPreferences(mActivityTestRule.activity)
     assertEquals("localhost", preferences.getString(SettingsFragment.SK_HOST_ADDRESS, ""))
     assertEquals("12345", preferences.getString(SettingsFragment.SK_HOST_PORT, ""))
-    assertEquals("50", preferences.getString(SettingsFragment.SK_SHOW_PADS, ""))
-    assertEquals("5", preferences.getString(SettingsFragment.SK_WHEEL_STEP, ""))
     assertEquals("3000", preferences.getString(SettingsFragment.SK_KEEPALIVE, ""))
+    assertEquals(
+        "http://localhost:8080/?action=stream",
+        preferences.getString(SettingsFragment.SK_VIDEO_URI, ""),
+    )
   }
 
   @Test
@@ -68,7 +72,7 @@ class SettingsTests {
         mActivityTestRule.activity.getSenderService().getKeepaliveTimeout()
 
     openSettings()
-    editPreference(4, "500") // keepalive below MINIMAL_KEEPALIVE
+    editPreference(6, "500") // keepalive below MINIMAL_KEEPALIVE
 
     Espresso.pressBack()
 
@@ -89,7 +93,6 @@ class SettingsTests {
             allOf(
                 withId(R.id.settings),
                 withText("Settings"),
-                childAtPosition(childAtPosition(withId(androidx.appcompat.R.id.action_bar), 1), 1),
                 isDisplayed(),
             )
         )

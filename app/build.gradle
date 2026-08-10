@@ -251,6 +251,7 @@ tasks.register('jacocoTestCoverageVerification', JacocoCoverageVerification) {
 
 dependencies {
     implementation libs.appcompat
+    implementation libs.material
     implementation libs.coreKtx
     implementation libs.androidxAnnotation
     implementation libs.preferenceKtx

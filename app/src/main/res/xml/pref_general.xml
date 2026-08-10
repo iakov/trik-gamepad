@@ -1,4 +1,17 @@
-<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <SwitchPreference
+        android:defaultValue="false"
+        android:key="wheelEnabled"
+        android:summaryOff="Accelerometer wheel off"
+        android:summaryOn="Accelerometer wheel on"
+        android:title="Wheel" />
+    <SwitchPreference
+        android:defaultValue="true"
+        android:key="keepScreenOn"
+        android:summaryOff="Screen may sleep while the gamepad is open"
+        android:summaryOn="Screen stays on while the gamepad is open"
+        android:title="Keep screen on" />
     <EditTextPreference
         android:defaultValue="192.168.77.1"
         android:inputType="textUri"
@@ -23,20 +36,19 @@
 	    android:defaultValue="@color/favouriteBall"
 	    alphaSlider="false"
 	/> -->
-    <EditTextPreference
+    <SeekBarPreference
         android:defaultValue="100"
-        android:hint="0..255"
-        android:inputType="number"
         android:key="showPads"
-        android:summary="0 for fully transparent, and 255 is opaque."
+        android:max="255"
+        android:summary="0 for fully transparent, 255 is opaque"
         android:title="Arrows transparency" />
 
-    <EditTextPreference
+    <SeekBarPreference
         android:defaultValue="7"
-        android:hint="1..100"
-        android:inputType="number"
         android:key="wheelSens"
-        android:summary="5..10 as usual, 1 for very sensitive"
+        android:max="100"
+        app:min="1"
+        android:summary="Smaller = more sensitive; 5..10 is typical"
         android:title="Wheel sensitivity" />
 
     <EditTextPreference
@@ -55,6 +67,16 @@
         android:selectAllOnFocus="true"
         android:singleLine="true"
         android:title="URI for video stream to play" />
+
+    <Preference
+        android:key="resetVideoURI"
+        android:summary="Fill the URI from the robot IP address above"
+        android:title="Reset video URI to robot default" />
+
+    <Preference
+        android:key="copyRobotIp"
+        android:summary="Copy the configured robot IP address"
+        android:title="Copy robot IP" />
 
     <Preference
         android:enabled="true"
