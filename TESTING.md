@@ -17,9 +17,9 @@ Two layers:
 - **Robolectric unit tests** (JVM, no device): `SenderServiceTest` runs under
   three SDK configs per build type and covers the TCP `SenderService`.
 - **Espresso instrumented tests** (`androidTest`): `KeepAliveTests`,
-  `MainWindowTests`, `SettingsTests`, run with AndroidX Test Orchestrator.
-  CI runs them on an API 36 emulator via GitHub Actions; locally they need a
-  running emulator.
+  `MainWindowTests`, `SettingsTests`, `MagicButtonsTests`, run with AndroidX
+  Test Orchestrator. CI runs them on an API 36 emulator via GitHub Actions;
+  locally they need a running emulator.
 
 ## Running tests
 
@@ -70,6 +70,17 @@ Local instrumented run (per-platform acceleration prerequisites):
 > "Windows/PowerShell quirks"). Verified invocation on this machine (two
 > emulators, Atd_API36 + Swiftshader_API36): `./gradlew connectedDebugAndroidTest --no-configuration-cache --no-daemon` → 9/9 pass.
 
+> **Long-session emulator degradation (hit 2026-08-11):** after an emulator has
+> been up through many suites, the suite fails *broadly* — logcat floods with
+> `Sending oneway calls to frozen process` (the app-freezer under memory
+> pressure freezes the app process, so the SenderService executor cannot run and
+> commands after the first are dropped), the package service can go down
+> (`Can't find service: package`), and the swiftshader focus flake returns.
+> `adb reboot` does **not** clear it (the emulator process keeps its memory);
+> kill + relaunch with the exact launch flags (`adb -s <port> emu kill`, then
+> relaunch; Swiftshader_API36 uses `-no-snapshot` so every launch is cold) and
+> settle ~30-60 s before re-running.
+
 > **Do NOT use `-gpu swiftshader_indirect` locally.** Verified: with the
 > software GPU the app window never receives focus and the same suite fails
 > 8/8 with `RootViewWithoutFocusException` — the exact failure CI saw (decision
@@ -97,6 +108,14 @@ Local instrumented run (per-platform acceleration prerequisites):
   If it still fails → pre-existing, don't chase ghosts.
 - **Batch before re-run**: found one failure? Grep for siblings and fix all
   before re-running — each re-run costs the full suite.
+- **Instrument the failing test, not just the app**: after reading the
+  sources, add targeted diagnostics to the test itself — put the server's
+  received messages in the assert message (`expected X, received so far: …`),
+  log the tapped views' bounds at tap time, dump a non-blocking main-thread
+  stack (`Thread.getAllStackTraces()`), and read the per-test logcat under
+  `app/build/outputs/androidTest-results/<avd>/logcat-*.txt`. The root cause
+  of a repeated instrumented failure is often in the test harness/injection,
+  not the app.
 - **Full output while debugging**, quiet mode only for the final green check.
 
 ## Patterns
@@ -151,6 +170,29 @@ content* must poll in a bounded loop (the
 `keepaliveShouldBeSentWhileConnected` pattern: `while (!seen && attempts < N) { Thread.sleep(...); runAll(); idle(); }`), or use the latch/`anyMessageWithin`
 helpers. Rule: **local green ≠ CI green for async-server tests** — write the
 bounded poll from the start, don't rely on the "run twice" rule to catch it.
+
+### tap→command wiring — direct `performClick()` over touch injection
+
+For instrumented tests whose point is "view N fires command N" (e.g. the magic
+buttons sending `btn N down`), drive the click with a `ViewAction` that calls
+`view.performClick()` directly instead of Espresso's touch `click()` **when the
+app does async work around the taps** (a control connect, video reload). A
+touch-injected tap that lands while the main thread is mid-transition is
+**silently dropped** — the button's DOWN/UP never fires its listener and no
+Espresso error is raised.
+
+- **Signature (hit 2026-08-11, ~2 h):** the outer buttons of a row fire
+  (`[btn 1 down, btn 5 down]`) while the middle/second taps never send. Proven
+  not a layout issue (uiautomator bounds: buttons y 945-1077, pill y 486-594,
+  overlay ends y 942 — no overlap), not a socket issue (one connect, no
+  disconnect, no `NotSent`).
+- **Not an app bug:** real-device input is queued and processed in order; this
+  is an injection-vs-main-thread race. Longer dwell and Espresso `click()`
+  reduce but do not eliminate it; `performClick()` is deterministic.
+- **When to still use touch injection:** `SquareButtonTest` (pad touch
+  precision, multi-segment moves) genuinely exercises touch dispatch — keep raw
+  `MotionEvents` there, and serialize taps behind bounded `awaitMessage` so a
+  tap never lands mid-transition.
 
 ### Robolectric determinism
 
@@ -219,6 +261,12 @@ metric"):
   duplication. Wired into `scripts/gate.py` + the CI build job (Campaign 6 D1;
   `scripts/gate.ps1` replaced by `gate.py` in Campaign 7).
 
+> **detekt `TooManyFunctions` is `>=`, not `>`**: a class at exactly the
+> threshold still fails ("31 detected, threshold 31" → violation). Keep at
+> least one function of headroom; when a class keeps growing thin helpers,
+> prefer merging them (e.g. `showVideoLoading`/`hideVideoLoading` →
+> `setVideoLoading(visible)`) over bumping the threshold again.
+
 A0 baseline (2026-08-09; `main` sources excluded):
 
 | File | tokens |
@@ -269,6 +317,11 @@ tested components (`HardwareGamepadController`/`RobotPresetStore`/
 `MagicButtonSymbols` + their test files); jscpd stays at 0 clones (new test
 clones were deduped as they landed).
 
+**Re-measure (Campaign 12, 2026-08-11):** **18,007** tokens (17,442 after
+Campaign 11) — growth from the video-only-mode test additions
+(`VideoStreamErrorNotifierTest`, empty-host gate tests, the `performClick`
+magic-buttons rewrite); jscpd stays at 0 clones.
+
 **Stateful-table trap:** a table row's expected value must not depend on state an
 earlier row set (e.g. a non-numeric wheel step *keeps* the current step, so after
 a `"42"` row the expected default became 42). Reset the fixture per row where a
@@ -281,9 +334,9 @@ row's outcome depends on prior state (`ui.step = 7` before each case).
   post-migration coverage push, then to 92/71 after the ROADMAP Phase 2-E/2-F/3
   extractions, then to 95/80 after Campaign 2's coverage push);
   `jacocoTestReport` always produces the full
-  report. Measured **0.95 LINE / 0.8205 BRANCH** (Campaign 10, 2026-08-10; the
-  new gamepad/status/preset branches dipped to 0.796 mid-campaign and were
-  covered back up — see MEMORY "Campaign 10"). MjpegView's render-thread
+  report. Measured **0.965 LINE / 0.834 BRANCH** (Campaign 12, 2026-08-11;
+  the new gamepad/status/preset branches dipped to 0.796 mid-Campaign-10 and
+  were covered back up — see MEMORY "Campaign 10"). MjpegView's render-thread
   plumbing (`MjpegView$MjpegRenderThread`/`MjpegViewThread`) is excluded from
   the gate with a recorded rationale (untestable thread lifecycle; the render
   logic lives in the covered `MjpegFrameRenderer`); so are Kotlin-inline

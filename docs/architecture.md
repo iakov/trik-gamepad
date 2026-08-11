@@ -15,8 +15,9 @@ Decisions (problem → alternatives → why → out-of-scope) live in
 
 Single Gradle module `app/` (pure Kotlin, 0 `.java`). Two activities:
 
-- **`MainActivity`** — the gamepad itself: two touch pads, five magic buttons,
-  a sensor-driven wheel, and the MJPEG video stream. Owns the
+- **`MainActivity`** — the gamepad itself: two touch pads, a configurable
+  magic-button row (0–5, default 3), a sensor-driven wheel, and the MJPEG video
+  stream. Owns the
   `SenderService`, implements the `SettingsUi` view callbacks, and is the only
   place the app's UI lives. UI helpers extracted (Campaign 2): `MagicButtonPanel`
   builds the `btn N down` buttons; `SystemUiController` owns the immersive
@@ -38,11 +39,14 @@ constants in `SettingsFragment`.
 
 - `com.trikset.gamepad` — app logic: `MainActivity`, `SettingsActivity`,
   `SettingsFragment`, `SenderService` (TCP) + its helpers `ConnectRunnable`,
-  `KeepAliveTimer`, `ConnectionState`, `SenderViewModel`, `SquareTouchPadLayout`
-  (pads) + `TouchPadController` (pad math), `VideoStreamLoader` (MJPEG HTTP
-  opener), `RawSocketHttpStream` (raw-socket HTTP client), `VideoRetryController`
-  (bounded retry), `WheelController`, `MagicButtonPanel`, `SystemUiController`,
-  `MainActivitySettingsController`.
+  `KeepAliveTimer`, `ConnectionState`, `SenderViewModel`, `ConnectionFeedback` +
+  `ConnectionIndicator` (status pill / gear-border color), `SquareTouchPadLayout`
+  (pads) + `TouchPadController` (pad math), `MagicButtonPanel` +
+  `MagicButtonSymbols` (magic buttons), `HardwareGamepadController`,
+  `VideoStreamLoader` (MJPEG HTTP opener), `RawSocketHttpStream` (raw-socket
+  HTTP client), `VideoRetryController` (bounded retry),
+  `VideoStreamErrorNotifier` (throttled failure Snackbar), `RobotPresetStore`,
+  `WheelController`, `SystemUiController`, `MainActivitySettingsController`.
 - `com.trikset.gamepad.mjpeg` — the MJPEG player (vendored origin, renamed
   from `com.demo.mjpeg` in Phase 5): `MjpegView` (SurfaceView + render
   thread), `MjpegInputStream` (frame parser), `MjpegFrameRenderer` (decoding
@@ -87,7 +91,8 @@ timer. The timeout is configurable via `SK_KEEPALIVE`.
   `pad<N> x y` on movement beyond a sensitivity threshold; `pad<N> up` on
   `ACTION_UP`/`ACTION_CANCEL`. Coordinates are letterboxed into a square via
   `onMeasure`.
-- **Magic buttons**: five buttons created in code (`recreateMagicButtons`),
+- **Magic buttons**: `MagicButtonPanel` builds `1..count` buttons (count 0–5,
+  default 3; display glyphs via `MagicButtonSymbols`, defaults ▲ ■ ● ✕ ◆),
   each sends `btn N down` and fires haptic feedback.
 - **Wheel**: `MainActivity` registers an accelerometer `SensorEventListener`.
   The tilt maps to a `-100..100` angle in the pure `WheelController`
@@ -140,23 +145,28 @@ and is excluded from the coverage gates.
 
 ## Settings
 
-Seven keys (`SK_*` in `SettingsFragment`): `SK_HOST_ADDRESS`, `SK_HOST_PORT`,
-`SK_SHOW_PADS` (pad opacity), `SK_VIDEO_URI`, `SK_WHEEL_STEP`,
-`SK_ABOUT_SYSTEM` (read-only system-info row that copies to clipboard),
-`SK_KEEPALIVE`. `MainActivitySettingsController` (implements the `SettingsUi`
+Keys are the `SK_*` constants in `SettingsFragment` (host/port, pads alpha,
+video URI + `SK_RESET_VIDEO_URI`, wheel step + `SK_WHEEL_ENABLED`, keepalive,
+`SK_KEEP_SCREEN_ON`, `SK_HIDE_CONTROLS`, `SK_SHOW_FPS`, `SK_GAMEPAD_SWAP`,
+`SK_MAGIC_BUTTON_COUNT` + glyphs `magicSymbol1..5`, robot presets
+save/delete/apply, copy-IP, about-system, and the `SK_ADVANCED` sub-screen
+key). The root screen shows the Basic categories inline; the Advanced settings
+sub-screen (Campaign 10 restructure) is reached through `SK_ADVANCED`.
+`MainActivitySettingsController` (implements the `SettingsUi`
 callback interface) owns the preference-change handling: retargets the
-`SenderService`, updates the action-bar title, rewrites the video URI on host
-change, animates pad opacity, parses the video URL, validates the keepalive
-value, and clamps the wheel step. Extracted from `MainActivity`'s inline
-listener (ROADMAP Phase 2-E) so the logic is directly testable without
-reflection.
+`SenderService`, hides pads/buttons on a blank host, animates pad opacity,
+parses the video URL, validates the keepalive value, and clamps the wheel
+step. The video URI is never implicitly overwritten on host change — the
+explicit "Reset video URI to robot default" preference fills it. Extracted
+from `MainActivity`'s inline listener (ROADMAP Phase 2-E) so the logic is
+directly testable without reflection.
 
 ## Test layering
 
 | Layer | Location | Runs |
 |-------|----------|------|
 | Robolectric unit tests | `app/src/test/` | `./gradlew test` (3 build-type variants in parallel JVMs, no device) |
-| Instrumented (Espresso) | `app/src/androidTest/` | `./gradlew connectedDebugAndroidTest` (emulator; best-effort on CI) |
+| Instrumented (Espresso) | `app/src/androidTest/` | `./gradlew connectedDebugAndroidTest` (emulator; CI runs them on `aosp_atd` — green since 2026-08-08) |
 
 Unit-test network coverage avoids real sockets: `SenderServiceTest` uses its
 own `DummyServer` on an ephemeral port, `SquareTouchPadLayoutTest` exercises

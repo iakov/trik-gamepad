@@ -383,14 +383,13 @@ Scope (user decision 2026-08-10): end-user UX for hardware gamepads (mapping,
 swap toggle), connection clarity (persistent status + explicit connect), magic
 button symbols/count, a manual hide-controls toggle, robot presets, and a
 settings restructure into a Basic root + "Advanced settings" sub-screen.
-Time-tracking protocol (campaign-level only): the header table is filled at
-kickoff (Estimated/Start) and finalized as the docs LAST step (End/Actual +
-MEMORY retrospective). Full execution record: MEMORY.md "Campaign 10
-execution run".
+Campaign timing (wall-clock): `Estimated` at kickoff, `Actual` (elapsed)
+finalized at the docs step — no start/end recorded. Full execution record:
+MEMORY.md "Campaign 10 execution run".
 
-| Estimated | Start | End | Actual |
-|-----------|-------|-----|--------|
-| ~10.5 h | 2026-08-10 | 2026-08-10 | ≈10 h (approximate; precise per-phase tracking from the next campaign) |
+| Estimated | Actual |
+|-----------|--------|
+| ~10.5 h | ≈10 h (approximate) |
 
 - **Settings restructure** — root shows Basic categories inline (Robot
   connection / Video / Controls) + a nested "Advanced settings" sub-screen
@@ -402,8 +401,8 @@ execution run".
 - **B** Connection status + explicit connect — a status `TextView` above the
   gear (`Connected to host:port` / `Connecting…` / `Disconnected — tap to connect`); tap calls public `SenderService.connect()`; logic in
   `ConnectionFeedback` (zero new MainActivity methods).
-- **G** Magic buttons — `SK_MAGIC_BUTTON_COUNT` (0–5, default 3) +
-  `SK_MAGIC_SYMBOL_1..5` (defaults ▲ ■ ● ✕ ◆); glyphs display-only, the
+- **G** Magic buttons — `SK_MAGIC_BUTTON_COUNT` (0–5, default 3) + display
+  glyphs `magicSymbol1..5` (defaults ▲ ■ ● ✕ ◆); glyphs display-only, the
   protocol stays numeric `btn N down`; `contentDescription` = "Button N";
   pure `MagicButtonSymbols` helper.
 - **H** Hide pads & buttons — `SK_HIDE_CONTROLS` (default off, manual);
@@ -465,9 +464,9 @@ retries continue (relaxed for the empty-host case so video-only still
 auto-recovers). Rationale: DECISIONS.md "Empty-host video-only mode".
 Retrospective + elapsed: MEMORY.md "Campaign 12 execution run".
 
-| Estimated | Start | End | Actual |
-|-----------|-------|-----|--------|
-| ~6 h | 2026-08-11T03:02:18+03:00 | 2026-08-11T05:22:16+03:00 | 2 h 19 m |
+| Estimated | Actual |
+|-----------|--------|
+| ~6 h | 2 h 19 m |
 
 - **Pill gating** — `ConnectionFeedback` gains `targetConfiguredProvider`; a
   `Disconnected` state with no configured host hides the pill entirely

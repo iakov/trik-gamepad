@@ -20,7 +20,7 @@ section keeps dated retrospectives, execution records, and reference quirks).
   All gradle commands run from the repo root.
 - `_apk/` holds committed release APKs with versioned names
   (`TRIKGamepad-1.40-21.apk`).
-- The `app/` source tree is **pure Kotlin** (9 main + 9 unit-test + 5
+- The `app/` source tree is **pure Kotlin** (26 main + 29 unit-test + 6
   androidTest `.kt`, 0 `.java`). The Kotlin migration landed in 2026-08-07
   (see the session retrospective in "Design decisions & retrospectives"); the 0-`.java`
   state is what retired checkstyle/pmd.
@@ -155,8 +155,8 @@ not tweak-and-rerun.**
 
 ### Emulator prerequisites
 
-Instrumented tests (`KeepAliveTests`, `MainWindowTests`, `SettingsTests`) are
-Espresso + AndroidX Test Orchestrator (`testOptions.execution ANDROIDX_TEST_ORCHESTRATOR`, `animationsDisabled`). They need a running
+Instrumented tests (`KeepAliveTests`, `MainWindowTests`, `SettingsTests`,
+`MagicButtonsTests`) are Espresso + AndroidX Test Orchestrator (`testOptions.execution ANDROIDX_TEST_ORCHESTRATOR`, `animationsDisabled`). They need a running
 emulator/device; without a hypervisor the x86_64 images are unusable (Windows
 AEHD / Linux KVM / macOS Hypervisor.framework — per-platform table in
 TESTING.md). Local run: boot the **aosp_atd** AVD `Atd_API36` with
@@ -198,8 +198,9 @@ launcher too — avg brightness 0.0) — a capture-path artifact, not an app def
 
 `com.trikset.gamepad.mjpeg` package (`MjpegView`, `MjpegInputStream`,
 `MjpegFrameRenderer`; renamed from `com.demo.mjpeg` in Phase 5). Default URI
-`http://<host>:8080/?action=stream`, rebuilt from `SK_VIDEO_URI`; changing the
-host address rewrites the video URI to match. The stream **reconnects on error**,
+`http://<host>:8080/?action=stream`, rebuilt from `SK_VIDEO_URI`; the "Reset
+video URI to robot default" preference refills it after a host change (no
+implicit rewrite). The stream **reconnects on error**,
 not on a timer: `MjpegView.MjpegRenderThread` stops on `IOException` and invokes
 `OnStreamErrorListener`, which `MainActivity` registers in `onResume` and routes
 to `restartVideoStream()` (main thread, drops the HTTP connection, re-opens via
@@ -210,8 +211,12 @@ reconnect-on-error"). Cleartext HTTP is enabled via
 
 ### Settings
 
-Keys are `SK_*` constants in `SettingsFragment`: `SK_HOST_ADDRESS`, `SK_HOST_PORT`,
-`SK_SHOW_PADS`, `SK_VIDEO_URI`, `SK_WHEEL_STEP`, `SK_ABOUT_SYSTEM`, `SK_KEEPALIVE`.
+Keys are the `SK_*` constants in `SettingsFragment`: `SK_HOST_ADDRESS`,
+`SK_HOST_PORT`, `SK_SHOW_PADS`, `SK_VIDEO_URI`, `SK_WHEEL_STEP`, `SK_KEEPALIVE`,
+`SK_WHEEL_ENABLED`, `SK_KEEP_SCREEN_ON`, `SK_HIDE_CONTROLS`, `SK_SHOW_FPS`,
+`SK_GAMEPAD_SWAP`, `SK_MAGIC_BUTTON_COUNT` (+ display glyphs `magicSymbol1..5`),
+`SK_ABOUT_SYSTEM`, `SK_COPY_ROBOT_IP`, `SK_RESET_VIDEO_URI`, `SK_SAVE_PRESET`,
+`SK_DELETE_PRESET`, `SK_ROBOT_PRESETS`, `SK_ADVANCED` (sub-screen key).
 Stored via androidx `PreferenceManager` (migrated 2026-08-08 from the legacy
 `android.preference.PreferenceManager`; both resolve the same
 `<package>_preferences` default file — verified via javap — so stored values
@@ -225,9 +230,10 @@ dead-zone step. `BuildConfig.VERSION_NAME` feeds the About/system-info field.
 
 - CI lives in `.github/workflows/ci.yml` (CircleCI was retired — see the
   "Revival restructure" entry). The workflow runs the gate suite: unit tests,
-  lint, checkstyle, SpotBugs, JaCoCo report + verification, and the format
-  check. Instrumented tests run on an emulator (API 36 AVD) — see TESTING.md
-  for the `immersive_mode_confirmations` prerequisite.
+  lint, detekt, SpotBugs, JaCoCo report + verification, the spotless format
+  check, and the jscpd test-duplication gate. Instrumented tests run on an
+  emulator (API 36 AVD) — see TESTING.md for the `immersive_mode_confirmations`
+  prerequisite.
 - CI builds with `-PpreDexEnable=false` (debug APK + androidTest APK) and never
   signs release (the keystore never enters CI; release signing stays local-only).
 - DummyServer tests bind `localhost:12345` inside the app process, so they run
@@ -1548,8 +1554,8 @@ user-visible gaps and decisions in the session. Commit `ffef353`.
 Scope (user decision 2026-08-10): end-user UX for hardware gamepads +
 connection clarity + settings restructure. Full record in ROADMAP
 "Campaign 10"; commits `e6f556a` (feat) + `60773e0` (fix: nested settings
-navigation). Time-tracking protocol started this campaign (campaign-level
-only); docs update was the LAST step.
+navigation). Wall-clock campaign timing (Estimated/Actual) started this
+campaign; docs update was the LAST step.
 
 **What landed:**
 
@@ -1630,8 +1636,8 @@ API-36 emulators** (Atd_API36 + Swiftshader_API36). Test logical-SLOC trend
 ### [2026-08-11] Campaign 11 execution run - connection status pill + spinner gating
 
 Campaign 10 follow-up (decided 2026-08-10, implemented this session). Full
-record in ROADMAP "Campaign 10 follow-up"; commits `feat` + `docs`. Per the
-time-tracking protocol, docs update was the LAST step before commit.
+record in ROADMAP "Campaign 10 follow-up"; commits `feat` + `docs`. Docs update
+was the LAST step before commit.
 
 **What landed:**
 
@@ -1682,13 +1688,10 @@ proof: `.tmp/status_line_final.png` (orange cluster verified at screen center).
 Scope (user decision 2026-08-11): empty host = video streaming only (no pill,
 no pads/buttons, no pointless connect), connect state machine hardened, and
 video-stream failures notified. Full record: ROADMAP "Campaign 12"; rationale:
-DECISIONS.md "Empty-host video-only mode + connect-UX hardening". The "always
-measure elapsed time" rule (AGENTS.md) started this campaign; Campaign 11's
-elapsed was NOT captured - the gap that motivated the rule.
-**Elapsed: 2 h 19 m** (Start 2026-08-11T03:02:18+03:00 -> End
-2026-08-11T05:22:16+03:00; Estimated ~6 h). Phases: implementation ~6 m,
-gate + test suite ~2 h (mostly the instrumented deep-dive below), then the
-screenshot and docs steps ~10 m.
+DECISIONS.md "Empty-host video-only mode + connect-UX hardening".
+**Timing: Estimated ~6 h, Actual 2 h 19 m** (wall-clock elapsed; start/end not
+recorded). Phases: implementation ~6 m, gate + test suite ~2 h (mostly the
+instrumented deep-dive below), then the screenshot and docs steps ~10 m.
 
 **What landed:**
 
