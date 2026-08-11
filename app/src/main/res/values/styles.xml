@@ -3,27 +3,37 @@
     <!--
         Base application theme, dependent on API level. This theme is replaced
         by AppBaseTheme from res/values-vXX/styles.xml on newer devices.
+        Parent is DayNight so the app follows the system theme (light/dark).
     -->
-    <style name="AppBaseTheme" parent="Theme.AppCompat">
+    <style name="AppBaseTheme" parent="Theme.AppCompat.DayNight">
         <item name="colorPrimary">@color/greendark</item>
         <item name="colorPrimaryDark">@color/greendark</item>
         <item name="colorAccent">@color/greenlight</item>
     </style>
 
-    <!-- Application theme. -->
+    <!-- Application theme (the gamepad). The screen is full-screen robot video with a
+         translucent dark HUD, so the window background stays black in BOTH themes
+         (see DESIGN.md "System theme"): only the system chrome and the action bar
+         follow the system light/dark mode. -->
     <style name="AppTheme" parent="AppBaseTheme">
         <!-- Support library compatibility -->
         <item name="windowActionBarOverlay">true</item>
+        <!-- Explicit HUD backdrop: without a stream the SurfaceView is transparent and would
+             otherwise show the theme's (light) window background behind the placeholder/HUD. -->
+        <item name="android:windowBackground">@android:color/black</item>
+        <!-- Our HUD is deliberately dark-over-video; never let the system force-dark invert it. -->
+        <item name="android:forceDarkAllowed">false</item>
         <!-- All customizations that are NOT specific to a particular API-level can go here. -->
     </style>
 
-    <!-- Settings matches the main screen's dark full-screen look (the old Light
-         variant clashed with the gamepad's dark immersive UI). -->
-    <style name="Theme.AppCompat.NoActionBar.FullScreen" parent="@style/Theme.AppCompat.NoActionBar">
+    <!-- Settings: a DayNight theme (no action bar, fullscreen). Unlike the gamepad screen this
+         follows the system light/dark mode for the preference surfaces and dialogs. -->
+    <style name="Theme.AppCompat.NoActionBar.FullScreen" parent="@style/Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowActionBar">false</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
+        <item name="android:forceDarkAllowed">false</item>
         <item name="colorPrimary">@color/greendark</item>
         <item name="colorPrimaryDark">@color/greendark</item>
         <item name="colorAccent">@color/greenlight</item>
