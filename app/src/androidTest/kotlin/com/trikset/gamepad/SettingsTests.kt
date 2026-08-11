@@ -44,11 +44,11 @@ class SettingsTests {
 
     // Basic (root) categories hold the connection + video + keep-screen-on prefs;
     // keepalive moved into the nested "Advanced settings" sub-screen.
-    editPreference("Robot IP address", "localhost")
-    editPreference("Robot TCP port", "12345")
-    editPreference("URI for video stream to play", "http://localhost:8080/?action=stream")
+    editPreference("Robot IP address…", "localhost")
+    editPreference("Robot TCP port…", "12345")
+    editPreference("URI for video stream to play…", "http://localhost:8080/?action=stream")
     openAdvanced()
-    editPreference("Keep-alive timeout, ms", "3000")
+    editPreference("Keep-alive timeout, ms…", "3000")
 
     // Out of the Advanced sub-screen, then out of Settings.
     Espresso.pressBack()
@@ -71,7 +71,7 @@ class SettingsTests {
 
     openSettings()
     openAdvanced()
-    editPreference("Keep-alive timeout, ms", "500") // keepalive below MINIMAL_KEEPALIVE
+    editPreference("Keep-alive timeout, ms…", "500") // keepalive below MINIMAL_KEEPALIVE
 
     Espresso.pressBack()
     Espresso.pressBack()
