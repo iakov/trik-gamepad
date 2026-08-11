@@ -54,6 +54,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
     private const val DEFAULT_HOST_PORT = "4444"
     private const val LOG_DIALOG_MAX_LINES = 200
+    // XML defaults for the seekbar settings (mirror pref_general.xml defaultValue).
+    private const val DEFAULT_WHEEL_STEP = 7
+    private const val DEFAULT_PADS_ALPHA = 100
+    private const val DEFAULT_MAGIC_BUTTON_COUNT = 3
 
     fun magicSymbolKey(buttonNumber: Int): String = "magicSymbol$buttonNumber"
   }
@@ -229,9 +233,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
     // not a fabricated 0.
     val seekBarFormats =
         mapOf(
-            SK_WHEEL_STEP to (R.string.pref_wheel_sens_summary to 7),
-            SK_SHOW_PADS to (R.string.pref_show_pads_summary to 100),
-            SK_MAGIC_BUTTON_COUNT to (R.string.pref_magic_count_summary to 3),
+            SK_WHEEL_STEP to (R.string.pref_wheel_sens_summary to DEFAULT_WHEEL_STEP),
+            SK_SHOW_PADS to (R.string.pref_show_pads_summary to DEFAULT_PADS_ALPHA),
+            SK_MAGIC_BUTTON_COUNT to
+                (R.string.pref_magic_count_summary to DEFAULT_MAGIC_BUTTON_COUNT),
         )
     for ((preferenceKey, pair) in seekBarFormats) {
       val preference = findPreference<Preference>(preferenceKey) ?: continue
