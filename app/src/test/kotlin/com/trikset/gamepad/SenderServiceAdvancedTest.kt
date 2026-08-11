@@ -157,6 +157,21 @@ class SenderServiceAdvancedTest : RobolectricTestBase() {
     client.send("boom")
     mExecutor.runAll()
     shadowOf(getMainLooper()).idle()
+    // A failed connect must not stick at Connecting: the state machine returns to
+    // Disconnected so the pill honestly shows "Tap to connect…" again.
+    assertEquals(ConnectionState.Disconnected(""), client.connectionState.value)
+  }
+
+  @Test
+  fun connectWithBlankHostShouldNotAttempt() {
+    val client = SenderService(mExecutor)
+    client.setTarget("", 4444)
+    client.connect()
+    mExecutor.runAll()
+    shadowOf(getMainLooper()).idle()
+    // Blank host -> connect() no-ops (a video-only device has nothing to connect to);
+    // the state never leaves Disconnected and no socket attempt is queued.
+    assertEquals(ConnectionState.Disconnected(""), client.connectionState.value)
   }
 
   @Test

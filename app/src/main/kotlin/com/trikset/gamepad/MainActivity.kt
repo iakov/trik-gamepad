@@ -62,6 +62,7 @@ class MainActivity :
         settingsButtonProvider = { findViewById(R.id.btnSettings) },
         rootViewProvider = { findViewById(R.id.main) },
         statusTextProvider = { findViewById(R.id.connectionStatus) },
+        targetConfiguredProvider = { !getSenderService().getHostAddr().isNullOrBlank() },
         connectAction = { getSenderService().connect() },
     )
   }
@@ -77,6 +78,7 @@ class MainActivity :
         },
     )
   }
+  private val videoStreamErrorNotifier = VideoStreamErrorNotifier()
 
   private fun createPad(id: Int, strId: String) {
     val pad = findViewById<SquareTouchPadLayout>(id)
@@ -141,17 +143,15 @@ class MainActivity :
     mSettingsController?.register()
 
     // Bounded video-stream retry, gated on the control connection's keepalive (connectionState is
-    // Connected == the same robot is reachable). Reloads only while the view is not playing, so a
-    // healthy stream is never disturbed; a failed open / silent stall / foldable surface recreation
-    // all leave the view not-playing and are recovered by the 5 s tick or by the control-Connected
+    // Connected == the same robot is reachable). The gate relaxes for an empty host: a video-only
+    // device (no control target) must still auto-recover its stream, so retries run on the URL +
+    // not-playing checks alone there. Reloads only while the view is not playing, so a healthy
+    // stream is never disturbed; a failed open / silent stall / foldable surface recreation all
+    // leave the view not-playing and are recovered by the 5 s tick or by the control-Connected
     // edge (see VideoRetryController).
     videoRetryController =
         VideoRetryController(
-            shouldReload = {
-              senderViewModel.connectionState.value is ConnectionState.Connected &&
-                  mVideoURL != null &&
-                  mVideo?.isPlaying() == false
-            },
+            shouldReload = { shouldReloadVideo() },
             reload = { restartVideoStream() },
         )
 
@@ -211,7 +211,7 @@ class MainActivity :
     mSensorManager?.unregisterListener(this)
     getSenderService().disconnect(PAUSE_DISCONNECT_REASON)
     videoRetryController?.onPause()
-    hideVideoLoading()
+    setVideoLoading(false)
     val video = mVideo
     if (video != null) {
       video.stopPlayback()
@@ -231,7 +231,7 @@ class MainActivity :
       // "MJPEG: reconnect-on-error").
       video.setOnStreamErrorListener { videoRetryController?.onStreamError() }
       // Hide the loading indicator once the first frame of this playback cycle renders.
-      video.setOnFirstFrameListener { runOnUiThread { hideVideoLoading() } }
+      video.setOnFirstFrameListener { runOnUiThread { setVideoLoading(false) } }
       restartVideoStream()
     }
     val sensorManager = mSensorManager
@@ -244,6 +244,19 @@ class MainActivity :
     }
   }
 
+  /**
+   * Retry gate for the bounded video-stream reload. Requires a configured URL and a not-playing
+   * view; the control connection must be Connected, unless the host is blank — a video-only device
+   * (no control target) still needs its stream to auto-recover.
+   */
+  private fun shouldReloadVideo(): Boolean {
+    val hostConfigured = !getSenderService().getHostAddr().isNullOrBlank()
+    return (!hostConfigured ||
+        senderViewModel.connectionState.value is ConnectionState.Connected) &&
+        mVideoURL != null &&
+        mVideo?.isPlaying() == false
+  }
+
   private fun restartVideoStream() {
     // The error listener may fire from the render thread; always hop to the
     // main thread before touching the view hierarchy / opening the stream.
@@ -253,22 +266,27 @@ class MainActivity :
       // up (no spinner when disconnected / no stream URL); it stays up until the first frame
       // renders (robot video disabled -> keeps cycling).
       if (mVideoURL != null && senderViewModel.connectionState.value is ConnectionState.Connected) {
-        showVideoLoading()
+        setVideoLoading(true)
       }
       // Feed the load outcome back into the retry controller: a failed open arms the bounded
-      // retry loop, a success disarms it.
+      // retry loop, a success disarms it. A failure also surfaces a throttled "video stream
+      // unavailable" Snackbar (once per failure episode, not per 5 s retry tick).
       VideoStreamLoader(video).load(mVideoURL) { ok ->
-        if (ok) videoRetryController?.onLoadSuccess() else videoRetryController?.onLoadFailed()
+        if (ok) {
+          videoRetryController?.onLoadSuccess()
+        } else {
+          videoRetryController?.onLoadFailed()
+          if (videoStreamErrorNotifier.shouldNotify()) {
+            connectionFeedback.error(getString(R.string.video_stream_unavailable))
+          }
+        }
       }
     }
   }
 
-  private fun showVideoLoading() {
-    findViewById<android.widget.ProgressBar>(R.id.videoLoading)?.visibility = View.VISIBLE
-  }
-
-  private fun hideVideoLoading() {
-    findViewById<android.widget.ProgressBar>(R.id.videoLoading)?.visibility = View.GONE
+  private fun setVideoLoading(visible: Boolean) {
+    findViewById<android.widget.ProgressBar>(R.id.videoLoading)?.visibility =
+        if (visible) View.VISIBLE else View.GONE
   }
 
   override fun onSensorChanged(event: SensorEvent) {
@@ -359,7 +377,7 @@ class MainActivity :
 
   override fun onDestroy() {
     mSensorManager?.unregisterListener(this)
-    hideVideoLoading()
+    setVideoLoading(false)
     val video = mVideo
     if (video != null) {
       video.stopPlayback()

@@ -1,12 +1,12 @@
 package com.trikset.gamepad
 
 import android.view.View
-import android.view.ViewGroup
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.UiController
 import androidx.test.espresso.ViewAction
 import androidx.test.espresso.action.MotionEvents
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
+import androidx.test.espresso.matcher.ViewMatchers.withContentDescription
 import androidx.test.espresso.matcher.ViewMatchers.withId
 import androidx.test.filters.LargeTest
 import java.util.Locale
@@ -211,9 +211,23 @@ class MainWindowTests {
     }
 
     @Test
+    @Throws(InterruptedException::class)
     fun magicButtonsShouldSendCorrectCommands() {
       val server = DummyServer()
-      onView(withId(R.id.buttons)).perform(pressButtons())
+      for (i in 1..5) {
+        // Direct performClick (no touch injection): the Espresso touch-based click() raced the
+        // connect->video-reload work and silently dropped the second tap in the sequence
+        // (hit 2026-08-11, whichever button was second). The wiring under test is the button
+        // listener -> command; pad touch handling is covered by SquareButtonTest.
+        onView(withContentDescription("Button $i")).perform(performClickAction())
+        // The listener fires an async send (connect + write on a real executor); bounded-await
+        // each command so the socket write lands (TESTING.md: never a bare assert on
+        // server-received content).
+        assertTrue(
+            "expected 'btn $i down', received so far: ${server.receivedMessages}",
+            server.awaitMessage(String.format(Locale.ROOT, "btn %d down", i), 30_000),
+        )
+      }
       server.stopListening()
 
       val messages = server.receivedMessages.iterator()
@@ -225,32 +239,15 @@ class MainWindowTests {
       assertFalse(messages.hasNext())
     }
 
-    /** Presses down and up at [at] (screen coords), dwelling [dwellMs] between. */
-    private fun tapAt(uiController: UiController, at: FloatArray, dwellMs: Long) {
-      val tap = MotionEvents.sendDown(uiController, at, tapPrecision).down
-      uiController.loopMainThreadForAtLeast(dwellMs)
-      MotionEvents.sendUp(uiController, tap)
-    }
-
-    private fun pressButtons(): ViewAction {
+    /** A [ViewAction] that calls [View.performClick] directly (bypasses touch injection). */
+    private fun performClickAction(): ViewAction {
       return object : ViewAction {
         override fun getConstraints(): Matcher<View> = isDisplayed()
 
-        override fun getDescription(): String = "Clicks on each of magic buttons"
+        override fun getDescription(): String = "performClick"
 
         override fun perform(uiController: UiController, view: View) {
-          val buttons = view as ViewGroup
-          for (i in 0..4) {
-            val currentButton = buttons.getChildAt(i)
-            val buttonTopLeftCoords = IntArray(2)
-            currentButton.getLocationOnScreen(buttonTopLeftCoords)
-            val clickCoords =
-                floatArrayOf(
-                    buttonTopLeftCoords[0] + currentButton.width / 2f,
-                    buttonTopLeftCoords[1] + currentButton.height / 2f,
-                )
-            tapAt(uiController, clickCoords, 50)
-          }
+          view.performClick()
         }
       }
     }

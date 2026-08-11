@@ -22,6 +22,7 @@ class ConnectionFeedback(
     private val settingsButtonProvider: () -> Button?,
     private val rootViewProvider: () -> View?,
     private val statusTextProvider: () -> TextView?,
+    private val targetConfiguredProvider: () -> Boolean,
     private val connectAction: () -> Unit,
 ) {
   private val indicator = ConnectionIndicator()
@@ -57,10 +58,15 @@ class ConnectionFeedback(
       // Connected -> no pill: the video stream / gear border conveys the state, and the
       // centered text would sit over the video.
       is ConnectionState.Connected -> status.visibility = View.GONE
-      is ConnectionState.Disconnected -> {
-        status.text = context.getString(R.string.connection_status_disconnected)
-        status.visibility = View.VISIBLE
-      }
+      is ConnectionState.Disconnected ->
+          // No configured target (e.g. a video-only device): no "tap to connect" affordance
+          // with nothing to connect to. The red gear + video placeholder already signal it.
+          if (targetConfiguredProvider()) {
+            status.text = context.getString(R.string.connection_status_disconnected)
+            status.visibility = View.VISIBLE
+          } else {
+            status.visibility = View.GONE
+          }
     }
   }
 

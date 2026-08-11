@@ -378,6 +378,46 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun emptyHostShouldHidePadsAndButtons() {
+    // Empty host = video-only device: no pads/buttons, even with the "hide controls" toggle unset.
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "")
+    assertEquals(View.GONE, activity.findViewById<View>(R.id.controlsOverlay)?.visibility)
+    assertEquals(View.GONE, activity.findViewById<View>(R.id.buttons)?.visibility)
+  }
+
+  @Test
+  fun shouldReloadVideoWhenConnectedWithUrl() {
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
+    setField(activity, "mVideo", MjpegView(activity))
+    setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
+    awaitControlConnection(activity.getSenderService())
+    val m = method(activity, "shouldReloadVideo")
+    assertTrue(m.invoke(activity) as Boolean)
+  }
+
+  @Test
+  fun shouldReloadVideoWhenVideoOnlyEmptyHost() {
+    // Empty host = video-only: the retry gate relaxes the Connected requirement.
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "")
+    setField(activity, "mVideo", MjpegView(activity))
+    setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
+    val m = method(activity, "shouldReloadVideo")
+    assertTrue(
+        "video-only (empty host) must retry without a control connection",
+        m.invoke(activity) as Boolean,
+    )
+  }
+
+  @Test
+  fun shouldNotReloadVideoWhenHostConfiguredButDisconnected() {
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
+    setField(activity, "mVideo", MjpegView(activity))
+    setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
+    val m = method(activity, "shouldReloadVideo")
+    assertFalse("configured host needs Connected to retry", m.invoke(activity) as Boolean)
+  }
+
+  @Test
   fun onPauseShouldHideLoadingIndicator() {
     restartVideoStreamWithConfiguredVideo()
     method(activity, "onPause").invoke(activity)

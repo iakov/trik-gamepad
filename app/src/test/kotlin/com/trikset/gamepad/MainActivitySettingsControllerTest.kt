@@ -171,6 +171,15 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
   }
 
   @Test
+  fun onPreferenceChangedWithEmptyHostShouldNullTheVideoUrlDefault() {
+    // Empty host + unset URI pref: the default is "" (placeholder), not the malformed
+    // "http://:8080/..." which used to toast "Illegal video stream URL" on every register.
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "").commit()
+    controller.onPreferenceChanged(prefs)
+    assertNull(ui.url)
+  }
+
+  @Test
   fun onPreferenceChangedWithVideoUriShouldSetUrl() {
     controller.onPreferenceChanged(prefs)
     setPref(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
@@ -254,6 +263,18 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     prefs.edit().putBoolean(SettingsFragment.SK_HIDE_CONTROLS, true).commit()
     controller.onPreferenceChanged(prefs)
     assertTrue(!ui.controlsVisibleState)
+  }
+
+  @Test
+  fun onPreferenceChangedWithEmptyHostShouldHideControlsRegardlessOfToggle() {
+    // Empty host = video-only device: no pads/buttons, even with the toggle unset.
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "").commit()
+    controller.onPreferenceChanged(prefs)
+    assertTrue("empty host must hide pads with the toggle unset", !ui.controlsVisibleState)
+    // Re-setting a host restores the controls.
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7").commit()
+    controller.onPreferenceChanged(prefs)
+    assertTrue(ui.controlsVisibleState)
   }
 
   @Test

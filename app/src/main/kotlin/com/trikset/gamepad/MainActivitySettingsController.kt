@@ -13,9 +13,9 @@ import java.util.Locale
 
 /**
  * Owns [MainActivity]'s preference-change handling: retargets the [sender] on host/port changes,
- * rewrites the video URI when the host changes, animates pad opacity, parses the video URL, clamps
- * the wheel step and validates the keepalive timeout. Extracted from MainActivity's inline listener
- * so the logic is directly testable without reflection.
+ * parses the video URL, animates pad opacity, clamps the wheel step and validates the keepalive
+ * timeout. Extracted from MainActivity's inline listener so the logic is directly testable without
+ * reflection.
  */
 class MainActivitySettingsController(
     context: Context,
@@ -112,11 +112,12 @@ class MainActivitySettingsController(
     ui.animatePadsAlpha(alpha, prevAlpha)
     prevAlpha = alpha
 
+    // Empty host = video-only device: the URI default cannot be derived from the host, and the
+    // malformed "http://:8080/..." would toast "Illegal video stream URL" on every register.
+    // An empty default -> setVideoUrl(null) -> the placeholder prompts the user to configure one.
+    val defaultVideoUri = if (addr.isBlank()) "" else "http://$addr:8080/?action=stream"
     val videoStreamURI =
-        sharedPreferences.getString(
-            SettingsFragment.SK_VIDEO_URI,
-            "http://$addr:8080/?action=stream",
-        )!!
+        sharedPreferences.getString(SettingsFragment.SK_VIDEO_URI, defaultVideoUri)!!
     try {
       ui.setVideoUrl(if (videoStreamURI.isEmpty()) null else URI(videoStreamURI).toURL())
     } catch (e: URISyntaxException) {
@@ -151,7 +152,8 @@ class MainActivitySettingsController(
     ui.setMagicButtons(magicCount, symbols)
 
     val hideControls = sharedPreferences.getBoolean(SettingsFragment.SK_HIDE_CONTROLS, false)
-    ui.setControlsVisible(!hideControls)
+    // Empty host = video-only device: no pads/buttons to tap regardless of the toggle.
+    ui.setControlsVisible(!hideControls && addr.isNotBlank())
 
     val showFps = sharedPreferences.getBoolean(SettingsFragment.SK_SHOW_FPS, false)
     ui.setShowFps(showFps)

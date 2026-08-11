@@ -17,6 +17,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
 
   private fun feedback(
       statusTextProvider: () -> TextView?,
+      targetConfiguredProvider: () -> Boolean = { true },
       connectAction: () -> Unit = {},
   ): ConnectionFeedback =
       ConnectionFeedback(
@@ -24,6 +25,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
           settingsButtonProvider = { null },
           rootViewProvider = { null },
           statusTextProvider = statusTextProvider,
+          targetConfiguredProvider = targetConfiguredProvider,
           connectAction = connectAction,
       )
 
@@ -31,12 +33,14 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
   private fun feedbackWith(
       btn: Button?,
       status: TextView?,
+      targetConfiguredProvider: () -> Boolean = { true },
   ): ConnectionFeedback =
       ConnectionFeedback(
           context = context,
           settingsButtonProvider = { btn },
           rootViewProvider = { null },
           statusTextProvider = { status },
+          targetConfiguredProvider = targetConfiguredProvider,
           connectAction = {},
       )
 
@@ -71,6 +75,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
             settingsButtonProvider = { activity.findViewById(R.id.btnSettings) },
             rootViewProvider = { activity.findViewById(R.id.main) },
             statusTextProvider = { activity.findViewById(R.id.connectionStatus) },
+            targetConfiguredProvider = { true },
             connectAction = {},
         )
     val app = org.robolectric.RuntimeEnvironment.getApplication()
@@ -102,6 +107,24 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
     feedback.update(ConnectionState.Disconnected("x"))
     assertEquals("Tap to connect…", status.text.toString())
     assertEquals(View.VISIBLE, status.visibility)
+  }
+
+  @Test
+  fun updateWithNoConfiguredTargetShouldHidePillWhenDisconnected() {
+    val btn = Button(context)
+    btn.setBackgroundResource(R.drawable.btn_settings)
+    val status = TextView(context)
+    val feedback = feedbackWith(btn, status, targetConfiguredProvider = { false })
+
+    feedback.update(ConnectionState.Connecting)
+    assertEquals(View.VISIBLE, status.visibility)
+
+    feedback.update(ConnectionState.Connected)
+    assertEquals(View.GONE, status.visibility)
+
+    // No target -> no "tap to connect" affordance (a video-only device has nothing to connect to).
+    feedback.update(ConnectionState.Disconnected("x"))
+    assertEquals(View.GONE, status.visibility)
   }
 
   @Test

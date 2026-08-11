@@ -98,9 +98,16 @@ class SenderService(
           Log.e("TCP", "GetStream: Error", e)
           socket.close()
           osw.close()
+          // Failed to finish the handshake: leave the state machine at Disconnected, not stuck at
+          // Connecting (a later connect attempt retries cleanly).
+          _connectionState.value = ConnectionState.Disconnected("")
         }
       } catch (e: IOException) {
         Log.e("TCP", "Connect: Error", e)
+        // A refused/unresolvable target must not leave the pill stuck at "Connecting…".
+        // Empty reason -> MainActivity does not double-notify (the "Connection to X error."
+        // Snackbar from onConnectionFinished is the single notification).
+        _connectionState.value = ConnectionState.Disconnected("")
       }
     }
   }
@@ -156,9 +163,11 @@ class SenderService(
 
   /**
    * Establishes the TCP connection without sending a command (the "tap to connect" entry point).
+   * No-ops when no target is configured (a blank host is a valid video-only configuration — there
+   * is nothing to connect to).
    */
   fun connect() {
-    if (mOut == null) {
+    if (mOut == null && !mHostAddr.isNullOrBlank()) {
       connectAsync()
     }
   }
