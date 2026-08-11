@@ -9,10 +9,13 @@ import android.util.DisplayMetrics
 import android.widget.Toast
 import androidx.core.content.edit
 import androidx.preference.EditTextPreference
+import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
+import com.trikset.gamepad.diagnostics.AppLog
+import com.trikset.gamepad.diagnostics.DiagLevel
 import java.util.Locale
 
 class SettingsFragment : PreferenceFragmentCompat() {
@@ -37,6 +40,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val SK_SAVE_PRESET = "saveRobotPreset"
     const val SK_DELETE_PRESET = "deleteRobotPreset"
     const val SK_ROBOT_PRESETS = "robotPresets"
+    const val SK_DIAG_LEVEL = "diagLevel"
+    const val SK_SHARE_WITHOUT_EDITING = "shareWithoutEditing"
+    const val SK_REPORT_ISSUE = "reportIssue"
+    const val SK_COPY_REPORT = "copyReport"
+    const val SK_VIEW_LOG = "viewLog"
     const val MAX_MAGIC_BUTTONS = 5
     private const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
     private const val DEFAULT_HOST_PORT = "4444"
@@ -226,6 +234,22 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
   }
 
+  /**
+   * Applies the "Diagnostics verbosity" setting to [AppLog.minBufferLevel] when the fragment is
+   * created and whenever it changes. Applied here (the settings owner) rather than in
+   * MainActivity's controller so it works even when the gamepad activity was never opened; [App]
+   * re-applies it at process start.
+   */
+  private fun initializeDiagnosticsLevelField() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
+    AppLog.minBufferLevel = DiagLevel.toBufferLevel(prefs.getString(SK_DIAG_LEVEL, null))
+    val preference = findPreference<ListPreference>(SK_DIAG_LEVEL) ?: return
+    preference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
+      AppLog.minBufferLevel = DiagLevel.toBufferLevel(newValue as? String)
+      true
+    }
+  }
+
   override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
     setPreferencesFromResource(R.xml.pref_general, rootKey)
 
@@ -234,5 +258,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
     initializeResetVideoUriField()
     initializeCopyRobotIpField()
     initializeRobotPresets()
+    initializeDiagnosticsLevelField()
   }
 }

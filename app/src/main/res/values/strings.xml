@@ -24,4 +24,40 @@
     <string name="preset_row_summary">%1$s:%2$s · tap to apply</string>
     <string name="no_presets_saved">No presets saved yet</string>
     <string name="delete_preset_dialog_title">Delete preset</string>
+    <string name="report_issue">Report an issue</string>
+    <string name="report_issue_summary">Create a diagnostic report; opens in a text editor so you can review it first</string>
+    <string name="copy_report">Copy report</string>
+    <string name="copy_report_summary">Copy the full diagnostic report to the clipboard</string>
+    <string name="view_log">View log</string>
+    <string name="view_log_summary">Show recent app activity logs</string>
+    <string name="view_log_title">App log</string>
+    <string name="view_log_empty">No log entries yet</string>
+    <string name="share_without_editing">Share logs without editing</string>
+    <string name="share_without_editing_off">Check to share directly unchanged</string>
+    <string name="share_without_editing_on">Uncheck to share to editor app for review</string>
+    <string name="report_editor_chooser_title">Choose a text editor to review and edit before sharing to developers</string>
+    <string name="share_report">Share diagnostic report</string>
+    <string name="report_subject">TRIK Gamepad issue report</string>
+    <string name="crash_dialog_title">TRIK Gamepad stopped unexpectedly</string>
+    <string name="crash_dialog_message">A report with the crash details is ready. You can review and edit it before sending it to the developers.</string>
+    <string name="review_and_share">Review &amp; share</string>
+    <string name="share">Share</string>
+    <string name="copy">Copy</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="diag_level_label_errors">Errors only</string>
+    <string name="diag_level_label_info">Info</string>
+    <string name="diag_level_label_debug">Debug</string>
+    <string name="diag_level_label_verbose">Verbose</string>
+    <string-array name="diag_level_labels">
+        <item>@string/diag_level_label_errors</item>
+        <item>@string/diag_level_label_info</item>
+        <item>@string/diag_level_label_debug</item>
+        <item>@string/diag_level_label_verbose</item>
+    </string-array>
+    <string-array name="diag_level_values">
+        <item>errors</item>
+        <item>info</item>
+        <item>debug</item>
+        <item>verbose</item>
+    </string-array>
 </resources>

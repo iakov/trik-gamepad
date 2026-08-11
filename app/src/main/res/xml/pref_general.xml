@@ -155,6 +155,13 @@
                 android:enabled="true"
                 android:key="aboutSystem"
                 android:title="About system" />
+            <ListPreference
+                android:defaultValue="info"
+                android:entries="@array/diag_level_labels"
+                android:entryValues="@array/diag_level_values"
+                android:key="diagLevel"
+                android:summary="How much detail diagnostic reports include: errors, info, debug, verbose"
+                android:title="Diagnostics verbosity" />
         </PreferenceCategory>
 
     </PreferenceScreen>
