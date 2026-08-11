@@ -44,8 +44,8 @@
     <string name="share">Share</string>
     <string name="copy_button">Copy</string>
     <string name="dismiss">Dismiss</string>
-    <string name="diag_level">Diagnostics verbosity</string>
-    <string name="diag_level_summary">How much detail diagnostic reports include: errors, info, debug, verbose</string>
+    <string name="diag_level">Diagnostics verbosity…</string>
+    <string name="diag_level_summary">%1$s · How much detail diagnostic reports include: errors, info, debug, verbose</string>
     <string name="diag_level_label_errors">Errors only</string>
     <string name="diag_level_label_info">Info</string>
     <string name="diag_level_label_debug">Debug</string>
@@ -62,4 +62,76 @@
         <item>debug</item>
         <item>verbose</item>
     </string-array>
+
+    <!-- Settings: pref_general.xml (externalized; rows that open an input dialog
+         end with ellipsis; see DESIGN.md "Ellipsis on dialog rows"). -->
+    <string name="pref_category_robot_connection">Robot connection</string>
+    <string name="pref_host_address">Robot IP address…</string>
+    <string name="pref_host_port">Robot TCP port…</string>
+    <string name="pref_category_video">Video</string>
+    <string name="pref_video_uri">URI for video stream to play…</string>
+    <string name="pref_reset_video_uri">Reset video URI to robot default</string>
+    <string name="pref_reset_video_uri_summary">Fill the URI from the robot IP address above</string>
+    <string name="pref_category_controls">Controls</string>
+    <string name="pref_keep_screen_on">Keep screen on</string>
+    <string name="pref_keep_screen_on_on">Screen stays on while the gamepad is open</string>
+    <string name="pref_keep_screen_on_off">Screen may sleep while the gamepad is open</string>
+    <string name="pref_advanced">Advanced settings</string>
+    <string name="pref_advanced_summary">Wheel, pads, network, magic buttons, robot presets, diagnostics</string>
+    <string name="pref_category_wheel">Wheel</string>
+    <string name="pref_wheel_enabled">Wheel</string>
+    <string name="pref_wheel_enabled_on">Accelerometer wheel on</string>
+    <string name="pref_wheel_enabled_off">Accelerometer wheel off</string>
+    <string name="pref_wheel_sens">Wheel sensitivity…</string>
+    <string name="pref_wheel_sens_summary">%1$d · Smaller = more sensitive; 5..10 is typical</string>
+    <string name="pref_category_pads_video">Pads &amp; video</string>
+    <string name="pref_show_pads">Arrows transparency…</string>
+    <string name="pref_show_pads_summary">%1$d · 0 for fully transparent, 255 is opaque</string>
+    <string name="pref_hide_controls">Hide pads &amp; buttons</string>
+    <string name="pref_hide_controls_on">Pads and buttons are hidden</string>
+    <string name="pref_hide_controls_off">Pads and buttons are visible</string>
+    <string name="pref_show_fps">Show FPS</string>
+    <string name="pref_show_fps_on">FPS counter shown over the video</string>
+    <string name="pref_show_fps_off">FPS counter hidden</string>
+    <string name="pref_category_hardware">Hardware gamepad</string>
+    <string name="pref_gamepad_swap">Swap sticks</string>
+    <string name="pref_gamepad_swap_on">Left and right sticks are swapped</string>
+    <string name="pref_gamepad_swap_off">Left stick drives the left pad</string>
+    <string name="pref_category_network">Network</string>
+    <string name="pref_keepalive_timeout">Keep-alive timeout, ms…</string>
+    <string name="pref_copy_robot_ip">Copy robot IP</string>
+    <string name="pref_copy_robot_ip_summary">Copy the configured robot IP address</string>
+    <string name="pref_category_presets">Robot presets</string>
+    <string name="pref_save_preset">Save current robot as preset…</string>
+    <string name="pref_save_preset_summary">Store the current host, port and video URI under a name</string>
+    <string name="pref_delete_preset">Delete a preset…</string>
+    <string name="pref_delete_preset_summary">Remove a saved preset</string>
+    <string name="pref_category_magic">Magic buttons</string>
+    <string name="pref_magic_count">Number of buttons…</string>
+    <string name="pref_magic_count_summary">%1$d · 0 hides the row; 1..5 buttons</string>
+    <string name="pref_magic_symbols">Button symbols…</string>
+    <string name="pref_category_about">About</string>
+
+    <!-- Settings: video-URI current-value summary -->
+    <string name="video_uri_summary_empty">No stream URI set</string>
+
+    <!-- Settings: magic-symbols dialog (advanced; see DESIGN.md "Magic button symbols") -->
+    <string name="magic_symbols_dialog_title">Button symbols</string>
+    <string name="magic_symbols_dialog_hint">Symbol shown on button %1$d</string>
+    <string name="magic_symbols_use_defaults">Use default symbols</string>
+    <string name="magic_symbols_save">Save</string>
+
+    <!-- Settings: About system preview = "Tap to copy — <short spec>". -->
+    <string name="about_system_summary">%1$s — %2$s</string>
+    <string name="about_system_info_format">Version:%1$s; Android %2$s; SDK %3$d; Resolution %4$dx%5$d; PPI %6$dx%7$d</string>
+
+    <!-- Accessibility: magic-button description carries the glyph so screen-reader users can
+         map glyph to meaning. -->
+    <string name="button_number_description">Button %1$s · %2$s</string>
+
+    <!-- Connection / input validation notices (previously hardcoded literals). -->
+    <string name="port_number_incorrect">Port number %1$s is incorrect.</string>
+    <string name="cannot_change_title">Cannot change title, not a problem</string>
+    <string name="illegal_video_uri">Illegal video stream URL</string>
+    <string name="disconnected_notice">Disconnected. %1$s</string>
 </resources>

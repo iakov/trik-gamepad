@@ -50,8 +50,8 @@ class MagicButtonPanelTest : RobolectricTestBase() {
     val container = FrameLayout(context)
     panel.populate(container, 2, symbols)
 
-    assertEquals("Button 1", (container.getChildAt(0) as Button).contentDescription)
-    assertEquals("Button 2", (container.getChildAt(1) as Button).contentDescription)
+    assertEquals("Button 1 · ▲", (container.getChildAt(0) as Button).contentDescription)
+    assertEquals("Button 2 · ■", (container.getChildAt(1) as Button).contentDescription)
   }
 
   @Test

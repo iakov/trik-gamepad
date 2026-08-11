@@ -27,7 +27,10 @@ class MagicButtonPanel(
       btn.gravity = Gravity.CENTER
       btn.layoutParams = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
       btn.text = symbols.getOrNull(num - 1) ?: name
-      btn.contentDescription = "Button $name"
+      // Accessibility: the glyph is part of the description so a screen-reader user can map the
+      // symbol to its meaning ("Button 1 · ▲"), not just its index.
+      btn.contentDescription =
+          context.getString(R.string.button_number_description, name, btn.text.toString())
       btn.setBackgroundResource(R.drawable.button_shape)
       btn.setOnClickListener {
         send("btn $name down")

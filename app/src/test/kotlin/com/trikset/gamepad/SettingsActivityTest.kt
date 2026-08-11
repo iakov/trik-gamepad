@@ -97,7 +97,14 @@ class SettingsActivityTest : RobolectricTestBase() {
         "http://10.0.0.9:8080/?action=stream",
         prefs.getString(SettingsFragment.SK_VIDEO_URI, ""),
     )
-    assertTrue((reset.summary ?: "").toString().contains("http://10.0.0.9:8080"))
+    // The action row's summary stays static; the videoURI row carries the current value.
+    assertEquals(
+        "Fill the URI from the robot IP address above",
+        reset.summary,
+    )
+    val videoUri = fragment.findPreference<Preference>(SettingsFragment.SK_VIDEO_URI)
+    assertNotNull(videoUri)
+    assertTrue((videoUri!!.summary ?: "").toString().contains("http://10.0.0.9:8080"))
   }
 
   @Test
@@ -227,5 +234,50 @@ class SettingsActivityTest : RobolectricTestBase() {
         "keepalive must resolve inside the Advanced subtree",
         sub.findPreference<Preference>(SettingsFragment.SK_KEEPALIVE),
     )
+  }
+
+  @Test
+  fun magicSymbolsRowShouldShowResolvedGlyphSummary() {
+    val symbols = fragment.findPreference<Preference>(SettingsFragment.SK_MAGIC_SYMBOLS)
+    assertNotNull(symbols)
+    assertEquals("▲ ■ ● ✕ ◆", symbols!!.summary)
+  }
+
+  @Test
+  fun magicSymbolsClickShouldOpenSymbolsDialog() {
+    val symbols = fragment.findPreference<Preference>(SettingsFragment.SK_MAGIC_SYMBOLS)
+    assertNotNull(symbols)
+    symbols!!.onPreferenceClickListener!!.onPreferenceClick(symbols)
+    assertNotNull(
+        "tapping Button symbols must open the glyph dialog",
+        org.robolectric.shadows.ShadowDialog.getLatestDialog(),
+    )
+  }
+
+  @Test
+  fun diagLevelSummaryShouldShowCurrentLabelOnChange() {
+    val diag = fragment.findPreference<Preference>(SettingsFragment.SK_DIAG_LEVEL)
+    assertNotNull(diag)
+    diag!!.onPreferenceChangeListener!!.onPreferenceChange(diag, "verbose")
+    assertTrue((diag.summary ?: "").toString().contains("Verbose"))
+    assertTrue((diag.summary ?: "").toString().contains("How much detail"))
+  }
+
+  @Test
+  fun videoUriSummaryShouldShowEmptyStateLabelWhenUnset() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().remove(SettingsFragment.SK_VIDEO_URI).commit()
+    val videoUri = fragment.findPreference<Preference>(SettingsFragment.SK_VIDEO_URI)
+    assertNotNull(videoUri)
+    videoUri!!.onPreferenceChangeListener!!.onPreferenceChange(videoUri, "")
+    assertEquals("No stream URI set", videoUri.summary)
+  }
+
+  @Test
+  fun seekBarSummariesShouldShowValueAndDescription() {
+    val wheel = fragment.findPreference<Preference>(SettingsFragment.SK_WHEEL_STEP)
+    assertNotNull(wheel)
+    wheel!!.onPreferenceChangeListener!!.onPreferenceChange(wheel, 12)
+    assertEquals("12 · Smaller = more sensitive; 5..10 is typical", wheel.summary)
   }
 }

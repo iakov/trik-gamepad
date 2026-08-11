@@ -3,6 +3,7 @@ package com.trikset.gamepad
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
 import android.util.DisplayMetrics
@@ -40,6 +41,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val SK_GAMEPAD_SWAP = "gamepadSwap"
     const val SK_ADVANCED = "advancedSettings"
     const val SK_MAGIC_BUTTON_COUNT = "magicButtonCount"
+    const val SK_MAGIC_SYMBOLS = "magicSymbols"
     const val SK_SAVE_PRESET = "saveRobotPreset"
     const val SK_DELETE_PRESET = "deleteRobotPreset"
     const val SK_ROBOT_PRESETS = "robotPresets"
@@ -84,7 +86,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
       val host = prefs?.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
       val uri = "http://$host:8080/?action=stream"
       prefs?.edit { putString(SK_VIDEO_URI, uri) }
-      reset.summary = uri
+      // The videoURI row shows the current value in its summary; refresh it so the reset is
+      // immediately visible (the row itself carries the value, not this action row).
+      findPreference<Preference>(SK_VIDEO_URI)?.summary = uri
       Toast.makeText(
               myActivity.applicationContext,
               getString(R.string.video_uri_reset),
@@ -102,7 +106,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     val systemInfo =
         String.format(
             Locale.ENGLISH,
-            "Version:%s; Android %s; SDK %d; Resolution %dx%d; PPI %dx%d",
+            getString(R.string.about_system_info_format),
             BuildConfig.VERSION_NAME,
             Build.VERSION.RELEASE,
             Build.VERSION.SDK_INT,
@@ -112,13 +116,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
             displayMetrics.xdpi.toInt(),
         )
     val aboutSystem = requireNotNull(findPreference<Preference>(SK_ABOUT_SYSTEM))
-    aboutSystem.summary = getString(R.string.tap_to_copy) + ":" + systemInfo
-    // Copying the full diagnostic report to the clipboard on click (the summary
-    // above stays the short hardware spec preview).
+    aboutSystem.summary =
+        getString(R.string.about_system_summary, getString(R.string.tap_to_copy), systemInfo)
+    // "About system" copies the SHORT device spec (the summary preview). "Copy report" stays the
+    // row that copies the full diagnostics report (see DESIGN.md "About system vs Copy report").
     aboutSystem.onPreferenceClickListener = Preference.OnPreferenceClickListener {
       val clipboard = myActivity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-      val clip = ClipData.newPlainText(getString(R.string.about_system), buildDiagnosticsReport())
-      clipboard.setPrimaryClip(clip)
+      clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.about_system), systemInfo))
 
       Toast.makeText(
               myActivity.applicationContext,
@@ -193,17 +197,69 @@ class SettingsFragment : PreferenceFragmentCompat() {
   }
 
   private fun initializeDynamicPreferenceSummary() {
-    val listener = Preference.OnPreferenceChangeListener { preference, value ->
-      preference.summary = value.toString()
-      true
-    }
+    val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
 
     // Root screen: host/port/keepalive all resolve; the Advanced sub-screen only contains
     // keepalive, so missing prefs are skipped (findPreference is null-safe).
     for (preferenceKey in arrayOf(SK_HOST_ADDRESS, SK_HOST_PORT, SK_KEEPALIVE)) {
       val preference = findPreference<Preference>(preferenceKey) ?: continue
-      preference.summary = requireNotNull(preference.sharedPreferences).getString(preferenceKey, "")
-      preference.onPreferenceChangeListener = listener
+      preference.summary = prefs.getString(preferenceKey, "").orEmpty()
+      preference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
+        pref.summary = value.toString()
+        true
+      }
+    }
+
+    // Video URI: current value, or an empty-state label when unset.
+    val videoUri = findPreference<Preference>(SK_VIDEO_URI)
+    if (videoUri != null) {
+      videoUri.summary =
+          prefs.getString(SK_VIDEO_URI, "").orEmpty().ifEmpty {
+            getString(R.string.video_uri_summary_empty)
+          }
+      videoUri.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
+        pref.summary =
+            (value as? String).orEmpty().ifEmpty { getString(R.string.video_uri_summary_empty) }
+        true
+      }
+    }
+
+    // SeekBars: "<current value> · <description>" (every value-bearing setting shows its value).
+    val seekBarFormats =
+        mapOf(
+            SK_WHEEL_STEP to R.string.pref_wheel_sens_summary,
+            SK_SHOW_PADS to R.string.pref_show_pads_summary,
+            SK_MAGIC_BUTTON_COUNT to R.string.pref_magic_count_summary,
+        )
+    for ((preferenceKey, formatRes) in seekBarFormats) {
+      val preference = findPreference<Preference>(preferenceKey) ?: continue
+      preference.summary = getString(formatRes, readSeekBarValue(prefs, preferenceKey))
+      preference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
+        pref.summary = getString(formatRes, value)
+        true
+      }
+    }
+  }
+
+  /** Reads a SeekBarPreference value (Int storage, honoring legacy String values). */
+  private fun readSeekBarValue(prefs: SharedPreferences, key: String): Int =
+      when (val value = prefs.all[key]) {
+        is Int -> value
+        is String -> value.toIntOrNull() ?: 0
+        else -> 0
+      }
+
+  /** "Button symbols…": dialog to edit the 5 glyphs; summary = the resolved glyphs joined. */
+  private fun initializeMagicSymbolsField() {
+    val myActivity = activity ?: return
+    val symbols = findPreference<Preference>(SK_MAGIC_SYMBOLS) ?: return
+    val store = MagicSymbolsStore(PreferenceManager.getDefaultSharedPreferences(requireContext()))
+    symbols.summary = store.readAll().joinToString(" ")
+    symbols.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+      MagicSymbolsDialog.show(myActivity, store) {
+        symbols.summary = store.readAll().joinToString(" ")
+      }
+      true
     }
   }
 
@@ -310,10 +366,25 @@ class SettingsFragment : PreferenceFragmentCompat() {
     val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
     AppLog.minBufferLevel = DiagLevel.toBufferLevel(prefs.getString(SK_DIAG_LEVEL, null))
     val preference = findPreference<ListPreference>(SK_DIAG_LEVEL) ?: return
+    preference.summary = diagLevelSummary(prefs.getString(SK_DIAG_LEVEL, null))
     preference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
       AppLog.minBufferLevel = DiagLevel.toBufferLevel(newValue as? String)
+      preference.summary = diagLevelSummary(newValue as? String)
       true
     }
+  }
+
+  /** "<current label> · How much detail…" — the current verbosity is always shown. */
+  private fun diagLevelSummary(value: String?): String {
+    val entryIndex =
+        resources.getStringArray(R.array.diag_level_values).indexOfFirst { it == value }
+    val label =
+        if (entryIndex >= 0) {
+          resources.getStringArray(R.array.diag_level_labels)[entryIndex]
+        } else {
+          getString(R.string.diag_level_label_info)
+        }
+    return getString(R.string.diag_level_summary, label)
   }
 
   override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -321,6 +392,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     initializeAboutSystemField()
     initializeDynamicPreferenceSummary()
+    initializeMagicSymbolsField()
     initializeResetVideoUriField()
     initializeCopyRobotIpField()
     initializeRobotPresets()

@@ -97,12 +97,12 @@ class MainActivitySettingsController(
     try {
       portNumber = portStr.toInt()
     } catch (e: NumberFormatException) {
-      ui.toast("Port number '$portStr' is incorrect.")
+      ui.toast(context.getString(R.string.port_number_incorrect, portStr))
     }
     sender.setTarget(addr, portNumber)
 
     if (!ui.setActionBarTitle(addr)) {
-      ui.toast("Can not change title, not a problem")
+      ui.toast(context.getString(R.string.cannot_change_title))
     }
 
     val defAlpha = PADS_ALPHA_DEFAULT
@@ -121,11 +121,11 @@ class MainActivitySettingsController(
     try {
       ui.setVideoUrl(if (videoStreamURI.isEmpty()) null else URI(videoStreamURI).toURL())
     } catch (e: URISyntaxException) {
-      ui.toast("Illegal video stream URL")
+      ui.toast(context.getString(R.string.illegal_video_uri))
       AppLog.e(TAG, "onPreferenceChanged: ", e)
       ui.setVideoUrl(null)
     } catch (e: MalformedURLException) {
-      ui.toast("Illegal video stream URL")
+      ui.toast(context.getString(R.string.illegal_video_uri))
       AppLog.e(TAG, "onPreferenceChanged: ", e)
       ui.setVideoUrl(null)
     }

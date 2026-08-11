@@ -169,7 +169,7 @@ class MainActivity :
                   state.reason.isNotEmpty() &&
                   state.reason != PAUSE_DISCONNECT_REASON
           ) {
-            connectionFeedback.error("Disconnected." + state.reason)
+            connectionFeedback.error(getString(R.string.disconnected_notice, state.reason))
           }
           if (state is ConnectionState.Connected) {
             // Edge trigger: robot reachable again -> reload the video right away if it is dead.

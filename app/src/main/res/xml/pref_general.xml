@@ -3,7 +3,7 @@
 
     <!-- Basic (root) categories: the settings users change most often. Niche /
          advanced settings live in the nested "Advanced settings" sub-screen. -->
-    <PreferenceCategory android:title="Robot connection">
+    <PreferenceCategory android:title="@string/pref_category_robot_connection">
         <EditTextPreference
             android:defaultValue="192.168.77.1"
             android:inputType="textUri"
@@ -11,7 +11,7 @@
             android:maxLines="1"
             android:selectAllOnFocus="true"
             android:singleLine="true"
-            android:title="Robot IP address" />
+            android:title="@string/pref_host_address" />
         <EditTextPreference
             android:defaultValue="4444"
             android:inputType="number"
@@ -19,30 +19,30 @@
             android:maxLines="1"
             android:selectAllOnFocus="true"
             android:singleLine="true"
-            android:title="Robot TCP port" />
+            android:title="@string/pref_host_port" />
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="Video">
+    <PreferenceCategory android:title="@string/pref_category_video">
         <EditTextPreference
             android:inputType="textUri"
             android:key="videoURI"
             android:maxLines="1"
             android:selectAllOnFocus="true"
             android:singleLine="true"
-            android:title="URI for video stream to play" />
+            android:title="@string/pref_video_uri" />
         <Preference
             android:key="resetVideoURI"
-            android:summary="Fill the URI from the robot IP address above"
-            android:title="Reset video URI to robot default" />
+            android:summary="@string/pref_reset_video_uri_summary"
+            android:title="@string/pref_reset_video_uri" />
     </PreferenceCategory>
 
-    <PreferenceCategory android:title="Controls">
+    <PreferenceCategory android:title="@string/pref_category_controls">
         <SwitchPreference
             android:defaultValue="true"
             android:key="keepScreenOn"
-            android:summaryOff="Screen may sleep while the gamepad is open"
-            android:summaryOn="Screen stays on while the gamepad is open"
-            android:title="Keep screen on" />
+            android:summaryOff="@string/pref_keep_screen_on_off"
+            android:summaryOn="@string/pref_keep_screen_on_on"
+            android:title="@string/pref_keep_screen_on" />
     </PreferenceCategory>
 
     <!-- Nested sub-screen: androidx preferences cannot nest PreferenceCategory
@@ -51,56 +51,56 @@
          resolve every key. -->
     <PreferenceScreen
         android:key="advancedSettings"
-        android:summary="Wheel, pads, network, magic buttons, robot presets"
-        android:title="Advanced settings">
+        android:summary="@string/pref_advanced_summary"
+        android:title="@string/pref_advanced">
 
-        <PreferenceCategory android:title="Wheel">
+        <PreferenceCategory android:title="@string/pref_category_wheel">
             <SwitchPreference
                 android:defaultValue="false"
                 android:key="wheelEnabled"
-                android:summaryOff="Accelerometer wheel off"
-                android:summaryOn="Accelerometer wheel on"
-                android:title="Wheel" />
+                android:summaryOff="@string/pref_wheel_enabled_off"
+                android:summaryOn="@string/pref_wheel_enabled_on"
+                android:title="@string/pref_wheel_enabled" />
             <SeekBarPreference
                 android:defaultValue="7"
                 android:key="wheelSens"
                 android:max="100"
                 app:min="1"
-                android:summary="Smaller = more sensitive; 5..10 is typical"
-                android:title="Wheel sensitivity" />
+                android:summary="@string/pref_wheel_sens_summary"
+                android:title="@string/pref_wheel_sens" />
         </PreferenceCategory>
 
-        <PreferenceCategory android:title="Pads &amp; video">
+        <PreferenceCategory android:title="@string/pref_category_pads_video">
             <SeekBarPreference
                 android:defaultValue="100"
                 android:key="showPads"
                 android:max="255"
-                android:summary="0 for fully transparent, 255 is opaque"
-                android:title="Arrows transparency" />
+                android:summary="@string/pref_show_pads_summary"
+                android:title="@string/pref_show_pads" />
             <SwitchPreference
                 android:defaultValue="false"
                 android:key="hideControls"
-                android:summaryOff="Pads and buttons are visible"
-                android:summaryOn="Pads and buttons are hidden"
-                android:title="Hide pads &amp; buttons" />
+                android:summaryOff="@string/pref_hide_controls_off"
+                android:summaryOn="@string/pref_hide_controls_on"
+                android:title="@string/pref_hide_controls" />
             <SwitchPreference
                 android:defaultValue="false"
                 android:key="showFps"
-                android:summaryOff="FPS counter hidden"
-                android:summaryOn="FPS counter shown over the video"
-                android:title="Show FPS" />
+                android:summaryOff="@string/pref_show_fps_off"
+                android:summaryOn="@string/pref_show_fps_on"
+                android:title="@string/pref_show_fps" />
         </PreferenceCategory>
 
-        <PreferenceCategory android:title="Hardware gamepad">
+        <PreferenceCategory android:title="@string/pref_category_hardware">
             <SwitchPreference
                 android:defaultValue="false"
                 android:key="gamepadSwap"
-                android:summaryOff="Left stick drives the left pad"
-                android:summaryOn="Left and right sticks are swapped"
-                android:title="Swap sticks" />
+                android:summaryOff="@string/pref_gamepad_swap_off"
+                android:summaryOn="@string/pref_gamepad_swap_on"
+                android:title="@string/pref_gamepad_swap" />
         </PreferenceCategory>
 
-        <PreferenceCategory android:title="Network">
+        <PreferenceCategory android:title="@string/pref_category_network">
             <EditTextPreference
                 android:defaultValue="5000"
                 android:digits="0123456789"
@@ -108,53 +108,43 @@
                 android:key="keepaliveTimeout"
                 android:maxLines="1"
                 android:singleLine="true"
-                android:title="Keep-alive timeout, ms" />
+                android:title="@string/pref_keepalive_timeout" />
             <Preference
                 android:key="copyRobotIp"
-                android:summary="Copy the configured robot IP address"
-                android:title="Copy robot IP" />
+                android:summary="@string/pref_copy_robot_ip_summary"
+                android:title="@string/pref_copy_robot_ip" />
         </PreferenceCategory>
 
-        <PreferenceCategory android:key="robotPresets" android:title="Robot presets">
+        <PreferenceCategory android:key="robotPresets" android:title="@string/pref_category_presets">
             <EditTextPreference
                 android:key="saveRobotPreset"
-                android:summary="Store the current host, port and video URI under a name"
-                android:title="Save current robot as preset" />
+                android:summary="@string/pref_save_preset_summary"
+                android:title="@string/pref_save_preset" />
             <Preference
                 android:key="deleteRobotPreset"
-                android:summary="Remove a saved preset"
-                android:title="Delete a preset" />
+                android:summary="@string/pref_delete_preset_summary"
+                android:title="@string/pref_delete_preset" />
         </PreferenceCategory>
 
-        <PreferenceCategory android:title="Magic buttons">
+        <PreferenceCategory android:title="@string/pref_category_magic">
             <SeekBarPreference
                 android:defaultValue="3"
                 android:key="magicButtonCount"
                 android:max="5"
-                android:summary="0 hides the row; 1..5 buttons"
-                android:title="Number of buttons" />
-            <EditTextPreference
-                android:key="magicSymbol1"
-                android:title="Button 1 symbol" />
-            <EditTextPreference
-                android:key="magicSymbol2"
-                android:title="Button 2 symbol" />
-            <EditTextPreference
-                android:key="magicSymbol3"
-                android:title="Button 3 symbol" />
-            <EditTextPreference
-                android:key="magicSymbol4"
-                android:title="Button 4 symbol" />
-            <EditTextPreference
-                android:key="magicSymbol5"
-                android:title="Button 5 symbol" />
+                android:summary="@string/pref_magic_count_summary"
+                android:title="@string/pref_magic_count" />
+            <!-- One consolidated row for the 5 per-button glyphs (stored under the legacy
+                 magicSymbol1..5 keys; see MagicSymbolsStore + DESIGN.md "Magic button symbols"). -->
+            <Preference
+                android:key="magicSymbols"
+                android:title="@string/pref_magic_symbols" />
         </PreferenceCategory>
 
-        <PreferenceCategory android:title="About">
+        <PreferenceCategory android:title="@string/pref_category_about">
             <Preference
                 android:enabled="true"
                 android:key="aboutSystem"
-                android:title="About system" />
+                android:title="@string/about_system" />
             <ListPreference
                 android:defaultValue="info"
                 android:entries="@array/diag_level_labels"
