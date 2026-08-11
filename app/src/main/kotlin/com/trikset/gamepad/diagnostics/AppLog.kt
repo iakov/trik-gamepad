@@ -56,15 +56,13 @@ object AppLog {
       }
     }
   }
+}
 
-  private fun format(level: Int, tag: String, msg: String, t: Throwable?): String {
-    val now = System.currentTimeMillis()
-    val time = String.format(Locale.ROOT, "%1\$tH:%1\$tM:%1\$tS.%1\$tL", now)
-    val throwable = if (t == null) "" else " (${t.javaClass.simpleName}: ${t.message})"
-    return "$time [${Thread.currentThread().name}] ${levelChar(level)} $tag: $msg$throwable"
-  }
-
-  private fun levelChar(level: Int): Char =
+private fun format(level: Int, tag: String, msg: String, t: Throwable?): String {
+  val now = System.currentTimeMillis()
+  val time = String.format(Locale.ROOT, "%1\$tH:%1\$tM:%1\$tS.%1\$tL", now)
+  val throwable = if (t == null) "" else " (${t.javaClass.simpleName}: ${t.message})"
+  val levelChar =
       when (level) {
         Log.VERBOSE -> 'V'
         Log.DEBUG -> 'D'
@@ -72,4 +70,5 @@ object AppLog {
         Log.WARN -> 'W'
         else -> 'E'
       }
+  return "$time [${Thread.currentThread().name}] $levelChar $tag: $msg$throwable"
 }

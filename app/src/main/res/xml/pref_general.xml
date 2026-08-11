@@ -160,26 +160,26 @@
                 android:entries="@array/diag_level_labels"
                 android:entryValues="@array/diag_level_values"
                 android:key="diagLevel"
-                android:summary="How much detail diagnostic reports include: errors, info, debug, verbose"
-                android:title="Diagnostics verbosity" />
+                android:summary="@string/diag_level_summary"
+                android:title="@string/diag_level" />
             <Preference
                 android:key="reportIssue"
-                android:summary="Create a diagnostic report; opens in a text editor so you can review it first"
-                android:title="Report an issue" />
+                android:summary="@string/report_issue_summary"
+                android:title="@string/report_issue" />
             <SwitchPreference
                 android:defaultValue="false"
                 android:key="shareWithoutEditing"
-                android:summaryOff="Check to share directly unchanged"
-                android:summaryOn="Uncheck to share to editor app for review"
-                android:title="Share logs without editing" />
+                android:summaryOff="@string/share_without_editing_off"
+                android:summaryOn="@string/share_without_editing_on"
+                android:title="@string/share_without_editing" />
             <Preference
                 android:key="copyReport"
-                android:summary="Copy the full diagnostic report to the clipboard"
-                android:title="Copy report" />
+                android:summary="@string/copy_report_summary"
+                android:title="@string/copy_report" />
             <Preference
                 android:key="viewLog"
-                android:summary="Show recent app activity logs"
-                android:title="View log" />
+                android:summary="@string/view_log_summary"
+                android:title="@string/view_log" />
         </PreferenceCategory>
 
     </PreferenceScreen>

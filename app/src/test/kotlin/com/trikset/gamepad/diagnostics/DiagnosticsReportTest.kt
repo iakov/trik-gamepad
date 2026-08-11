@@ -33,7 +33,7 @@ class DiagnosticsReportTest {
     val report = DiagnosticsReport.build(context, prefs, null, emptyList(), null)
     assertTrue(report.contains("# TRIK Gamepad diagnostic report"))
     assertTrue(report.contains("Version: ${BuildConfig.VERSION_NAME}"))
-    assertTrue(report.contains("build ${BuildConfig.BUILD_TYPE}"))
+    assertTrue(report.contains("Build type: ${BuildConfig.BUILD_TYPE}"))
     assertTrue(report.contains("Manufacturer: ${android.os.Build.MANUFACTURER}"))
     assertTrue(report.contains("Model: ${android.os.Build.MODEL}"))
     assertTrue(report.contains("Android: ${android.os.Build.VERSION.RELEASE}"))

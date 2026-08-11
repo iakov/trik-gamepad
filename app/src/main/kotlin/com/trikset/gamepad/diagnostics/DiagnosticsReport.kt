@@ -31,9 +31,9 @@ object DiagnosticsReport {
     out.appendLine("# TRIK Gamepad diagnostic report")
     out.appendLine()
     out.appendLine("## App")
-    out.appendLine(
-        "- Version: ${BuildConfig.VERSION_NAME} (versionCode ${BuildConfig.VERSION_CODE}, build ${BuildConfig.BUILD_TYPE})"
-    )
+    out.appendLine("- Version: ${BuildConfig.VERSION_NAME}")
+    out.appendLine("- Version code: ${BuildConfig.VERSION_CODE}")
+    out.appendLine("- Build type: ${BuildConfig.BUILD_TYPE}")
     out.appendLine()
     out.appendLine("## Device")
     out.appendLine("- Manufacturer: ${Build.MANUFACTURER}")

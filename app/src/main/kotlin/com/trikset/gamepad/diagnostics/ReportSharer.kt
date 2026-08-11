@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad.R
 import com.trikset.gamepad.SettingsFragment
@@ -56,9 +57,8 @@ object ReportSharer {
     val probe =
         Intent(Intent.ACTION_EDIT).apply {
           setDataAndType(
-              Uri.parse(
-                  "content://${ReportDiagnosticsWriter.fileProviderAuthority(context)}/probe.md"
-              ),
+              "content://${ReportDiagnosticsWriter.fileProviderAuthority(context)}/probe.md"
+                  .toUri(),
               "text/plain",
           )
         }

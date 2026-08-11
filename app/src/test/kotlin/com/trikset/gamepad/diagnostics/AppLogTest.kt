@@ -3,6 +3,7 @@ package com.trikset.gamepad.diagnostics
 import android.util.Log
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -118,6 +119,19 @@ class AppLogTest {
     val records = ShadowLog.getLogsForTag("raisedDebug")
     assertEquals(1, records.size)
     assertEquals("now visible", records[0].msg)
+  }
+
+  @Test
+  fun debugWithThrowableIsBufferedAndLoggedWhenTagRaised() {
+    ShadowLog.setLoggable("raisedDebugThrowable", Log.DEBUG)
+    AppLog.minBufferLevel = Log.DEBUG
+    AppLog.d("raisedDebugThrowable", "recovery", IllegalArgumentException("bad"))
+
+    val line = AppLog.tail(1000).first { it.contains("D raisedDebugThrowable: recovery") }
+    assertTrue(line.contains("(IllegalArgumentException: bad)"))
+    val records = ShadowLog.getLogsForTag("raisedDebugThrowable")
+    assertEquals(1, records.size)
+    assertNotNull(records[0].throwable)
   }
 
   @Test

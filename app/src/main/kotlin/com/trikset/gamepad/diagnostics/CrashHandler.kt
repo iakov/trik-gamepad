@@ -13,6 +13,7 @@ class CrashHandler(
     private val previous: Thread.UncaughtExceptionHandler?,
 ) : Thread.UncaughtExceptionHandler {
 
+  @Suppress("TooGenericExceptionCaught") // the crash path must never fail because capture did
   override fun uncaughtException(thread: Thread, throwable: Throwable) {
     try {
       store.save(Log.getStackTraceString(throwable))

@@ -67,4 +67,10 @@ class CrashLogStoreTest : RobolectricTestBase() {
     store.markPrompted()
     assertFalse(store.shouldPrompt())
   }
+
+  @Test
+  fun markPromptedWithoutAnyCrashIsSafe() {
+    CrashLogStore(context).markPrompted()
+    assertFalse(CrashLogStore(context).shouldPrompt())
+  }
 }

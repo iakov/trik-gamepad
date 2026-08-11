@@ -46,4 +46,20 @@ class CrashHandlerTest : RobolectricTestBase() {
     assertTrue(store.latest()!!.stackTrace.contains("java.lang.IllegalStateException: x"))
     assertEquals(1, File(context.filesDir, CrashLogStore.CRASH_DIR).listFiles()!!.size)
   }
+
+  @Test
+  fun failedCaptureDoesNotBreakTheCrashPath() {
+    // Block the crash directory: a regular FILE at the crashes path makes
+    // writeText throw IOException, exercising the defensive catch. The crash
+    // path must still delegate to the previous handler.
+    val crashesFile = File(context.filesDir, CrashLogStore.CRASH_DIR)
+    crashesFile.writeText("block the directory")
+    var delegated = false
+    val previous = Thread.UncaughtExceptionHandler { _, _ -> delegated = true }
+
+    CrashHandler(CrashLogStore(context), previous)
+        .uncaughtException(Thread.currentThread(), RuntimeException("boom"))
+
+    assertTrue("the crash must reach the previous handler even when capture fails", delegated)
+  }
 }
