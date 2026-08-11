@@ -13,10 +13,13 @@ import androidx.appcompat.app.AlertDialog
  */
 object MagicSymbolsDialog {
 
+  private const val FIELD_PADDING_PX = 48
+  private const val FIELD_TOP_PADDING_PX = 8
+
   fun show(activity: Activity, store: MagicSymbolsStore, onSaved: () -> Unit) {
     val container = LinearLayout(activity)
     container.orientation = LinearLayout.VERTICAL
-    container.setPadding(48, 8, 48, 0)
+    container.setPadding(FIELD_PADDING_PX, FIELD_TOP_PADDING_PX, FIELD_PADDING_PX, 0)
     val fields = ArrayList<EditText>(MagicSymbolsStore.MAX_BUTTONS)
     val initial = store.readAll()
     for (n in 1..MagicSymbolsStore.MAX_BUTTONS) {

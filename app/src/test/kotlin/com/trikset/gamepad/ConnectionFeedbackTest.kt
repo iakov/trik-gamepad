@@ -19,7 +19,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
 
   private fun feedback(
       statusTextProvider: () -> TextView?,
-      targetConfiguredProvider: () -> Boolean = { true },
+      targetProvider: () -> String? = { targetText },
       connectAction: () -> Unit = {},
   ): ConnectionFeedback =
       ConnectionFeedback(
@@ -27,8 +27,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
           settingsButtonProvider = { null },
           rootViewProvider = { null },
           statusTextProvider = statusTextProvider,
-          targetConfiguredProvider = targetConfiguredProvider,
-          connectingTargetProvider = { targetText },
+          targetProvider = targetProvider,
           connectAction = connectAction,
       )
 
@@ -36,15 +35,14 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
   private fun feedbackWith(
       btn: Button?,
       status: TextView?,
-      targetConfiguredProvider: () -> Boolean = { true },
+      targetProvider: () -> String? = { targetText },
   ): ConnectionFeedback =
       ConnectionFeedback(
           context = context,
           settingsButtonProvider = { btn },
           rootViewProvider = { null },
           statusTextProvider = { status },
-          targetConfiguredProvider = targetConfiguredProvider,
-          connectingTargetProvider = { targetText },
+          targetProvider = targetProvider,
           connectAction = {},
       )
 
@@ -79,8 +77,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
             settingsButtonProvider = { activity.findViewById(R.id.btnSettings) },
             rootViewProvider = { activity.findViewById(R.id.main) },
             statusTextProvider = { activity.findViewById(R.id.connectionStatus) },
-            targetConfiguredProvider = { true },
-            connectingTargetProvider = { targetText },
+            targetProvider = { targetText },
             connectAction = {},
         )
     val app = org.robolectric.RuntimeEnvironment.getApplication()
@@ -159,7 +156,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
     val btn = Button(context)
     btn.setBackgroundResource(R.drawable.btn_settings)
     val status = TextView(context)
-    val feedback = feedbackWith(btn, status, targetConfiguredProvider = { false })
+    val feedback = feedbackWith(btn, status, targetProvider = { null })
 
     feedback.update(ConnectionState.Connecting)
     assertEquals(View.VISIBLE, status.visibility)

@@ -10,19 +10,18 @@ import android.content.Context
  */
 class ConnectionAnnouncer(
     private val context: Context,
-    private val targetConfiguredProvider: () -> Boolean,
-    private val targetTextProvider: () -> String,
+    private val targetProvider: () -> String?,
 ) {
   private var lastAnnouncement: String? = null
 
   fun textFor(state: ConnectionState): String? =
       when (state) {
         is ConnectionState.Connecting ->
-            context.getString(R.string.connection_status_connecting, targetTextProvider())
+            context.getString(R.string.connection_status_connecting, targetProvider() ?: "")
         is ConnectionState.Connected -> context.getString(R.string.connection_status_connected)
         is ConnectionState.Disconnected ->
             // No configured target (video-only device): nothing to connect to, nothing to announce.
-            if (targetConfiguredProvider()) {
+            if (targetProvider() != null) {
               context.getString(R.string.connection_status_disconnected)
             } else {
               null

@@ -12,8 +12,8 @@ class ConnectionAnnouncerTest : RobolectricTestBase() {
 
   private val context = org.robolectric.RuntimeEnvironment.getApplication()
 
-  private fun announcer(targetConfigured: Boolean = true): ConnectionAnnouncer =
-      ConnectionAnnouncer(context, { targetConfigured }, { "192.168.77.1:4444" })
+  private fun announcer(target: String? = "192.168.77.1:4444"): ConnectionAnnouncer =
+      ConnectionAnnouncer(context) { target }
 
   @Test
   fun textForShouldMapConnecting() {
@@ -25,7 +25,7 @@ class ConnectionAnnouncerTest : RobolectricTestBase() {
 
   @Test
   fun textForShouldUseTheConfiguredTarget() {
-    val a = ConnectionAnnouncer(context, { true }, { "10.0.0.9:8080" })
+    val a = ConnectionAnnouncer(context) { "10.0.0.9:8080" }
     assertEquals("Connecting to 10.0.0.9:8080…", a.textFor(ConnectionState.Connecting))
   }
 
@@ -41,7 +41,7 @@ class ConnectionAnnouncerTest : RobolectricTestBase() {
 
   @Test
   fun textForShouldBeSilentForDisconnectedWithoutTarget() {
-    assertNull(announcer(targetConfigured = false).textFor(ConnectionState.Disconnected("x")))
+    assertNull(announcer(target = null).textFor(ConnectionState.Disconnected("x")))
   }
 
   @Test
@@ -64,7 +64,7 @@ class ConnectionAnnouncerTest : RobolectricTestBase() {
 
   @Test
   fun nextAnnouncementShouldStaySilentWithoutTarget() {
-    val a = announcer(targetConfigured = false)
+    val a = announcer(target = null)
     assertNull(a.nextAnnouncement(ConnectionState.Disconnected("x")))
   }
 }
