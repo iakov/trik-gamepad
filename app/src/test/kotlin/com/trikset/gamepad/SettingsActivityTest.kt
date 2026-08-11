@@ -360,15 +360,8 @@ class SettingsActivityTest : RobolectricTestBase() {
     val dialog =
         org.robolectric.shadows.ShadowDialog.getLatestDialog() as androidx.appcompat.app.AlertDialog
     org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-    val lists = ArrayList<android.widget.ListView>()
-    fun collect(view: android.view.View) {
-      if (view is android.widget.ListView) lists.add(view)
-      if (view is android.view.ViewGroup) {
-        for (i in 0 until view.childCount) collect(view.getChildAt(i))
-      }
-    }
-    collect(dialog.window!!.decorView)
-    val list = lists.first()
+    val list =
+        dialogViews(dialog) { it is android.widget.ListView }.first() as android.widget.ListView
     list.performItemClick(list.adapter.getView(0, null, list), 0, list.adapter.getItemId(0))
 
     assertTrue(
@@ -384,21 +377,30 @@ class SettingsActivityTest : RobolectricTestBase() {
     val dialog =
         org.robolectric.shadows.ShadowDialog.getLatestDialog() as androidx.appcompat.app.AlertDialog
     org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-    val fields = ArrayList<android.widget.EditText>()
-    fun collect(view: android.view.View) {
-      if (view is android.widget.EditText) fields.add(view)
-      if (view is android.view.ViewGroup) {
-        for (i in 0 until view.childCount) collect(view.getChildAt(i))
-      }
-    }
-    collect(dialog.window!!.decorView)
+    val fields = dialogViews(dialog) { it is android.widget.EditText }
     assertTrue("the dialog must pre-fill 5 glyph fields", fields.size == 5)
-    fields[0].setText("Z")
+    (fields[0] as android.widget.EditText).setText("Z")
     dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).performClick()
     org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
     assertTrue(
         "row summary must reflect the saved glyph",
         symbols.summary.toString().startsWith("Z"),
     )
+  }
+
+  /** Walks the dialog's window tree for views matching [predicate] (appcompat dialog internals). */
+  private fun dialogViews(
+      dialog: androidx.appcompat.app.AlertDialog,
+      predicate: (android.view.View) -> Boolean,
+  ): List<android.view.View> {
+    val found = ArrayList<android.view.View>()
+    fun collect(view: android.view.View) {
+      if (predicate(view)) found.add(view)
+      if (view is android.view.ViewGroup) {
+        for (i in 0 until view.childCount) collect(view.getChildAt(i))
+      }
+    }
+    collect(dialog.window?.decorView ?: return emptyList())
+    return found
   }
 }
