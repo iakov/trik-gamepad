@@ -1945,9 +1945,9 @@ Quirks hit (all new, none previously documented):
   a single-line regex replace turned a 1-line diff into 385-line EOL churn and a BOM. Fix:
   git checkout the file and redo the edit with the edit tool (EOL-preserving), or route a
   byte-preserving Python script through .tmp/ (the d'abord -apostrophe fix).
-- **Robolectric ndroid.R.color.darker_gray is not #555555** (measured 2.32:1 with white, i.e.
+- **Robolectric android.R.color.darker_gray is not #555555** (measured 2.32:1 with white, i.e.
   a mid-gray): own the fill as @color/magic_button_fill_default so runtime + WCAG test agree.
-- **nnounceForAccessibility events are not reliably capturable** via ShadowAccessibilityManager
+- **announceForAccessibility events are not reliably capturable** via ShadowAccessibilityManager
   in Robolectric; the decision logic (mapping, dedup, target gating) was extracted into the pure
   ConnectionAnnouncer (fully tested); the view call stays a thin one-liner.
 - **detekt semantics**: TooManyFunctions fails at exactly the threshold (31/31); merging the two

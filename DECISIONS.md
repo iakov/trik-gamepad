@@ -1051,11 +1051,11 @@ ______________________________________________________________________
   (consolidated magic-symbols dialog with pre-filled defaults, current-value
   summaries, ellipsis on input rows, About copies the short spec only, string
   externalization); accessibility (deduped, target-gated
-  nnounceForAccessibility state announcements, state-aware gear
+  announceForAccessibility state announcements, state-aware gear
   contentDescription, glyph-aware magic-button descriptions, 48dp touch
   targets, ripple, contrast fixes, importantForAccessibility hygiene);
   WCAG regression tests (contrast ratios + touch targets read the live
-  resources); connection pill shows the target (Connecting to host:port…)
+  resources); connection pill shows the target (Connecting to host:port:)
   and a reconnect badge distinguishes reloads of a previously-playing stream;
   localization (en+ru+fr+de+vi, @android:string/\* reuse for exact matches,
   Android 13+ localeConfig, gate-wired check_translations.py --sync parity

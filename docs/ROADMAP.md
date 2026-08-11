@@ -553,7 +553,7 @@ MEMORY.md "Campaign 15 execution run".
 |-----------|--------|
 | ~6 h | ≈3 h 30 m (impl + gates + instrumented + docs) |
 
-- **Settings** — strings externalized to alues/strings.xml (E1); the five
+- **Settings** — strings externalized to values/strings.xml (E1); the five
   per-button glyph rows replaced by one "Button symbols…" dialog (pre-filled
   defaults ▲ ■ ● ✕ ◆, "Use default symbols", saves the array independent of the
   count); current-value summaries for videoURI/seekbars/verbosity (with a
@@ -561,7 +561,7 @@ MEMORY.md "Campaign 15 execution run".
   ellipsis on input-dialog rows; About system copies the short spec only
   ("Copy report" stays the full-report row); Advanced summary mentions
   diagnostics.
-- **Accessibility** — deduped, target-gated nnounceForAccessibility
+- **Accessibility** — deduped, target-gated announceForAccessibility
   announcements (ConnectionAnnouncer); the gear's contentDescription carries
   the connection state; magic-button descriptions include the glyph; the pill
   is a real 48dp touch target; magic buttons got 48dp minima, an explicit
@@ -570,23 +570,23 @@ MEMORY.md "Campaign 15 execution run".
 - **WCAG regression tests** — WcagContrastTest (relative-luminance ratios on
   the live color resources, ≥4.5:1 text / ≥3.0:1 UI) and TouchTargetSizeTest
   (48dp on gear/pill/button-row).
-- **Connection & video** — the pill shows Connecting to host:port…; a reload
-  of a previously-playing stream shows a "Video reconnecting…" badge. Stall
+- **Connection & video** — the pill shows Connecting to host:port:; a reload
+  of a previously-playing stream shows a "Video reconnecting:" badge. Stall
   detection was deliberately not added (a video-disabled robot legitimately
   keeps the spinner cycling).
 - **Localization** — ships en+ru+fr+de+vi (
-  esourceConfigurations,
-  alues-*/strings.xml, Android 13+ localeConfig); exact-match typical
+  resourceConfigurations,
+  values-*/strings.xml, Android 13+ localeConfig); exact-match typical
   strings reuse @android:string/* (copy/cancel); deterministic
   scripts/check_translations.py --sync parity guard wired into the canonical
   gate; one-off MyMemory back-translation review ran for all four locales
   (RU will also get a native-speaker review).
 - **System theme** — Theme.AppCompat.DayNight for Settings/dialogs; the
   gamepad HUD stays dark-over-video (black window background,
-  orceDarkAllowed=false). Verified by pixel-sampled screenshots
+  forceDarkAllowed=false). Verified by pixel-sampled screenshots
   (.tmp/settings_light.png / settings_dark.png).
 - **Verification** — canonical gate green twice (LINE **0.9752** / BRANCH
-  **0.8661**, jscpd 0 clones, translations sync OK); 3-variant est ×2
+  **0.8661**, jscpd 0 clones, translations sync OK); 3-variant test ×2
   (second with --rerun-tasks); instrumented **9/9 on both API-36 emulators**
   (two instrumented tests updated for the ellipsis titles / glyph-suffixed
   button descriptions); commits c817649..1b0115e. **CAMPAIGN 15 COMPLETE.**

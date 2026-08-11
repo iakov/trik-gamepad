@@ -125,9 +125,13 @@ configurations, update this section and the referenced config files.
   "spotlessKotlinCheck FAILED", "configuration cache cannot be reused"), sort by
   count, and root-cause the top ones. Recurring messages in *every* run mean a
   systemic cause, not noise — this is how the config-cache invalidation and the
-  Gradle deprecation warnings were missed (both in ~every log). Both are now
-  resolved under the current toolchain (config-cache reuses; the Gradle-10
-  deprecations were fixed) — re-run the scan before trusting old examples.
+  Gradle deprecation warnings were missed (both in ~every log). Status as of
+  2026-08-11: the config-cache invalidation is resolved (it reuses); the
+  "incompatible with Gradle 10" deprecation warnings are **still present** in
+  every build and tracked as pending in `.PLAN.md` ("Gradle-10-era bump" —
+  the `ReportingExtension.file` plugin deprecation) — re-run the scan before
+  trusting old examples, and do not re-mark these resolved until the warning is
+  gone from a build log.
 
 ### After merge
 
@@ -204,6 +208,13 @@ configurations, update this section and the referenced config files.
   pref/measure helpers, data-driven tables) instead of copy-pasting. **Dedup drives the token number, not
   table-ization**; a table row's expected value must not depend on an earlier row's state (reset the fixture per row).
   Rationale + details: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric" + TESTING.md "Test quality discipline".
+- **A test that can never fail asserts nothing**: no tautologies (`assertTrue(X || !X)`,
+  `assertTrue(x !== null)` on a non-null `lateinit`), no asserting setup values
+  instead of the code's effect, and no assertions nested only in a
+  `while (hasNext())` loop that passes vacuously on `[]` (all three hit 2026-08-11).
+  Write new behavior tests **red-first (TDD)** — a test you have never seen fail
+  may not be testing anything — and mutation-check: break the code under test and
+  confirm the test goes red. Rationale + the three modes: TESTING.md "Tests must be able to fail".
 - **Exact-text UI matchers break silently on rewording**: before changing any user-visible string
   (titles, values, contentDescriptions), grep `androidTest` for `withText`/`withContentDescription`
   exact matchers and update them in the **same commit** (hit twice in C15: the ellipsis-prefixed

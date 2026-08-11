@@ -136,10 +136,10 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
 
 ## Connection & video state UX
 
-- The status pill shows the *target* while connecting: `Connecting to host:port…` (and announces it). `Disconnected` shows `Tap to connect…`; a
+- The status pill shows the *target* while connecting: `Connecting to host:port:` (and announces it). `Disconnected` shows `Tap to connect:`; a
   blank host (video-only mode) hides the pill entirely.
 - The loading spinner is shown for both first load and reconnect, but a reload
-  of a stream that **was playing** additionally shows a `Video reconnecting…`
+  of a stream that **was playing** additionally shows a `Video reconnecting:`
   badge, so the user can tell a reconnect apart from the first load. Stall
   detection ("no video signal") was deliberately **not** added: a robot with
   video disabled legitimately keeps the spinner cycling (see DECISIONS.md).
