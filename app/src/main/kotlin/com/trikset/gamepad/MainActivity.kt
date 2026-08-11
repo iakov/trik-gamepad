@@ -65,6 +65,7 @@ class MainActivity :
         rootViewProvider = { findViewById(R.id.main) },
         statusTextProvider = { findViewById(R.id.connectionStatus) },
         targetConfiguredProvider = { !getSenderService().getHostAddr().isNullOrBlank() },
+        connectingTargetProvider = { senderTargetText() },
         connectAction = { getSenderService().connect() },
     )
   }
@@ -274,11 +275,15 @@ class MainActivity :
     // main thread before touching the view hierarchy / opening the stream.
     runOnUiThread {
       val video = mVideo ?: return@runOnUiThread
+      // A reload of a stream that WAS playing is a reconnect; a first load is not. The badge
+      // distinguishes the two (both share the loading spinner).
+      val wasPlaying = video.isPlaying()
       // Show the loading indicator only while a URL is configured AND the control connection is
       // up (no spinner when disconnected / no stream URL); it stays up until the first frame
       // renders (robot video disabled -> keeps cycling).
       if (mVideoURL != null && senderViewModel.connectionState.value is ConnectionState.Connected) {
         setVideoLoading(true)
+        setVideoReconnecting(wasPlaying)
       }
       // Feed the load outcome back into the retry controller: a failed open arms the bounded
       // retry loop, a success disarms it. A failure also surfaces a throttled "video stream
@@ -298,6 +303,15 @@ class MainActivity :
 
   private fun setVideoLoading(visible: Boolean) {
     findViewById<android.widget.ProgressBar>(R.id.videoLoading)?.visibility =
+        if (visible) View.VISIBLE else View.GONE
+    // The reconnect badge is a companion of the loading indicator: it never shows on its own.
+    if (!visible) {
+      setVideoReconnecting(false)
+    }
+  }
+
+  private fun setVideoReconnecting(visible: Boolean) {
+    findViewById<android.widget.TextView>(R.id.videoReconnecting)?.visibility =
         if (visible) View.VISIBLE else View.GONE
   }
 
@@ -378,6 +392,13 @@ class MainActivity :
   }
 
   fun getSenderService(): SenderService = senderViewModel.sender
+
+  /** "host:port" of the configured robot, for the "Connecting to host:port…" pill/announcement. */
+  private fun senderTargetText(): String {
+    val sender = getSenderService()
+    val host = sender.getHostAddr() ?: return ""
+    return "$host:${sender.getHostPort()}"
+  }
 
   fun getSettingsController(): MainActivitySettingsController? = mSettingsController
 

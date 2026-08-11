@@ -13,11 +13,20 @@ class ConnectionAnnouncerTest : RobolectricTestBase() {
   private val context = org.robolectric.RuntimeEnvironment.getApplication()
 
   private fun announcer(targetConfigured: Boolean = true): ConnectionAnnouncer =
-      ConnectionAnnouncer(context) { targetConfigured }
+      ConnectionAnnouncer(context, { targetConfigured }, { "192.168.77.1:4444" })
 
   @Test
   fun textForShouldMapConnecting() {
-    assertEquals("Connecting…", announcer().textFor(ConnectionState.Connecting))
+    assertEquals(
+        "Connecting to 192.168.77.1:4444…",
+        announcer().textFor(ConnectionState.Connecting),
+    )
+  }
+
+  @Test
+  fun textForShouldUseTheConfiguredTarget() {
+    val a = ConnectionAnnouncer(context, { true }, { "10.0.0.9:8080" })
+    assertEquals("Connecting to 10.0.0.9:8080…", a.textFor(ConnectionState.Connecting))
   }
 
   @Test
@@ -49,7 +58,7 @@ class ConnectionAnnouncerTest : RobolectricTestBase() {
   fun nextAnnouncementShouldAnnounceAgainAfterStateChanges() {
     val a = announcer()
     a.nextAnnouncement(ConnectionState.Connected)
-    assertEquals("Connecting…", a.nextAnnouncement(ConnectionState.Connecting))
+    assertEquals("Connecting to 192.168.77.1:4444…", a.nextAnnouncement(ConnectionState.Connecting))
     assertEquals("Connected", a.nextAnnouncement(ConnectionState.Connected))
   }
 

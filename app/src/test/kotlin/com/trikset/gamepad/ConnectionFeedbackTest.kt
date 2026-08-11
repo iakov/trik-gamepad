@@ -15,6 +15,7 @@ import org.robolectric.RobolectricTestRunner
 class ConnectionFeedbackTest : RobolectricTestBase() {
 
   private val context = org.robolectric.RuntimeEnvironment.getApplication()
+  private val targetText = "192.168.77.1:4444"
 
   private fun feedback(
       statusTextProvider: () -> TextView?,
@@ -27,6 +28,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
           rootViewProvider = { null },
           statusTextProvider = statusTextProvider,
           targetConfiguredProvider = targetConfiguredProvider,
+          connectingTargetProvider = { targetText },
           connectAction = connectAction,
       )
 
@@ -42,6 +44,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
           rootViewProvider = { null },
           statusTextProvider = { status },
           targetConfiguredProvider = targetConfiguredProvider,
+          connectingTargetProvider = { targetText },
           connectAction = {},
       )
 
@@ -77,6 +80,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
             rootViewProvider = { activity.findViewById(R.id.main) },
             statusTextProvider = { activity.findViewById(R.id.connectionStatus) },
             targetConfiguredProvider = { true },
+            connectingTargetProvider = { targetText },
             connectAction = {},
         )
     val app = org.robolectric.RuntimeEnvironment.getApplication()
@@ -138,7 +142,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
     val feedback = feedbackWith(btn, status)
 
     feedback.update(ConnectionState.Connecting)
-    assertEquals("Connecting…", status.text.toString())
+    assertEquals("Connecting to 192.168.77.1:4444…", status.text.toString())
     assertEquals(View.VISIBLE, status.visibility)
 
     feedback.update(ConnectionState.Connected)

@@ -148,6 +148,8 @@ class SenderService(
 
   fun getHostAddr(): String? = mHostAddr
 
+  fun getHostPort(): Int = mHostPort
+
   fun send(command: String) {
     if (mOut == null) {
       connectAsync() // synchronized on the same object as postCommand
