@@ -34,24 +34,49 @@ Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Build (from repo root)
 
-- Toolchain (locked in `DECISIONS.md` "AGP 9.3.1 / Gradle 9.5.0 migration LANDED"): **AGP 9.3.1, Gradle 9.5.0, built-in Kotlin** (AGP 9 removed the `org.jetbrains.kotlin.android` plugin — DSL/jvmTarget detail: DECISIONS.md). Java 11 source/target, Gradle runs under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 tests). `compileSdk 36`, `targetSdk 36`, `minSdk 23`, `maxSdk 36` — single main flavor, no product flavors.
-- `org.gradle.configuration-cache=true` — re-enabled under AGP 9; do not disable it again (rationale: DECISIONS.md).
-- Three build types (`debug`/`release`/`releaseDebug`); `./gradlew test` runs
-  Robolectric under all three in parallel JVMs — unit tests must use ephemeral
-  ports and reset SharedPreferences per test (they persist across methods in a
-  JVM; the old SenderService static-state trap was removed in ROADMAP Phase 3 —
-  see TESTING.md).
+- Versions/toolchain live in `gradle/libs.versions.toml` (the catalog) +
+  `app/build.gradle`/`settings.gradle`: single main flavor, `compileSdk 36` /
+  `targetSdk 36` / `minSdk 23` / `maxSdk 36`, the three build types
+  (`debug`/`release`/`releaseDebug`), and the `versionCode` formula are all
+  there — never restate them here (see "Sources of truth").
+  AGP 9's built-in Kotlin removed the `org.jetbrains.kotlin.android` plugin;
+  Gradle runs under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 —
+  also the CI JDK). Migration rationale: `DECISIONS.md` "AGP 9.3.1 / Gradle
+  9.5.0 migration LANDED".
+- `org.gradle.configuration-cache=true` in `gradle.properties` — do not disable
+  it again (rationale: DECISIONS.md).
+- Three build types; `./gradlew test` runs Robolectric under all three in
+  parallel JVMs — unit tests must use ephemeral ports and reset
+  SharedPreferences per test (they persist across methods in a JVM; the old
+  SenderService static-state trap is gone — see TESTING.md).
 - **Verify coverage measures the live class output.** The coverage gate reads
   `intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes`
   under AGP 9's built-in Kotlin — a stale `tmp/kotlin-classes` path silently
   under-measures and lets new app classes bypass the gate (hit 2026-08-09, see
   DECISIONS.md). After any toolchain migration, add a new app class and confirm
   it appears in the JaCoCo report.
-- `settings.gradle` at repo root: `rootProject.name = 'trik-gamepad'`, `include ':app'`.
-- `local.properties` (gitignored): on Windows, `sdk.dir` must escape the drive-colon (`C\:/...`) or lint's `PropertyEscape` check fails the build (POSIX paths need no escaping).
-- Signing: `app/build.gradle` applies a release signing config conditionally — only when `file('../android-keystorage.jks')` exists. Debug builds fall back to the auto-generated debug keystore in CI. See MEMORY.md "Build & layout" for gitignore status and how the path resolves.
-- Version is hand-set at the top of `app/build.gradle` (`appMajorVersion`/`appMinorVersion`, currently 1.41). `versionCode` is computed (`minSdk*10000 + abiCode*1000 + major*100 + minor`), `versionNameSuffix` is `-API<minSdk>`. Bump `appMinorVersion` for a release; never set versionCode by hand.
-- Dev tooling is cross-platform (Windows/Linux/macOS), managed by uv: `pyproject.toml` declares the dev deps (lizard, pre-commit, mdformat) and `uv sync` (re)creates `.venv` (gitignored) + the committed `uv.lock`. Run tools as `uv run ...` (venv-agnostic — resolves `.venv/bin` on POSIX, `.venv/Scripts` on Windows).
+- Signing: `app/build.gradle` applies a release signing config conditionally —
+  only when `file('../android-keystorage.jks')` exists; debug builds fall back
+  to the auto-generated debug keystore in CI. See MEMORY.md "Build & layout".
+- Version: hand-set at the top of `app/build.gradle`
+  (`appMajorVersion`/`appMinorVersion`). Bump `appMinorVersion` for a release;
+  never set versionCode by hand.
+- Dev tooling is cross-platform (Windows/Linux/macOS), managed by uv:
+  `pyproject.toml` declares the dev deps; `uv sync` (re)creates `.venv`
+  (gitignored) + the committed `uv.lock`. Run tools as `uv run ...`
+  (venv-agnostic — resolves `.venv/bin` on POSIX, `.venv/Scripts` on Windows).
+
+### Sources of truth (scripts — reference, never restate)
+
+| Guardrail | Source |
+|-----------|--------|
+| Coverage gate thresholds | `app/build.gradle` `jacocoTestCoverageVerification` |
+| Quality gate steps + tooling | `scripts/gate.py` (+ CI mirror `.github/workflows/ci.yml`) |
+| Test-duplication gate | `.jscpd.json` |
+| detekt rules/thresholds | `app/config/detekt/detekt.yml` |
+| lint rules | `app/lint.xml` (+ baseline) |
+| pre-commit hooks | `.pre-commit-config.yaml` |
+| Dependency/tool versions | `gradle/libs.versions.toml` |
 
 ## Hooks
 
@@ -99,9 +124,8 @@ configurations, update this section and the referenced config files.
   count, and root-cause the top ones. Recurring messages in *every* run mean a
   systemic cause, not noise — this is how the config-cache invalidation and the
   Gradle deprecation warnings were missed (both in ~every log). Both are now
-  resolved under the AGP 9.3.1 / Gradle 9.5.0 toolchain (config-cache reuses;
-  the Gradle-10 deprecations were fixed) — re-run the scan before trusting old
-  examples.
+  resolved under the current toolchain (config-cache reuses; the Gradle-10
+  deprecations were fixed) — re-run the scan before trusting old examples.
 
 ### After merge
 
@@ -113,7 +137,7 @@ configurations, update this section and the referenced config files.
 
 ### Before test / command
 
-- From repo root: `./gradlew test` (Robolectric, no device needed); a single test via `./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.<method>"`.
+- From repo root: `./gradlew test` (Robolectric, no device needed); single-test syntax: Commands.
 - Instrumented tests need a running emulator/device (hypervisor: Windows AEHD / Linux KVM / macOS Hypervisor.framework — verify with `emulator -accel-check`); boot with `-gpu host` (never `swiftshader_indirect`) and pre-empt the immersive-mode confirmation (`adb shell settings put secure immersive_mode_confirmations confirmed`). Full recipe + per-platform table: TESTING.md.
 - **Instrumented tap→command tests use direct `performClick()`** (a `ViewAction` calling `view.performClick()`), not Espresso touch `click()`, when the app does async work (connect/video reload) around the taps. A tap injected during such a main-thread transition is **silently dropped** — signature: the outer buttons of a row fire while the middle/second taps never send (verified a test-injection artifact, not an app bug). Touch-precision assertions belong only in dedicated pad tests. Diagnostics + rationale: TESTING.md "tap→command wiring".
 - **Cold-boot degraded emulators**: after a long session, broad instrumented failures (logcat `Sending oneway calls to frozen process`, package-service down, focus flakes) mean the emulators are degraded — `adb reboot` is **not** enough; kill + relaunch with the exact launch flags and settle ~30-60 s before re-running. Details: TESTING.md "long-session emulator degradation".
@@ -166,6 +190,7 @@ configurations, update this section and the referenced config files.
 - **Tooling assumptions**: never assume tooling behaves intuitively — verify options against `--help`/docs/schema with a read-only probe; route complex arguments through a `.tmp/` file rather than inlining. (Shell-escaping differences, e.g. PowerShell vs bash: "Windows/PowerShell quirks".)
 - **Re-read `.md` diffs after mdformat**: line-start `+`/`-`/`*` mid-paragraph get reflowed into lists — never start a wrapped line with a list character.
 - **Documenting decisions**: `AGENTS.md` stores rules/constraints only — never rationale. A *decision* (problem → alternatives → why → out-of-scope) belongs in `DECISIONS.md`; a fact/quirk/retrospective belongs in `MEMORY.md`. Removing a documented rule changes agent behavior — only delete if provably wrong; relocate rationale, never drop it. Would removing this change agent behavior? → keep it. Is the claim provably wrong (verified against executable sources — config, workflow, code)? → only then delete/correct. Does it enforce a docs/structure contract? → keep structural-convention rules even when the wording looks generic.
+- **AGENTS.md grows only via argued decisions**: a new line must be justified by a decision documented in `DECISIONS.md` (why it is, or is expected to be, useful). Retrospectives may remove statements that were never proven, to keep AGENTS.md lean.
 - **Merge, don't delete**: when replacing a section, merge old content into the new rather than deleting outright; confirm each deletion is intentional. On docs-drift review, read `AGENTS.md` top-to-bottom and push detail/rationale down to `MEMORY.md`/`DECISIONS.md` — `AGENTS.md` = pointers, the rest = on-demand detail; keep context small and focused.
 - **Session context is ephemeral**: persist decisions to `AGENTS.md`/`DECISIONS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
 - **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
@@ -180,25 +205,18 @@ configurations, update this section and the referenced config files.
 ```sh
 ./gradlew assembleDebug                      # CI adds: -PpreDexEnable=false
 ./gradlew assembleDebugAndroidTest
-./gradlew test                               # Robolectric unit tests, no device needed
-./gradlew lint                               # lint.xml downgrades MissingTranslation to warning
-./gradlew connectedDebugAndroidTest          # needs running emulator/device (per-platform prereqs: TESTING.md)
-uv run python scripts/gate.py                # canonical local gate (cross-platform, Windows + Linux/macOS):
-                                             # spotlessApply THEN the full quality suite + jscpd
-                                             # duplication gate + lizard token trend, each --no-daemon,
-                                             # tee'd to .tmp/gate.log
-./gradlew detekt spotbugsDebug jacocoTestReport jacocoTestCoverageVerification spotlessCheck   # quality gates (also run in CI; checkstyle/pmd retired after the pure-Kotlin migration)
+./gradlew test                               # Robolectric unit tests, all 3 build types (no device)
+./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.<method>"   # single test
+./gradlew connectedDebugAndroidTest          # needs emulator/device; add --no-configuration-cache (prereqs + flags: TESTING.md)
+uv run python scripts/gate.py                # THE canonical quality gate — steps + tooling live in
+                                             # scripts/gate.py (CI mirror: ci.yml; jscpd config: .jscpd.json).
+                                             # Never re-run its steps by hand.
 ```
 
-Test-quality tooling (Campaign 6 — see TESTING.md "Test quality metrics"):
-
-```sh
-uv sync                                       # (re)create .venv from pyproject.toml + uv.lock (dev deps: lizard, pre-commit, mdformat)
-npx -y jscpd app/src/test app/src/androidTest --config .jscpd.json   # hard duplication gate (fails on new clones >= 50 tokens; `paths` config key is ignored, positional dirs required)
-uv run lizard -l kotlin app/src/test app/src/androidTest --csv   # per-function token counts (summed = logical SLOC trend)
-uv run pre-commit run --all-files            # venv-agnostic (resolves .venv/bin on POSIX, .venv/Scripts on Windows)
-uvx mdformat <file>.md
-```
+Dev tooling (uv): `uv sync` (re)creates `.venv` from `pyproject.toml` +
+`uv.lock`; run tools via `uv run ...` (venv-agnostic). Pre-commit:
+`uv run pre-commit run --all-files` (hooks: `.pre-commit-config.yaml`);
+`.md` formatting: `uvx mdformat <file>.md`.
 
 ## App protocol (quick reference)
 
@@ -212,6 +230,9 @@ about the *subject* (Gradle daemons, UTF/BOM, EOL) or about the *environment*
 stay universal, environment-related ones stay here — they are not universal
 rules.
 
+- **`local.properties` drive-colon escaping (Windows)**: `sdk.dir=C\:/...`
+  (escape the drive-letter colon) or lint's `PropertyEscape` check fails the
+  build; POSIX paths need no escaping. The file is gitignored.
 - **`.md` formatting + EOL trap (Windows checkout)**: pre-format with `uvx mdformat` before pre-commit (the first hook run reformats and fails); after committing `.md`, expect a dirty working tree — the hook rewrites to LF (vs CRLF) with a **content-identical** diff (`git diff --stat` empty, `git status` dirty). Verify content-identical, then `git checkout -- <md>`; never `git add` the EOL-only state. POSIX checkouts are LF already, so the symptom does not appear there.
 - **PS 5.1 `$ErrorActionPreference='Stop'` + native stderr is a terminating error**: `& npx ... *>> $log` under EAP=Stop silently kills the script the moment the tool prints to stderr (jscpd prints "Using config from ..."). Scope `$ErrorActionPreference='Continue'` around native calls and check `$LASTEXITCODE` — for ANY new native command in a PowerShell script with EAP=Stop. (The Python gate `scripts/gate.py` is immune — `subprocess` captures stderr.)
 - **`gh` run commands take the run **id**, not a PowerShell run object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
