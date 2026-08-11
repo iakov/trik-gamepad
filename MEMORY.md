@@ -1753,3 +1753,53 @@ detekt/spotbugs/lint green; instrumented **9/9 on both emulators**
 18,007 tokens. Screenshot proof (empty-host video-only: no pill, no controls,
 placeholder): `.tmp/empty_host_final.png` — 0 orange pixels at screen center
 (prior disconnected proof `.tmp/status_line_final.png` had 1,303).
+
+### [2026-08-11] Campaign 13 execution run - branch-coverage ratchet 80% -> 85%
+
+Scope (user decision 2026-08-11): drive measured branch coverage to >= 85% and
+ratchet the BRANCH gate from 0.80 to 0.85. Rationale: DECISIONS.md "Campaign 13:
+branch-coverage ratchet 80% -> 85%". **Timing: Estimated ~1 h, Actual ~35 m**
+(measured on the command log; start/end not explicitly timestamped).
+
+**What landed (tests only, no prod-code changes; measured from 0.834 -> 0.867):**
+
+- **HardwareGamepadController**: D-pad test now covers all four directions
+  (DOWN/LEFT branches were unexercised) + a `SOURCE_GAMEPAD`-only move event
+  (the `&&` second condition's false path in `onMotionEvent`).
+- **MainActivity**: `ACTION_MULTIPLE` dispatch hits the `when` else branch;
+  `setSenderService(null)`; `onDestroy` with nulled
+  `mSensorManager`/`mVideo`/`mSettingsController`; a nulled `videoRetryController`
+  across a Connected emission + `onPause`/`onResume` covers the `?.` null paths.
+- **SenderService**: `connect()` on a null/blank host is a no-op (the
+  `isNullOrBlank` guard); `ShadowLog.setLoggable("TCP", Log.DEBUG)` covers the
+  DEBUG-gate **true** branches in `send()`/`disconnect()`.
+- **MjpegInputStream**: header block ending at EOF without a trailing CRLF still
+  resolves Content-Length; a malformed header (colon-less first
+  "Content-Length" text + bare-LF empty line + EOF on a non-CL line) exercises
+  the empty-line skip and the EOF-in-header recovery.
+
+**Quirks re-verified while grinding (worth knowing for the next ratchet):**
+
+- **Robolectric `ShadowLog.isLoggable` defaults to `level >= INFO`** (bytecode
+  `iconst_4` default), so `Log.isLoggable(TAG, DEBUG)` is **false** unless a
+  test calls `ShadowLog.setLoggable(TAG, DEBUG)` (2-arg form; there is no
+  boolean overload in Robolectric 4.16). The false branches were already
+  covered by every existing test.
+- **Kotlin-synthetic null branches cap the achievable ratio.** `?.`/`?:`/
+  `isNullOrBlank` compile to null-check branches that are structurally
+  unhittable when the receiver can never be null (e.g. MainActivity's
+  `findViewById` on always-present views, `viewThread` after `init()`,
+  `getHostAddr()` after `register()` always sets a default host). SettingsFragment
+  (21 missed) and MainActivity remain the largest sinks; ~86-87% is a realistic
+  ceiling without excluding more classes — the new 0.85 gate leaves 1.7 pt
+  margin.
+- The **`X Content-Length`-style trick** (first occurrence of the marker inside
+  a non-content-length line) is the only way to reach `parseContentLength`'s
+  empty-line / EOF branches, because a real Content-Length line returns
+  immediately and the parsed region starts at the marker's first occurrence.
+
+**Verification (measured):** BRANCH **529/610 = 0.867** (was 509/610 = 0.834),
+LINE 1156/1191 = 0.971 (was 0.965); `jacocoTestCoverageVerification` with
+`minimum = 0.85` green; canonical gate (`uv run python scripts/gate.py`) green;
+full 3-variant `test` suite run 3× (once via gate.py, twice `--rerun-tasks`).
+Test logical-SLOC 18,425 tokens (up 418 from C12 — the new branches).

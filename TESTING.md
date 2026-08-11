@@ -329,14 +329,17 @@ row's outcome depends on prior state (`ui.step = 7` before each case).
 
 ## Known gaps
 
-- Coverage gate is a JaCoCo ratchet at **95% line / 80% branch**
+- Coverage gate is a JaCoCo ratchet at **95% line / 85% branch**
   (`jacocoTestCoverageVerification`, raised from 85/60 through the Phase 3
   post-migration coverage push, then to 92/71 after the ROADMAP Phase 2-E/2-F/3
-  extractions, then to 95/80 after Campaign 2's coverage push);
+  extractions, then to 95/80 after Campaign 2's coverage push, then to 95/85
+  after Campaign 13);
   `jacocoTestReport` always produces the full
-  report. Measured **0.965 LINE / 0.834 BRANCH** (Campaign 12, 2026-08-11;
-  the new gamepad/status/preset branches dipped to 0.796 mid-Campaign-10 and
-  were covered back up — see MEMORY "Campaign 10"). MjpegView's render-thread
+  report. Measured **0.971 LINE / 0.867 BRANCH** (Campaign 13, 2026-08-11; up
+  from 0.965/0.834 after Campaign 12 — the 0.80 gate was raised to 0.85 with
+  a 1.7 pt margin. The new gamepad/status/preset branches dipped to 0.796
+  mid-Campaign-10 and were covered back up — see MEMORY "Campaign 10").
+  MjpegView's render-thread
   plumbing (`MjpegView$MjpegRenderThread`/`MjpegViewThread`) is excluded from
   the gate with a recorded rationale (untestable thread lifecycle; the render
   logic lives in the covered `MjpegFrameRenderer`); so are Kotlin-inline

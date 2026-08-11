@@ -25,7 +25,7 @@ Each note follows the same shape:
 | Area | Covers | Newest decision |
 |------|--------|-----------------|
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-09] Dev tooling is cross-platform via uv (Python gate) |
-| Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-06] Coverage drive to 85% |
+| Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-11] Branch-coverage ratchet 80% → 85% |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode | [2026-08-11] Empty-host video-only mode + connect-UX hardening |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
@@ -419,6 +419,32 @@ ______________________________________________________________________
 - **Out of scope / consequences:** the residual import-header clones (52–76
   tokens) are language boilerplate, never logic duplication; the gate still
   fails on any real logic clone ≥ 50 tokens.
+
+### [2026-08-11] Campaign 13: branch-coverage ratchet 80% → 85%
+
+- **Problem:** the BRANCH gate sat at 0.80 with measured 0.834 (509/610
+  branches) after Campaign 12; a 3.4 pt headroom invites silent regressions,
+  and branch coverage is the metric the C-push historically had to grind.
+- **Alternatives considered:** leave the gate at 0.80 (no enforcement — the
+  number would drift without consequence); raise the gate to 0.85 without new
+  tests (fails the gate); add targeted tests AND raise the gate (ratchet).
+- **Chosen solution:** targeted branch tests (HardwareGamepadController D-pad
+  all four directions + `SOURCE_GAMEPAD`-only motion; MainActivity
+  `ACTION_MULTIPLE` dispatch, `setSenderService(null)`, onDestroy/onPause/
+  onResume with nulled collaborators, Connected edge with a null retry
+  controller; SenderService `connect()` on a blank host + `ShadowLog`
+  `setLoggable("TCP", DEBUG)` for the DEBUG-gate true branches; MjpegInputStream
+  EOF-in-header / empty-line / colon-less-line fixtures) then BRANCH `minimum`
+  → `0.85` in `app/build.gradle`.
+- **Why:** 529/610 = **0.867** measured after the tests — a 1.7 pt margin over
+  the new gate (the Kotlin-synthetic `?.`/`?:`/`isNullOrBlank` branches in
+  MainActivity/SettingsFragment stay structurally unhittable, so ~85% is a
+  realistic ceiling for the current code shape without excluding more logic).
+- **Out of scope / consequences:** the LINE gate stays at 0.95 (measured 0.971);
+  the remaining 81 missed branches are dominated by SettingsFragment (21) and
+  framework-coupled MainActivity/SettingsFragment null branches. `ShadowLog`
+  `isLoggable` defaults to `level >= INFO`, so the DEBUG-gate false branches
+  were already covered — the test forces the true side.
 
 ______________________________________________________________________
 
