@@ -515,7 +515,7 @@ Campaign 14)". Retrospective + elapsed: MEMORY.md "Campaign 14 execution run".
 
 | Estimated | Actual |
 |-----------|--------|
-| ~2 h | ≈1 h 20 m (impl + gate iterations) + docs |
+| ~2 h | ≈1 h 45 m (impl + gate iterations + docs + emulator proof) |
 
 - **AppLog + 500-line ring buffer** — every log call mirrors to logcat and
   into a thread-safe ring buffer; the buffer floor defaults to INFO and is
