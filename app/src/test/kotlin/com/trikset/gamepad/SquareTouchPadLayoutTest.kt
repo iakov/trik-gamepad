@@ -34,6 +34,13 @@ class SquareTouchPadLayoutTest : RobolectricTestBase() {
     pad.layout(0, 0, width, height)
   }
 
+  /** Reads a private field (same reflection pattern as MainActivityTest). */
+  private fun field(target: Any, name: String): Any? {
+    val f = target.javaClass.getDeclaredField(name)
+    f.isAccessible = true
+    return f.get(target)
+  }
+
   @Before
   fun setUp() {
     sender = SenderService(mExecutor)
@@ -145,11 +152,15 @@ class SquareTouchPadLayoutTest : RobolectricTestBase() {
 
   @Test
   fun onSizeChangedShouldCenterWhenStartingEmpty() {
-    // size changed from (0,0) -> centers the touch point.
+    // Size changed from (0,0) -> the touch point centers at (w/2, h/2): the
+    // absX/absY fields are set (no public getter, so reflect — same pattern as
+    // MainActivityTest). The old assertion `sender !== null` was a tautology
+    // (non-null lateinit) and never tested the centering.
     measureAndLayout(200, 200)
-    // After a layout with old size 0, dispatch a move to read the new center.
-    pad.dispatchTouchEvent(eventAt(100f, 100f, MotionEvent.ACTION_DOWN))
-    assertTrue(sender !== null)
+    val absX = field(pad, "absX") as Float
+    val absY = field(pad, "absY") as Float
+    assertEquals("centered x", 100f, absX)
+    assertEquals("centered y", 100f, absY)
   }
 
   @Test

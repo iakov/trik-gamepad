@@ -50,6 +50,13 @@ class MainWindowTests {
     fun squareButtonsShouldHandleCircularTapsCorrectly() {
       val server = DummyServer()
       onView(withId(currentPadId)).perform(movingTap())
+      // The trailing 'up' is sent asynchronously (pad -> SenderService executor ->
+      // socket); stopListening() drops any line that lands after its flag is set,
+      // so bounded-await the up before stopping (hit 2026-08-11 on a physical phone).
+      assertTrue(
+          "expected 'pad $currentPadName up', received so far: ${server.receivedMessages}",
+          server.awaitMessage(String.format(Locale.ROOT, "pad %s up", currentPadName), 30_000),
+      )
       server.stopListening()
 
       assertPadCommands(server.receivedMessages, currentPadName) { x, y ->
@@ -62,12 +69,20 @@ class MainWindowTests {
     fun squareButtonsShouldHandleDiagonalTapsCorrectly() {
       val server = DummyServer()
       onView(withId(currentPadId)).perform(diagonalTap())
+      // Same async-'up' race as the circular tap: bounded-await before stopping.
+      assertTrue(
+          "expected 'pad $currentPadName up', received so far: ${server.receivedMessages}",
+          server.awaitMessage(String.format(Locale.ROOT, "pad %s up", currentPadName), 30_000),
+      )
       server.stopListening()
 
       var currentIndex = 0
       assertPadCommands(server.receivedMessages, currentPadName) { x, y ->
-        assertTrue(Math.abs(-100 + currentIndex * 200 / 10 - x) <= 25)
-        assertTrue(Math.abs(100 - currentIndex * 200 / 10 - y) <= 25)
+        // The DOWN starts at command (-80,80) (Samsung top strip is a dead zone for
+        // the (100,100) corner), so the expected diagonal baseline is (-80,80), not
+        // (-100,100); ±25 absorbs the int-truncation rounding in the received values.
+        assertTrue(Math.abs(-80 + currentIndex * 200 / 10 - x) <= 25)
+        assertTrue(Math.abs(80 - currentIndex * 200 / 10 - y) <= 25)
         ++currentIndex
       }
     }
@@ -110,19 +125,30 @@ class MainWindowTests {
         override fun perform(uiController: UiController, view: View) {
           val topLeftCoords = IntArray(2)
           view.getLocationOnScreen(topLeftCoords)
-          val startCoords =
-              floatArrayOf(
-                  topLeftCoords[0] + tapPrecision[0],
-                  topLeftCoords[1] - tapPrecision[1],
-              )
-          val tap = MotionEvents.sendDown(uiController, startCoords, tapPrecision).down
+          // Invert TouchPadController's mapping (command = 200*1.15*(frac-0.5)) so every
+          // touch point lands INSIDE the pad. The old path started 1px above the pad's
+          // top edge and moved further up-right, so the DOWN never reached the pad and
+          // the test only passed vacuously on an empty message list (hit 2026-08-11,
+          // physical phone; the bounded await exposed the missing 'up'). Start at command
+          // (-80,80) instead of (-100,100): on Samsung phones the top ~125px of the
+          // screen is a dead strip (status/gesture area) and a DOWN at screen y≈84 is
+          // swallowed; the assertion's ±25 tolerance absorbs the constant 20 offset.
+          fun touchPoint(commandX: Int, commandY: Int): FloatArray {
+            val xFrac = 0.5 + commandX / COMMAND_SCALE
+            val yFrac = 0.5 - commandY / COMMAND_SCALE
+            return floatArrayOf(
+                topLeftCoords[0] + (xFrac * view.width).toFloat(),
+                topLeftCoords[1] + (yFrac * view.height).toFloat(),
+            )
+          }
+          val tap = MotionEvents.sendDown(uiController, touchPoint(-80, 80), tapPrecision).down
           uiController.loopMainThreadUntilIdle()
           try {
             for (i in 1 until tapSegmentCount) {
               val currentCoords =
-                  floatArrayOf(
-                      startCoords[0] + i.toFloat() * view.width / tapSegmentCount,
-                      startCoords[1] - i.toFloat() * view.height / tapSegmentCount,
+                  touchPoint(
+                      -100 + i * 200 / tapSegmentCount,
+                      100 - i * 200 / tapSegmentCount,
                   )
               if (!MotionEvents.sendMovement(uiController, tap, currentCoords)) {
                 MotionEvents.sendCancel(uiController, tap)
@@ -179,6 +205,11 @@ class MainWindowTests {
     }
 
     companion object {
+      // TouchPadController maps touch fraction -> command as 200*1.15*(frac-0.5);
+      // invert that here so the injected points hit the pad (constants are private
+      // there, so mirror them for the test).
+      const val COMMAND_SCALE = 200.0 * 1.15
+
       @JvmStatic
       @Parameters
       fun data(): Collection<Array<Any>> =

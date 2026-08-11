@@ -8,6 +8,7 @@ import java.lang.reflect.Method
 import java.net.URL
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -457,8 +458,9 @@ class MainActivityTest : RobolectricTestBase() {
     event.values[1] = 0.7f
     event.values[2] = 0f
     activity.onSensorChanged(event)
-    // Wheel enabled -> a "wheel N" command was sent.
-    assertTrue(activity.getSenderService().getHostAddr() != null)
+    // Wheel enabled -> the accelerometer sample is processed: mAngle changes from 0
+    // (mirrors onSensorChangedWhenWheelDisabledShouldReturnEarly asserting mAngle == 0).
+    assertNotEquals(0, field(activity, "mAngle") as Int)
   }
 
   @Test

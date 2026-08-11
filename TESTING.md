@@ -330,6 +330,34 @@ Data-driven tables buy clearer intent, not fewer tokens; the `cases` literals
 are the test. Expect dedup to cut tokens; don't chase the number by adding
 rows.
 
+### Tests must be able to fail
+
+A test that cannot fail asserts nothing — it only burns time and gives false
+confidence (hit 2026-08-11: the `SquareButtonTest` diagonal gesture injected
+its DOWN 1px above the pad, so the pad never received any touch, the received
+list stayed empty, and `assertPadCommands`' `while (hasNext())` loop ran zero
+times — green on every emulator until a bounded await exposed the missing
+`up`). The three concrete never-fail modes, all seen in this repo:
+
+- **Tautological assertion** — `assertTrue(button.isPressed || !button.isPressed)`
+  (MagicButtonPanelTest) and `assertTrue(sender !== null)` on a non-null
+  `lateinit` (SquareTouchPadLayoutTest) are always true. An assertion must have
+  a value that can go wrong.
+- **Asserting setup, not the effect** — `onSensorChangedAccelerometerShouldProcessWheel`
+  asserted `getHostAddr() != null` (a value set in `setUp`) while the comment
+  claimed "a wheel command was sent". Assert the code-under-test's output, not
+  a value the fixture already set.
+- **Empty-list iteration** — an assertion nested in `while (hasNext())` passes
+  vacuously on `[]`. Assert the list is non-empty (or bounded-await the expected
+  content) before iterating.
+
+**Guards:** after writing an assertion, break the code under test (comment the
+line / invert the condition) and confirm the test goes **red**; if it stays
+green it asserts nothing. Write new behavior tests **red-first (TDD)**: a test
+you have never seen fail may not be testing anything. The JaCoCo gate proves a
+line *executed*, never that an assertion is meaningful — coverage green is not
+test green.
+
 **Stateful-table trap:** a table row's expected value must not depend on state
 an earlier row set (e.g. a non-numeric wheel step *keeps* the current step, so
 after a `"42"` row the expected default became 42). Reset the fixture per row
