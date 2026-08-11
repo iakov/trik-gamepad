@@ -120,6 +120,7 @@ configurations, update this section and the referenced config files.
 ### Operational rules (command hygiene)
 
 - **Command hygiene**: every command runs with a reasonable timeout and is logged (tee to `app/build/<task>.log` or `.tmp/`); on timeout read the log first. If a command takes ≥1.5× the expected time, analyze the wrong guess and record expected vs actual.
+- **Always measure elapsed time for every campaign**: at kickoff fill the campaign's ROADMAP header table `Estimated`/`Start` (ISO wall-clock); finalize `End`/`Actual` (= End − Start) as part of the docs-last-step. A campaign whose MEMORY retrospective has no elapsed figure is **incomplete** — treat missing timing like missing verification. Record per-phase timestamps when feasible; for an untimed phase say "not timed" rather than omit the figure.
 - **A wrong guess usually means an option was not set properly** — re-audit the invocation.
 - **Slow commands → research (incl. web), tune repeatable tooling, document in MEMORY.md** — never fix the symptom.
 - **Single-branch CI cache trap**: `gradle/actions/setup-gradle` `cache-read-only: ${{ github.ref != 'refs/heads/master' }}` means the cache is **never written** when the workflow never pushes to `master` (single-branch no-PR) — every CI run is cold. Set `cache-read-only: false` and verify a follow-up run is faster. Measured here: build gate 4m27s → 1m05s (~4×).

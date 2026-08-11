@@ -452,4 +452,54 @@ gating". Retrospective + timing: MEMORY.md "Campaign 11 execution run".
   instrumented 9/9 on both emulators. Screenshot proof (centered orange pill
   on a fresh disconnected launch): `.tmp/status_line_final.png` (orange pixel
   cluster verified at screen center).
-  **CAMPAIGN 11 COMPLETE**.
+  **CAMPAIGN 11 COMPLETE.**
+
+## Campaign 12 — empty-host / video-only mode + connect-UX hardening
+
+Scope (user decision 2026-08-11): an empty robot IP is a valid configuration
+(device used for video streaming only) — the pill and the pads/buttons are
+hidden when no target is configured, `connect()` no-ops on a blank host, and
+the connect state machine is hardened (a failed connect no longer sticks at
+"Connecting…"). Video-stream failures get a throttled Snackbar while bounded
+retries continue (relaxed for the empty-host case so video-only still
+auto-recovers). Rationale: DECISIONS.md "Empty-host video-only mode".
+Retrospective + elapsed: MEMORY.md "Campaign 12 execution run".
+
+| Estimated | Start | End | Actual |
+|-----------|-------|-----|--------|
+| ~6 h | 2026-08-11T03:02:18+03:00 | 2026-08-11T05:22:16+03:00 | 2 h 19 m |
+
+- **Pill gating** — `ConnectionFeedback` gains `targetConfiguredProvider`; a
+  `Disconnected` state with no configured host hides the pill entirely
+  (no "Tap to connect…" with nothing to connect to). `MainActivity` supplies
+  it from `SenderService.getHostAddr()`.
+- **Controls auto-hide** — pads + magic-button row hide when the host is blank,
+  regardless of the "Hide pads & buttons" toggle (which keeps meaning for a
+  configured robot). No new settings option.
+- **connect() no-op** on blank host; **stuck-Connecting fix** — a failed
+  connect transitions back to `Disconnected("")` so the pill honestly returns
+  to "Tap to connect…" and the existing "Connection to X error." Snackbar is
+  the single notification.
+- **Throttled video-failure Snackbar** — pure `VideoStreamErrorNotifier`
+  (~15 s window) surfaces "Video stream unavailable" once per failure episode;
+  bounded 5 s retries unchanged.
+- **Video-only retry** — `shouldReloadVideo` allows retry when the host is empty
+  (no control connection needed); the spinner stays `Connected`-gated.
+- **Empty-host video-URI default** — blank host yields an empty default
+  (placeholder shown) instead of the malformed `http://:8080/...`, removing a
+  misleading "Illegal video stream URL" toast.
+- **Tests** — `ConnectionFeedbackTest` (target-configured GONE/VISIBLE),
+  `MainActivityTest` (empty-host controls hidden; `shouldReloadVideo` gate:
+  video-only true / configured-but-disconnected false),
+  `MainActivitySettingsControllerTest` (host-blank hides controls even with the
+  toggle unset; empty-host URI default null), `SenderServiceAdvancedTest`
+  (failed connect returns to `Disconnected`; `connectWithBlankHostShouldNotAttempt`),
+  `VideoStreamErrorNotifierTest` (throttle boundary). The magic-buttons
+  instrumented test now uses direct `performClick` (a tap during the
+  connect→Connected transition was dropped by touch injection — see MEMORY).
+- **Verification**: canonical gate green ×2 (jacoco 96.5% line / 83.4% branch,
+  jscpd 0 clones), instrumented **9/9 on both emulators** (after a true cold
+  boot + the `performClick` fix), pre-commit clean. Screenshot proof of the
+  empty-host video-only state: `.tmp/empty_host_final.png` (no pill — 0 orange
+  pixels — no controls, placeholder shown).
+  **CAMPAIGN 12 COMPLETE.**

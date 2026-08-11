@@ -27,7 +27,7 @@ Each note follows the same shape:
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-09] Dev tooling is cross-platform via uv (Python gate) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-06] Coverage drive to 85% |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry | [2026-08-10] Connection status pill + spinner gating |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode | [2026-08-11] Empty-host video-only mode + connect-UX hardening |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-09] Why .PLAN.md exists |
 
@@ -700,6 +700,44 @@ ______________________________________________________________________
   (`#FF9800`) added; `connection_status_text_size` = 20sp;
   `video_loading_size` = 120dp. `Tap to connect` uses the real ellipsis
   character (`…`) — lint `TypographyEllipsis` rejects `...`.
+
+### [2026-08-11] Empty-host video-only mode + connect-UX hardening (Campaign 12)
+
+- **Problem:** the status pill and the pads/buttons made no sense with an empty
+  robot IP: a "tap to connect" affordance with nothing to connect to, and touch
+  surfaces for a robot that isn't configured. Reviewing the Campaign 10/11
+  behavior, the maintainer flagged "it is stupid to show it if ip is empty" and
+  asked what a video-only device (empty host + a video URL) should look like.
+  Separately, a failed connect left the pill stuck at "Connecting…" forever
+  (`connectToTRIK` never returned to `Disconnected` on `IOException`).
+- **Alternatives considered:** reject an empty host in Settings (blocks the
+  video-only use case — rejected for that reason); validate host format
+  (over-validation — DNS names may work); hide the pill only vs also hide the
+  controls; notify on video-stream failure per retry tick vs throttled.
+- **Chosen solution (user decision 2026-08-11):** empty host is a **valid
+  configuration = video streaming only**. The pill hides entirely
+  (`ConnectionFeedback.targetConfiguredProvider`), the pads + magic-button row
+  auto-hide regardless of the "Hide pads & buttons" toggle
+  (`setControlsVisible(!hideControls && addr.isNotBlank())`), `connect()`
+  no-ops on a blank host, and the empty-host video-URI default is `""`
+  (placeholder) instead of the malformed `http://:8080/...`. A failed connect
+  returns to `Disconnected("")` (empty reason → the existing "Connection to X
+  error." Snackbar is the single notification). Video-stream failures surface a
+  throttled (~15 s) "Video stream unavailable" Snackbar via a pure
+  `VideoStreamErrorNotifier` while bounded retries continue — and the retry
+  gate relaxes for an empty host (`shouldReloadVideo` allows retry without a
+  control connection) so video-only still auto-recovers; the spinner stays
+  `Connected`-gated.
+- **Why:** an empty IP is a legitimate end-user configuration (watch-only
+  device), so it must not be blocked or force a bogus connect; hiding the
+  tappable affordances removes noise; the state machine fix makes the pill
+  honest after a failed tap; the throttled Snackbar informs without spamming
+  the 5 s retry loop.
+- **Out of scope / consequences:** no new settings toggle (auto-hide is
+  automatic); no host-format validation; the touch-injection race where a tap
+  during the connect→Connected transition is dropped is a test-environment
+  artifact (Espresso `click()` vs direct `performClick()`) — documented in
+  MEMORY "Campaign 12 execution run", not fixed in the app.
 
 ______________________________________________________________________
 

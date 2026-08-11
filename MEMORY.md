@@ -1676,3 +1676,77 @@ full 3-variant `test` suite ×2 green (`--rerun-tasks` on the second pass —
 UP-TO-DATE would have executed nothing); instrumented **9/9 on both emulators**
 (Atd_API36 + Swiftshader_API36). Test logical-SLOC 17,442 tokens. Screenshot
 proof: `.tmp/status_line_final.png` (orange cluster verified at screen center).
+
+### [2026-08-11] Campaign 12 execution run - empty-host / video-only mode + connect-UX hardening
+
+Scope (user decision 2026-08-11): empty host = video streaming only (no pill,
+no pads/buttons, no pointless connect), connect state machine hardened, and
+video-stream failures notified. Full record: ROADMAP "Campaign 12"; rationale:
+DECISIONS.md "Empty-host video-only mode + connect-UX hardening". The "always
+measure elapsed time" rule (AGENTS.md) started this campaign; Campaign 11's
+elapsed was NOT captured - the gap that motivated the rule.
+**Elapsed: 2 h 19 m** (Start 2026-08-11T03:02:18+03:00 -> End
+2026-08-11T05:22:16+03:00; Estimated ~6 h). Phases: implementation ~6 m,
+gate + test suite ~2 h (mostly the instrumented deep-dive below), then the
+screenshot and docs steps ~10 m.
+
+**What landed:**
+
+- **Pill gating**: `ConnectionFeedback` gained `targetConfiguredProvider`;
+  `Disconnected` + no configured host -> the pill is `GONE` (no "Tap to
+  connect…" with nothing to connect to). MainActivity supplies it from
+  `SenderService.getHostAddr()`.
+- **Controls auto-hide**: `MainActivitySettingsController` ->
+  `setControlsVisible(!hideControls && addr.isNotBlank())` — pads + magic
+  buttons hide on an empty host regardless of the toggle (video-only device).
+- **connect() no-op** on a blank host (`SenderService.connect()` early-returns);
+  **stuck-Connecting fix**: `connectToTRIK` now sets `Disconnected("")` on
+  connect failure (empty reason -> no double Snackbar; the existing "Connection
+  to X error." Snackbar is the single notification).
+- **Throttled video-failure Snackbar**: pure `VideoStreamErrorNotifier`
+  (~15 s window; `NEVER_SHOWN` sentinel — a naive 0-ms start made the first
+  call false at small timestamps) + MainActivity's `restartVideoStream` failure
+  branch -> `connectionFeedback.error("Video stream unavailable")`.
+- **Video-only retry**: extracted `MainActivity.shouldReloadVideo()`; the gate
+  is `(!hostConfigured || Connected) && mVideoURL != null && !isPlaying`, so an
+  empty-host (video-only) device auto-recovers without a control connection;
+  the spinner stays `Connected`-gated.
+- **Empty-host video-URI default**: `""` (placeholder shown) instead of the
+  malformed `http://:8080/...` interpolation that toasted "Illegal video stream
+  URL" on every register.
+- **detekt `TooManyFunctions` headroom**: MainActivity hit 31 (= threshold,
+  which is `>=`) after adding `shouldReloadVideo`; instead of bumping the
+  threshold again (C10 already did 25->31), merged `showVideoLoading` +
+  `hideVideoLoading` into `setVideoLoading(visible: Boolean)` -> 30 functions.
+
+**The magic-buttons instrumented flake (deep dive, ~2 h):**
+
+- The full suite failed 8+ times ONLY on `magicButtonsShouldSendCorrectCommands`
+  with a tell-tale pattern: `[btn 1 down, btn 5 down]` — the outer buttons
+  sent, the middle never did. Geometry was proven clean (uiautomator bounds:
+  buttons y 945-1077, pill y 486-594, overlay ends y 942 — no overlap).
+- Root cause: the tap that lands **during the connect->Connected transition's
+  main-thread work is silently dropped**. The first tap connects; the second
+  tap (whichever button) arrives while the pill/gear/video-reload work runs and
+  the button's DOWN/UP never fires its listener. Longer dwell and Espresso
+  `click()` reduced but did not eliminate it; direct `performClick()`
+  (listener-level, no touch injection) is deterministic. The wiring under test
+  is the button listener -> command; pad touch precision is covered by
+  `SquareButtonTest`, so `performClick` is the right tool here.
+- The emulators had also degraded over the long session: "Sending oneway calls
+  to frozen process" (app-freezer under memory pressure freezing the sender
+  executor), Atd's package service going down mid-run, and the documented
+  swiftshader focus flake. A true cold boot (kill + relaunch, `-no-snapshot`
+  for Swiftshader) cleared the cascade failures; only the magic-buttons
+  deterministic flake remained until the `performClick` fix.
+- **`getDefaultSharedPreferences` file name** is `{package}_preferences.xml`
+  (NOT `{package}.xml`) — needed when seeding the empty-host screenshot proof
+  via `run-as`.
+
+**Verification (measured):** canonical gate green ×2 (jacoco **0.95 LINE /
+0.80 BRANCH** — measured **96.5% line / 83.4% branch**), jscpd 0 clones,
+detekt/spotbugs/lint green; instrumented **9/9 on both emulators**
+(Atd_API36 + Swiftshader_API36) after the `performClick` fix. Test logical-SLOC
+18,007 tokens. Screenshot proof (empty-host video-only: no pill, no controls,
+placeholder): `.tmp/empty_host_final.png` — 0 orange pixels at screen center
+(prior disconnected proof `.tmp/status_line_final.png` had 1,303).
