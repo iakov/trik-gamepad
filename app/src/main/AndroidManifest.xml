@@ -10,6 +10,7 @@
   <!--  <uses-permission android:name="android.permission.VIBRATE" /> -->
 
     <application
+        android:name=".App"
         android:icon="@mipmap/trik_gamepad_logo_512x512"
         android:label="@string/appLabel"
         android:theme="@style/AppTheme"

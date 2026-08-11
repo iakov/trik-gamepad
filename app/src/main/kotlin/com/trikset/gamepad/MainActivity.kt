@@ -1,5 +1,7 @@
 package com.trikset.gamepad
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -18,12 +20,17 @@ import android.view.animation.AlphaAnimation
 import android.widget.Button
 import android.widget.Toast
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.preference.PreferenceManager
+import com.trikset.gamepad.diagnostics.AppLog
+import com.trikset.gamepad.diagnostics.CrashLogStore
+import com.trikset.gamepad.diagnostics.DiagnosticsReport
+import com.trikset.gamepad.diagnostics.ReportSharer
 import com.trikset.gamepad.mjpeg.MjpegView
 import java.net.URL
 import kotlinx.coroutines.launch
@@ -176,6 +183,54 @@ class MainActivity :
         }
       }
     }
+
+    maybeShowCrashReportDialog()
+  }
+
+  /**
+   * Surfaces a captured crash exactly once: offers to share the report via the text-editor flow (or
+   * the direct share sheet when "Share without editing" is set), copy it, or dismiss. The report
+   * carries the live connection state and current log tail next to the crash trace.
+   */
+  private fun maybeShowCrashReportDialog() {
+    val store = CrashLogStore(this)
+    if (!store.shouldPrompt()) {
+      return
+    }
+    store.markPrompted()
+    val crash = store.latest() ?: return
+    val shareWithoutEditing =
+        PreferenceManager.getDefaultSharedPreferences(this)
+            .getBoolean(SettingsFragment.SK_SHARE_WITHOUT_EDITING, false)
+    val reportText = buildCrashReport(store, crash.stackTrace)
+    AlertDialog.Builder(this)
+        .setTitle(R.string.crash_dialog_title)
+        .setMessage(R.string.crash_dialog_message)
+        .setPositiveButton(
+            if (shareWithoutEditing) R.string.share else R.string.review_and_share
+        ) { _, _ ->
+          ReportSharer.share(this, reportText)
+        }
+        .setNeutralButton(R.string.copy) { _, _ -> copyReport(reportText) }
+        .setNegativeButton(R.string.dismiss, null)
+        .show()
+  }
+
+  private fun buildCrashReport(store: CrashLogStore, crashTrace: String): String {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(this)
+    return DiagnosticsReport.build(
+        this,
+        prefs,
+        senderViewModel.connectionState.value,
+        AppLog.tail(AppLog.BUFFER_CAPACITY),
+        crashTrace,
+    )
+  }
+
+  private fun copyReport(reportText: String) {
+    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.report_subject), reportText))
+    Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
   }
 
   override fun onCreateOptionsMenu(menu: Menu): Boolean {
