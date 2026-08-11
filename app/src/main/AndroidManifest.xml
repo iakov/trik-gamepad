@@ -7,6 +7,17 @@
     <uses-feature android:name="android.hardware.sensor.accelerometer" android:required="false" />
     <uses-feature android:name="android.hardware.gamepad" android:required="false" />
 
+    <!-- Package visibility: ReportSharer probes for text editors handling the
+         report file (ACTION_EDIT + text/plain) to decide between the
+         review-in-editor flow and the direct share sheet. Without this the
+         query returns empty on API 30+ and the editor flow silently dies. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.EDIT" />
+            <data android:mimeType="text/plain" />
+        </intent>
+    </queries>
+
   <!--  <uses-permission android:name="android.permission.VIBRATE" /> -->
 
     <application
