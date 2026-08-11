@@ -349,9 +349,7 @@ class SettingsActivityTest : RobolectricTestBase() {
 
   @Test
   fun deletePresetWithExistingPresetsShouldShowDialogAndDeleteOnItemTap() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
-    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
-    prefs.edit().putString(SettingsFragment.SK_HOST_PORT, "4444").commit()
+    seedHostAndPort()
     val save = fragment.findPreference<EditTextPreference>(SettingsFragment.SK_SAVE_PRESET)!!
     save.onPreferenceChangeListener!!.onPreferenceChange(save, "workshop")
 
@@ -366,7 +364,7 @@ class SettingsActivityTest : RobolectricTestBase() {
 
     assertTrue(
         "the preset must be deleted after tapping its row in the dialog",
-        RobotPresetStore(prefs).all().isEmpty(),
+        RobotPresetStore(PreferenceManager.getDefaultSharedPreferences(activity)).all().isEmpty(),
     )
   }
 
@@ -386,6 +384,13 @@ class SettingsActivityTest : RobolectricTestBase() {
         "row summary must reflect the saved glyph",
         symbols.summary.toString().startsWith("Z"),
     )
+  }
+
+  /** Seeds the robot host/port prefs used by the preset save/delete tests. */
+  private fun seedHostAndPort(host: String = "10.0.0.9", port: String = "4444") {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, host).commit()
+    prefs.edit().putString(SettingsFragment.SK_HOST_PORT, port).commit()
   }
 
   /** Walks the dialog's window tree for views matching [predicate] (appcompat dialog internals). */
