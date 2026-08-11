@@ -24,10 +24,9 @@ section keeps dated retrospectives, execution records, and reference quirks).
   All gradle commands run from the repo root.
 - `_apk/` holds committed release APKs with versioned names
   (`TRIKGamepad-1.40-21.apk`).
-- The `app/` source tree is **pure Kotlin** (26 main + 29 unit-test + 6
-  androidTest `.kt`, 0 `.java`). The Kotlin migration landed in 2026-08-07
-  (see the session retrospective in "Design decisions & retrospectives"); the 0-`.java`
-  state is what retired checkstyle/pmd.
+- The `app/` source tree is **pure Kotlin** (0 `.java`). The Kotlin migration
+  landed in 2026-08-07 (see the session retrospective in "Design decisions &
+  retrospectives"); the 0-`.java` state is what retired checkstyle/pmd.
 - `xamarin/` was an unfinished F# port — **deleted** during the revival
   restructure (git history preserves it). `imgs/` moved to `docs/img/`.
 
@@ -44,9 +43,11 @@ keystore is present, so release builds sign normally. Key alias is `gamepad`.
 ### Versioning
 
 `appMajorVersion`/`appMinorVersion` are hand-set at the top of `app/build.gradle`
-(currently 1.41; the 1.41 bump landed with the SDK 36 toolchain upgrade).
+(never restated here — versions drift and are discoverable from that file;
+AGENTS.md "Build" is the pointer).
 `versionCode = minSdk*10000 + abiCode*1000 + major*100 + minor`
-(never set by hand), `versionName = "1.41"`, `versionNameSuffix = "-API23"`.
+(never set by hand), `versionName = "<major>.<minor>"`,
+`versionNameSuffix = "-API<minSdk>"`.
 Bump `appMinorVersion` per release; semantic 1.x is kept intentionally
 (Play Store requires a strictly increasing versionCode per app — date-based
 versions risk collisions with the `minSdk*10000 + ...` formula).
@@ -57,10 +58,10 @@ versions risk collisions with the `minSdk*10000 + ...` formula).
   Android SDK via `sdk.dir=<path>`; on Windows the drive-letter colon MUST be
   escaped (e.g. `C\:/Users/<user>/Android/Sdk` style) or lint's
   `PropertyEscape` check fails the build (POSIX paths need no escaping).
-- JDK 21 (Microsoft OpenJDK) works with Gradle 9.5.0 + AGP 9.3.1 (current
-  toolchain, locked in `DECISIONS.md` "AGP 9.3.1 / Gradle 9.5.0 migration
-  LANDED"; migrated from Gradle 8.14.5 + AGP 8.13.2
-  2026-08-08).
+- JDK 21 is required (Robolectric needs it for SDK 36; it is also the CI JDK).
+  The concrete Gradle/AGP pair is NOT restated here — toolchain versions drift
+  and live in the Gradle wrapper + `gradle/libs.versions.toml`; the migration
+  rationale is in `DECISIONS.md` "AGP 9.3.1 / Gradle 9.5.0 migration LANDED".
 - Local emulator acceleration (Windows): AEHD (Android Emulator Hypervisor
   Driver 2.2) is installed; verify with `emulator -accel-check`. Installer
   lives in the SDK:
@@ -1970,6 +1971,12 @@ eportIssue-click listener line stays uncovered (no hacky test).
 
 - **jscpd min-tokens 50 caught 5-line test helpers** (dialog-view walk, prefs seeding): extracted
   shared private helpers in SettingsActivityTest.
+- **`HapticFeedbackConstants.CLICK` is not resolvable in the compile-SDK stub** (unresolved
+  reference): use `KEYBOARD_TAP` for the light-tap tick on magic buttons.
+- **Suspected latent crash: a legacy `String` seekbar value (from the pre-C9 `EditTextPreference`
+  era) makes `SeekBarPreference` throw `ClassCastException` on load** (prefs.getInt on a String;
+  observed in Robolectric, device-unconfirmed). `MainActivitySettingsController.readInt` still
+  honors String defensively; a future migration pass should coerce/re-write such values to Int.
 
 **Retrospective analysis (good / bad / solutions):**
 

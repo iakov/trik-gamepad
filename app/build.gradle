@@ -94,8 +94,10 @@ android {
         targetCompatibility JavaVersion.VERSION_11
     }
     lint {
-        // MissingTranslation is downgraded in lint.xml by convention (English-only
-        // resources); everything else fails the build.
+        // MissingTranslation is downgraded in lint.xml; key + format-specifier
+        // parity across the shipped locales is enforced by
+        // scripts/check_translations.py --sync (gate.py + CI). Everything else
+        // fails the build.
         abortOnError = true
         // Report warnings too (checkAllWarnings) and ratchet via a baseline:
         // the current warnings (pinned dep versions, AsyncTask leak patterns to

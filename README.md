@@ -9,6 +9,9 @@ You can get it [here](https://play.google.com/store/apps/details?id=com.trikset.
 
 ## For users
 
+Available in English, Russian, French, German and Vietnamese (follows the
+system language).
+
 On large-screen Android 16 devices (tablets, foldables, and desktop windows —
 screens with the smaller side at least 600 dp), Android ignores the app's
 landscape lock, so the gamepad can appear rotated or stretched. To keep the
@@ -20,6 +23,8 @@ system's aspect-ratio settings, or lock your device's rotation to landscape.
 New session or contributor? Start here:
 
 - `AGENTS.md` — rules, guardrails, and commands for AI agents and contributors.
+- `DESIGN.md` — UX/accessibility conventions (named sections; the AGENTS memory
+  index points into them).
 - `MEMORY.md` — project facts, architecture details, CI quirks, and
   retrospectives (pull on demand; `AGENTS.md` points to its sections).
 - `DECISIONS.md` — the decision log (problem → alternatives → why → out-of-scope

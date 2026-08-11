@@ -407,3 +407,7 @@ A0 baseline (2026-08-09; `main` sources excluded) — the fixed trend anchor:
   `Thread.sleep`.
 - `MainActivity` forces landscape + immersive; instrumented tests run against
   that configuration only.
+- The aosp API-36 emulator images cannot switch the UI language: `cmd locale set-system-locale` and `cmd app locale` are missing, and `settings put system system_locales` does not propagate to activities without a reboot — so
+  a locale-rendering screenshot is not capturable there. Locale parity is
+  covered by `scripts/check_translations.py --sync` + the one-off
+  `--back-translate` review instead.

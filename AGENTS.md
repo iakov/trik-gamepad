@@ -85,7 +85,9 @@ configurations, update this section and the referenced config files.
 
 ### On session init
 
-- Read this file, `MEMORY.md` header + section list, `DECISIONS.md` index, `TESTING.md`, `app/build.gradle`, and `.github/workflows/ci.yml`; pull MEMORY/DECISIONS sections on demand.
+- Read this file, `MEMORY.md` header + section list, `DECISIONS.md` index,
+  `DESIGN.md` section index, `TESTING.md`, `app/build.gradle`, and
+  `.github/workflows/ci.yml`; pull MEMORY/DECISIONS/DESIGN sections on demand.
 - Don't talk to the user before session warm-up is complete.
 
 ### Before commit
@@ -194,6 +196,7 @@ configurations, update this section and the referenced config files.
 - **Merge, don't delete**: when replacing a section, merge old content into the new rather than deleting outright; confirm each deletion is intentional. On docs-drift review, read `AGENTS.md` top-to-bottom and push detail/rationale down to `MEMORY.md`/`DECISIONS.md` — `AGENTS.md` = pointers, the rest = on-demand detail; keep context small and focused.
 - **Session context is ephemeral**: persist decisions to `AGENTS.md`/`DECISIONS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
 - **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
+- **Docs store experience, not state**: keep only what saves future time and cannot be rediscovered faster than a doc can drift — counts, versions, thresholds, and hashes must be OUT of docs (glob/wrapper/`libs.versions.toml`/build scripts reveal them in seconds). Dated records stay as history; never restate live state. Docs help, not burden: a line that would not save a future step is cut.
 - **Code comments are first-level documentation**: re-validate comments when the surrounding code changes — a comment that describes a no-longer-true constraint or gives misleading advice is garbage (hit 2026-08-10: the NSC whitelist comment and the `main`-child-order comment both went stale within the same campaign). No stale or misleading comments; when in doubt, delete the comment rather than leave a wrong one.
 - **Machine-local workarounds never enter repo docs**: host-specific repo mirrors, init scripts, URLs and other local-host hacks live on the host in their corresponding places (e.g. the Gradle user-home), or in a gitignored `.tooling.md` if no other place exists — repo docs must not reference them.
 - **Verify toolchain/dependency-manager names against executable sources** (build files, lockfiles) before writing them into any doc.
@@ -218,9 +221,11 @@ configurations, update this section and the referenced config files.
 ./gradlew test                               # Robolectric unit tests, all 3 build types (no device)
 ./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.<method>"   # single test
 ./gradlew connectedDebugAndroidTest          # needs emulator/device; add --no-configuration-cache (prereqs + flags: TESTING.md)
-uv run python scripts/gate.py                # THE canonical quality gate — steps + tooling live in
-                                             # scripts/gate.py (CI mirror: ci.yml; jscpd config: .jscpd.json).
-                                             # Never re-run its steps by hand.
+  uv run python scripts/gate.py                # THE canonical quality gate — steps + tooling live in
+                                               # scripts/gate.py (CI mirror: ci.yml; jscpd config: .jscpd.json).
+                                               # Never re-run its steps by hand.
+  uv run python scripts/check_translations.py --sync              # translation key/format parity (also runs inside gate.py/CI)
+  uv run python scripts/check_translations.py --back-translate    # one-off semantic review via MyMemory (not a gate)
 ```
 
 Dev tooling (uv): `uv sync` (re)creates `.venv` from `pyproject.toml` +

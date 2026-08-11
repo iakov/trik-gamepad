@@ -62,6 +62,11 @@ jobs:
       - name: Test duplication gate (jscpd)
         run: npx -y jscpd app/src/test app/src/androidTest --config .jscpd.json --reporters console
 
+      # Translation sync guard (mirror of gate.py; Android lint has no
+      # key/format-specifier parity check).
+      - name: Translation sync guard
+        run: python3 scripts/check_translations.py --sync
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7

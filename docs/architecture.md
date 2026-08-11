@@ -233,8 +233,10 @@ immersive-mode confirmation overlay; the app runs edge-to-edge landscape.
   a `HideRunnable` re-hides them after 3 s. Required for targetSdk 36
   (edge-to-edge).
 - Haptics on pads/buttons via `HapticFeedbackConstants`.
-- Resources are English-only; `MissingTranslation` is a lint warning, not an
-  error.
+- Resources ship 5 locales (`en`/`ru`/`fr`/`de`/`vi`); translation key +
+  format-specifier parity is enforced by `scripts/check_translations.py --sync`
+  (gate.py + CI), so `MissingTranslation` stays a lint warning — see
+  `DESIGN.md "Localization"`.
 
 ## Domain knowledge & best-practice reference
 
