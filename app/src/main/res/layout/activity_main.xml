@@ -19,7 +19,7 @@
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
         android:text="@string/video_placeholder"
-        android:textColor="@android:color/darker_gray"
+        android:textColor="@color/video_placeholder_text"
         android:textSize="18sp"
         android:visibility="gone" />
 
@@ -99,6 +99,7 @@
         android:layout_height="@dimen/video_loading_size"
         android:layout_centerInParent="true"
         android:background="@drawable/video_loading_background"
+        android:importantForAccessibility="no"
         android:padding="14dp"
         android:visibility="gone" />
 
@@ -106,7 +107,10 @@
          connected (ConnectionFeedback.setStatusText). Centered, drawn over the
          video-loading spinner center; kept AFTER videoLoading in the child list so
          the pill renders on top (both are brought-to-front together with the
-         controls overlay — see above). -->
+         controls overlay; see above). minHeight 48dp = the tap-to-connect touch
+         target; textIsSelectable is OFF and there is no contentDescription so
+         TalkBack reads the live state text (the app announces state changes via
+         announceForAccessibility). -->
     <TextView
         android:id="@+id/connectionStatus"
         android:layout_width="wrap_content"
@@ -114,15 +118,14 @@
         android:layout_centerInParent="true"
         android:background="@drawable/connection_status_background"
         android:clickable="true"
-        android:contentDescription="@string/connection_status_description"
         android:focusable="true"
         android:maxLines="1"
+        android:minHeight="@dimen/touch_target_min"
         android:paddingStart="10dp"
         android:paddingEnd="10dp"
         android:paddingTop="6dp"
         android:paddingBottom="6dp"
         android:textColor="@color/status_orange"
-        android:textIsSelectable="true"
         android:textSize="@dimen/connection_status_text_size"
         android:textStyle="bold"
         android:visibility="gone" />

@@ -26,6 +26,7 @@ class ConnectionFeedback(
     private val connectAction: () -> Unit,
 ) {
   private val indicator = ConnectionIndicator()
+  private val announcer = ConnectionAnnouncer(context, targetConfiguredProvider)
 
   /** Wires the tap-to-connect action onto the status line; call once after the views exist. */
   fun attach() {
@@ -35,6 +36,18 @@ class ConnectionFeedback(
   fun update(state: ConnectionState) {
     paintGearBorder(state)
     setStatusText(state)
+    announceState(state)
+  }
+
+  /**
+   * Announces connection-state changes for screen-reader users (the state is otherwise color-only).
+   */
+  private fun announceState(state: ConnectionState) {
+    val announcement = announcer.nextAnnouncement(state) ?: return
+    // announceForAccessibility (deprecated since API 33 in favor of live regions) is the simplest
+    // cross-version "speak this now" API: a no-op without an accessibility service and works on
+    // minSdk 23; a live region on the pill cannot announce "Connected" because the pill hides.
+    @Suppress("DEPRECATION") statusTextProvider()?.announceForAccessibility(announcement)
   }
 
   private fun paintGearBorder(state: ConnectionState) {
@@ -46,7 +59,17 @@ class ConnectionFeedback(
     val stroke = context.resources.getDimensionPixelSize(R.dimen.settings_button_stroke)
     shape.setStroke(stroke, color)
     btn.invalidate()
+    // The gear is the persistent status indicator; its description carries the state so a
+    // screen-reader user who focuses it hears Connecting/Connected/Disconnected.
+    btn.contentDescription = context.getString(stateDescriptionResource(state))
   }
+
+  private fun stateDescriptionResource(state: ConnectionState): Int =
+      when (state) {
+        is ConnectionState.Connected -> R.string.settings_button_description_connected
+        is ConnectionState.Connecting -> R.string.settings_button_description_connecting
+        is ConnectionState.Disconnected -> R.string.settings_button_description_disconnected
+      }
 
   private fun setStatusText(state: ConnectionState) {
     val status = statusTextProvider() ?: return

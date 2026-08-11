@@ -65,6 +65,29 @@ class MagicButtonPanelTest : RobolectricTestBase() {
   }
 
   @Test
+  fun populateShouldSet48dpTouchTargets() {
+    val container = FrameLayout(context)
+    panel.populate(container, 3, symbols)
+    val expected = context.resources.getDimensionPixelSize(R.dimen.touch_target_min)
+    for (i in 0 until container.childCount) {
+      val btn = container.getChildAt(i) as Button
+      assertEquals("minWidth must be >= 48dp", expected, btn.minimumWidth)
+      assertEquals("minHeight must be >= 48dp", expected, btn.minimumHeight)
+    }
+  }
+
+  @Test
+  fun populateShouldSetContrastSafeTextColor() {
+    val container = FrameLayout(context)
+    panel.populate(container, 1, symbols)
+    val btn = container.getChildAt(0) as Button
+    assertEquals(
+        androidx.core.content.ContextCompat.getColor(context, R.color.magic_button_text),
+        btn.currentTextColor,
+    )
+  }
+
+  @Test
   fun clickShouldSendBtnDownCommand() {
     val container = FrameLayout(context)
     panel.populate(container, 3, symbols)

@@ -3,4 +3,5 @@
     <dimen name="settings_button_stroke">3dp</dimen>
     <dimen name="connection_status_text_size">20sp</dimen>
     <dimen name="video_loading_size">120dp</dimen>
+    <dimen name="touch_target_min">48dp</dimen>
 </resources>

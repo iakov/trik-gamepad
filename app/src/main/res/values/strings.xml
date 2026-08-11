@@ -16,7 +16,6 @@
     <string name="connection_status_connecting">Connecting…</string>
     <string name="connection_status_disconnected">Tap to connect…</string>
     <string name="video_stream_unavailable">Video stream unavailable</string>
-    <string name="connection_status_description">Connection status; tap to connect</string>
     <string name="preset_name_required">Preset name cannot be empty</string>
     <string name="preset_saved">Preset “%1$s” saved</string>
     <string name="preset_deleted">Preset “%1$s” deleted</string>
@@ -128,6 +127,13 @@
     <!-- Accessibility: magic-button description carries the glyph so screen-reader users can
          map glyph to meaning. -->
     <string name="button_number_description">Button %1$s · %2$s</string>
+
+    <!-- Connection-state announcements (screen-reader users: connection is not color-only).
+         The gear's description carries the state so a TalkBack user who lands on it hears it. -->
+    <string name="connection_status_connected">Connected</string>
+    <string name="settings_button_description_connected">Connected. Toggle system bars</string>
+    <string name="settings_button_description_connecting">Connecting. Toggle system bars</string>
+    <string name="settings_button_description_disconnected">Disconnected. Toggle system bars</string>
 
     <!-- Connection / input validation notices (previously hardcoded literals). -->
     <string name="port_number_incorrect">Port number %1$s is incorrect.</string>

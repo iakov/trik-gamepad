@@ -1,5 +1,6 @@
 package com.trikset.gamepad
 
+import android.content.Context
 import android.view.View
 import android.widget.Button
 import android.widget.TextView
@@ -86,6 +87,46 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
     feedback.update(ConnectionState.Connecting)
     assertEquals(app.getColor(R.color.amber), borderStrokeColor(activity))
   }
+
+  @Test
+  fun updateShouldMakeGearDescriptionStateAware() {
+    val btn = Button(context)
+    btn.setBackgroundResource(R.drawable.btn_settings)
+    val status = TextView(context)
+    val feedback = feedbackWith(btn, status)
+
+    feedback.update(ConnectionState.Connecting)
+    assertEquals("Connecting. Toggle system bars", btn.contentDescription.toString())
+    feedback.update(ConnectionState.Connected)
+    assertEquals("Connected. Toggle system bars", btn.contentDescription.toString())
+    feedback.update(ConnectionState.Disconnected("x"))
+    assertEquals("Disconnected. Toggle system bars", btn.contentDescription.toString())
+  }
+
+  @Test
+  fun updateShouldNotAnnounceWhenAccessibilityDisabled() {
+    val btn = Button(context)
+    btn.setBackgroundResource(R.drawable.btn_settings)
+    val status = TextView(context)
+    val feedback = feedbackWith(btn, status)
+
+    feedback.update(ConnectionState.Connecting)
+    // announceForAccessibility is a no-op when no accessibility service is running; the
+    // announcement decision itself is covered by ConnectionAnnouncerTest.
+    assertEquals(null, lastAnnouncement())
+  }
+
+  private fun announcementEvents(): List<android.view.accessibility.AccessibilityEvent> {
+    val manager =
+        context.getSystemService(Context.ACCESSIBILITY_SERVICE)
+            as android.view.accessibility.AccessibilityManager
+    return org.robolectric.Shadows.shadowOf(manager).sentAccessibilityEvents.filter {
+      it.eventType == android.view.accessibility.AccessibilityEvent.TYPE_ANNOUNCEMENT
+    }
+  }
+
+  private fun lastAnnouncement(): CharSequence? =
+      announcementEvents().lastOrNull()?.text?.lastOrNull()
 
   @Test
   fun updateShouldRenderConnectionStatusText() {

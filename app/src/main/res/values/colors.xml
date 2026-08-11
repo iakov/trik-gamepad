@@ -5,4 +5,11 @@
     <color name="amber">#FFC107</color>
     <color name="red">#E53935</color>
     <color name="status_orange">#FF9800</color>
+    <color name="magic_button_text">#FFFFFF</color>
+    <!-- Magic-button default fill (the platform darker_gray value, owned here so the WCAG test and
+         the drawable always agree; text on it >= 4.5:1). -->
+    <color name="magic_button_fill_default">#555555</color>
+    <!-- Light gray hint over the black video area: contrast >= 4.5:1 (verified by WcagContrastTest;
+         android:color/darker_gray #555 on black was ~2.8:1 and failed AA). -->
+    <color name="video_placeholder_text">#BDBDBD</color>
 </resources>
