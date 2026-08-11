@@ -15,7 +15,10 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad.diagnostics.AppLog
+import com.trikset.gamepad.diagnostics.CrashLogStore
 import com.trikset.gamepad.diagnostics.DiagLevel
+import com.trikset.gamepad.diagnostics.DiagnosticsReport
+import com.trikset.gamepad.diagnostics.ReportSharer
 import java.util.Locale
 
 class SettingsFragment : PreferenceFragmentCompat() {
@@ -48,6 +51,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val MAX_MAGIC_BUTTONS = 5
     private const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
     private const val DEFAULT_HOST_PORT = "4444"
+    private const val LOG_DIALOG_MAX_LINES = 200
 
     fun magicSymbolKey(buttonNumber: Int): String = "magicSymbol$buttonNumber"
   }
@@ -109,10 +113,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
         )
     val aboutSystem = requireNotNull(findPreference<Preference>(SK_ABOUT_SYSTEM))
     aboutSystem.summary = getString(R.string.tap_to_copy) + ":" + systemInfo
-    // Copying system info to the clipboard on click
+    // Copying the full diagnostic report to the clipboard on click (the summary
+    // above stays the short hardware spec preview).
     aboutSystem.onPreferenceClickListener = Preference.OnPreferenceClickListener {
       val clipboard = myActivity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-      val clip = ClipData.newPlainText(getString(R.string.about_system), systemInfo)
+      val clip = ClipData.newPlainText(getString(R.string.about_system), buildDiagnosticsReport())
       clipboard.setPrimaryClip(clip)
 
       Toast.makeText(
@@ -124,6 +129,67 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
       true
     }
+  }
+
+  /**
+   * "Report an issue": opens the report file in a text editor for review (or a share sheet when
+   * "Share without editing" is set / no editor exists).
+   */
+  private fun initializeReportIssueField() {
+    val myActivity = activity ?: return
+    val report = findPreference<Preference>(SK_REPORT_ISSUE) ?: return
+    report.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+      ReportSharer.share(myActivity, buildDiagnosticsReport())
+      true
+    }
+  }
+
+  /** "Copy report": clipboard copy of the full report text. */
+  private fun initializeCopyReportField() {
+    val myActivity = activity ?: return
+    val copy = findPreference<Preference>(SK_COPY_REPORT) ?: return
+    copy.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+      val clipboard = myActivity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+      clipboard.setPrimaryClip(
+          ClipData.newPlainText(getString(R.string.copy_report), buildDiagnosticsReport())
+      )
+      Toast.makeText(
+              myActivity.applicationContext,
+              getString(R.string.copied_to_clipboard),
+              Toast.LENGTH_SHORT,
+          )
+          .show()
+      true
+    }
+  }
+
+  /** "View log": in-app read-only dialog with the recent AppLog tail for self-diagnosis. */
+  private fun initializeViewLogField() {
+    val myActivity = activity ?: return
+    val viewLog = findPreference<Preference>(SK_VIEW_LOG) ?: return
+    viewLog.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+      val lines = AppLog.tail(LOG_DIALOG_MAX_LINES)
+      val message =
+          if (lines.isEmpty()) getString(R.string.view_log_empty) else lines.joinToString("\n")
+      androidx.appcompat.app.AlertDialog.Builder(myActivity)
+          .setTitle(R.string.view_log_title)
+          .setMessage(message)
+          .setPositiveButton(R.string.dismiss, null)
+          .show()
+      true
+    }
+  }
+
+  private fun buildDiagnosticsReport(): String {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
+    val crash = CrashLogStore(requireContext()).latest()
+    return DiagnosticsReport.build(
+        requireContext(),
+        prefs,
+        null,
+        AppLog.tail(AppLog.BUFFER_CAPACITY),
+        crash?.stackTrace,
+    )
   }
 
   private fun initializeDynamicPreferenceSummary() {
@@ -259,5 +325,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
     initializeCopyRobotIpField()
     initializeRobotPresets()
     initializeDiagnosticsLevelField()
+    initializeReportIssueField()
+    initializeCopyReportField()
+    initializeViewLogField()
   }
 }

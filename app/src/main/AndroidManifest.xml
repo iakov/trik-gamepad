@@ -17,6 +17,19 @@
         tools:targetApi="n">
        <!--  <service android:name=".SenderService" />  -->
 
+       <!-- Shares the diagnostic report file with other apps (text editor for
+            review, or mail/IM for the final report); exported=false and limited
+            to cacheDir/diagnostics via res/xml/file_paths.xml. -->
+       <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
        <activity
             android:name="com.trikset.gamepad.MainActivity"
             android:exported="true">
