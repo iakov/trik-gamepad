@@ -225,15 +225,18 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
 
     // SeekBars: "<current value> · <description>" (every value-bearing setting shows its value).
+    // The fallback is each preference's XML default so a fresh install shows the real value,
+    // not a fabricated 0.
     val seekBarFormats =
         mapOf(
-            SK_WHEEL_STEP to R.string.pref_wheel_sens_summary,
-            SK_SHOW_PADS to R.string.pref_show_pads_summary,
-            SK_MAGIC_BUTTON_COUNT to R.string.pref_magic_count_summary,
+            SK_WHEEL_STEP to (R.string.pref_wheel_sens_summary to 7),
+            SK_SHOW_PADS to (R.string.pref_show_pads_summary to 100),
+            SK_MAGIC_BUTTON_COUNT to (R.string.pref_magic_count_summary to 3),
         )
-    for ((preferenceKey, formatRes) in seekBarFormats) {
+    for ((preferenceKey, pair) in seekBarFormats) {
       val preference = findPreference<Preference>(preferenceKey) ?: continue
-      preference.summary = getString(formatRes, readSeekBarValue(prefs, preferenceKey))
+      val (formatRes, default) = pair
+      preference.summary = getString(formatRes, readSeekBarValue(prefs, preferenceKey, default))
       preference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
         pref.summary = getString(formatRes, value)
         true
@@ -241,12 +244,14 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
   }
 
-  /** Reads a SeekBarPreference value (Int storage, honoring legacy String values). */
-  private fun readSeekBarValue(prefs: SharedPreferences, key: String): Int =
+  /**
+   * Reads a SeekBarPreference value (Int storage, honoring legacy String values), else [default].
+   */
+  internal fun readSeekBarValue(prefs: SharedPreferences, key: String, default: Int): Int =
       when (val value = prefs.all[key]) {
         is Int -> value
-        is String -> value.toIntOrNull() ?: 0
-        else -> 0
+        is String -> value.toIntOrNull() ?: default
+        else -> default
       }
 
   /** "Button symbols…": dialog to edit the 5 glyphs; summary = the resolved glyphs joined. */

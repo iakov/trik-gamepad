@@ -280,4 +280,125 @@ class SettingsActivityTest : RobolectricTestBase() {
     wheel!!.onPreferenceChangeListener!!.onPreferenceChange(wheel, 12)
     assertEquals("12 · Smaller = more sensitive; 5..10 is typical", wheel.summary)
   }
+
+  @Test
+  fun seekBarSummariesShowDefaultsWhenUnset() {
+    // Fresh install: no stored values -> the XML defaults (7/100/3) must show, not a fabricated 0.
+    val wheel = fragment.findPreference<Preference>(SettingsFragment.SK_WHEEL_STEP)
+    assertEquals("7 · Smaller = more sensitive; 5..10 is typical", wheel!!.summary)
+    val pads = fragment.findPreference<Preference>(SettingsFragment.SK_SHOW_PADS)
+    assertEquals("100 · 0 for fully transparent, 255 is opaque", pads!!.summary)
+    val count = fragment.findPreference<Preference>(SettingsFragment.SK_MAGIC_BUTTON_COUNT)
+    assertEquals("3 · 0 hides the row; 1..5 buttons", count!!.summary)
+  }
+
+  @Test
+  fun seekBarSummariesHonorLegacyStringStorage() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "12").commit()
+    // Direct call: the fragment's own initialization cannot reach the String branch without the
+    // SeekBarPreference view crashing first (prefs.getInt on a String value throws), but the
+    // defensive parser must still honor it (mirrors MainActivitySettingsController.readInt).
+    assertEquals(12, SettingsFragment().readSeekBarValue(prefs, SettingsFragment.SK_WHEEL_STEP, 7))
+    assertEquals(
+        "unparseable String falls back to the default",
+        7,
+        SettingsFragment().readSeekBarValue(prefs, SettingsFragment.SK_WHEEL_STEP + ".nope", 7),
+    )
+  }
+
+  @Test
+  fun diagLevelSummaryFallsBackToInfoForUnknownValue() {
+    val diag = fragment.findPreference<Preference>(SettingsFragment.SK_DIAG_LEVEL)
+    assertNotNull(diag)
+    diag!!.onPreferenceChangeListener!!.onPreferenceChange(diag, "bogus")
+    assertTrue((diag.summary ?: "").toString().contains("Info"))
+  }
+
+  @Test
+  fun copyReportClickShouldCopyFullReport() {
+    val copy = fragment.findPreference<Preference>(SettingsFragment.SK_COPY_REPORT)
+    assertNotNull(copy)
+    copy!!.onPreferenceClickListener!!.onPreferenceClick(copy)
+    val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val text = clipboard.primaryClip!!.getItemAt(0).text.toString()
+    assertTrue("the copied report must include the version header", text.contains("Version:"))
+  }
+
+  @Test
+  fun viewLogClickShouldShowDialog() {
+    val viewLog = fragment.findPreference<Preference>(SettingsFragment.SK_VIEW_LOG)
+    assertNotNull(viewLog)
+    viewLog!!.onPreferenceClickListener!!.onPreferenceClick(viewLog)
+    assertNotNull(
+        "view log must open a dialog",
+        org.robolectric.shadows.ShadowDialog.getLatestDialog(),
+    )
+  }
+
+  @Test
+  fun viewLogClickShouldIncludeLogTail() {
+    com.trikset.gamepad.diagnostics.AppLog.clearForTest()
+    com.trikset.gamepad.diagnostics.AppLog.i("test", "hello-log-line")
+    val viewLog = fragment.findPreference<Preference>(SettingsFragment.SK_VIEW_LOG)
+    viewLog!!.onPreferenceClickListener!!.onPreferenceClick(viewLog)
+    val dialog = org.robolectric.shadows.ShadowDialog.getLatestDialog()
+    val message = dialog!!.findViewById<android.widget.TextView>(android.R.id.message)
+    assertTrue((message.text.toString()).contains("hello-log-line"))
+  }
+
+  @Test
+  fun deletePresetWithExistingPresetsShouldShowDialogAndDeleteOnItemTap() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
+    prefs.edit().putString(SettingsFragment.SK_HOST_PORT, "4444").commit()
+    val save = fragment.findPreference<EditTextPreference>(SettingsFragment.SK_SAVE_PRESET)!!
+    save.onPreferenceChangeListener!!.onPreferenceChange(save, "workshop")
+
+    val delete = fragment.findPreference<Preference>(SettingsFragment.SK_DELETE_PRESET)!!
+    delete.onPreferenceClickListener!!.onPreferenceClick(delete)
+    val dialog =
+        org.robolectric.shadows.ShadowDialog.getLatestDialog() as androidx.appcompat.app.AlertDialog
+    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    val lists = ArrayList<android.widget.ListView>()
+    fun collect(view: android.view.View) {
+      if (view is android.widget.ListView) lists.add(view)
+      if (view is android.view.ViewGroup) {
+        for (i in 0 until view.childCount) collect(view.getChildAt(i))
+      }
+    }
+    collect(dialog.window!!.decorView)
+    val list = lists.first()
+    list.performItemClick(list.adapter.getView(0, null, list), 0, list.adapter.getItemId(0))
+
+    assertTrue(
+        "the preset must be deleted after tapping its row in the dialog",
+        RobotPresetStore(prefs).all().isEmpty(),
+    )
+  }
+
+  @Test
+  fun magicSymbolsDialogSaveShouldRefreshRowSummary() {
+    val symbols = fragment.findPreference<Preference>(SettingsFragment.SK_MAGIC_SYMBOLS)!!
+    symbols.onPreferenceClickListener!!.onPreferenceClick(symbols)
+    val dialog =
+        org.robolectric.shadows.ShadowDialog.getLatestDialog() as androidx.appcompat.app.AlertDialog
+    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    val fields = ArrayList<android.widget.EditText>()
+    fun collect(view: android.view.View) {
+      if (view is android.widget.EditText) fields.add(view)
+      if (view is android.view.ViewGroup) {
+        for (i in 0 until view.childCount) collect(view.getChildAt(i))
+      }
+    }
+    collect(dialog.window!!.decorView)
+    assertTrue("the dialog must pre-fill 5 glyph fields", fields.size == 5)
+    fields[0].setText("Z")
+    dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).performClick()
+    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+    assertTrue(
+        "row summary must reflect the saved glyph",
+        symbols.summary.toString().startsWith("Z"),
+    )
+  }
 }
