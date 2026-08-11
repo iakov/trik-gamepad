@@ -197,7 +197,17 @@ configurations, update this section and the referenced config files.
 - **Code comments are first-level documentation**: re-validate comments when the surrounding code changes — a comment that describes a no-longer-true constraint or gives misleading advice is garbage (hit 2026-08-10: the NSC whitelist comment and the `main`-child-order comment both went stale within the same campaign). No stale or misleading comments; when in doubt, delete the comment rather than leave a wrong one.
 - **Machine-local workarounds never enter repo docs**: host-specific repo mirrors, init scripts, URLs and other local-host hacks live on the host in their corresponding places (e.g. the Gradle user-home), or in a gitignored `.tooling.md` if no other place exists — repo docs must not reference them.
 - **Verify toolchain/dependency-manager names against executable sources** (build files, lockfiles) before writing them into any doc.
-- **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`, pref/measure helpers, data-driven tables) instead of copy-pasting. **Dedup drives the token number, not table-ization**; a table row's expected value must not depend on an earlier row's state (reset the fixture per row). Rationale + details: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric" + TESTING.md "Test quality discipline".
+- **Tests are code**: re-use similar test support (shared `TestTcpServer`, `RobolectricTestBase`,
+  pref/measure helpers, data-driven tables) instead of copy-pasting. **Dedup drives the token number, not
+  table-ization**; a table row's expected value must not depend on an earlier row's state (reset the fixture per row).
+  Rationale + details: `DECISIONS.md` "[2026-08-09] Test logical SLOC metric" + TESTING.md "Test quality discipline".
+- **Exact-text UI matchers break silently on rewording**: before changing any user-visible string
+  (titles, values, contentDescriptions), grep `androidTest` for `withText`/`withContentDescription`
+  exact matchers and update them in the **same commit** (hit twice in C15: the ellipsis-prefixed
+  preference titles and the glyph-suffixed magic-button descriptions each broke instrumented tests).
+- **Budget the coverage pass with the code**: a commit that adds app classes should carry the tests
+  that keep `jacocoTestCoverageVerification` green — waiting for the gate to fail costs repeated
+  full-gate iterations (hit 3× in C15; new app code always dips the ratio).
 - **Mark dormant hooks**: a rule/hook that does not apply to the current phase must say so explicitly (e.g. PR-workflow hooks are dormant during the single-branch no-PR execution plan) — otherwise it silently misdirects agents into workflow artifacts that don't exist yet.
 
 ## Commands
@@ -234,6 +244,7 @@ rules.
   (escape the drive-letter colon) or lint's `PropertyEscape` check fails the
   build; POSIX paths need no escaping. The file is gitignored.
 - **`.md` formatting + EOL trap (Windows checkout)**: pre-format with `uvx mdformat` before pre-commit (the first hook run reformats and fails); after committing `.md`, expect a dirty working tree — the hook rewrites to LF (vs CRLF) with a **content-identical** diff (`git diff --stat` empty, `git status` dirty). Verify content-identical, then `git checkout -- <md>`; never `git add` the EOL-only state. POSIX checkouts are LF already, so the symptom does not appear there.
+- **PS `Set-Content`/`Out-File` rewrite the ENTIRE file with a BOM + normalized EOLs**: a one-line regex "fix" run through `Set-Content -Encoding utf8` across 5 files turned a 5-line diff into 385 lines of EOL churn plus a UTF-8 BOM on every file (hit 2026-08-11, C15). For targeted edits use the edit tool (byte-preserving); for whole-file transforms use a byte-preserving Python script routed through `.tmp/` (the edit tool and Python preserve untouched bytes; the shell cmdlets do not). Verify `git diff --stat` stayed minimal after any PowerShell file rewrite.
 - **PS 5.1 `$ErrorActionPreference='Stop'` + native stderr is a terminating error**: `& npx ... *>> $log` under EAP=Stop silently kills the script the moment the tool prints to stderr (jscpd prints "Using config from ..."). Scope `$ErrorActionPreference='Continue'` around native calls and check `$LASTEXITCODE` — for ANY new native command in a PowerShell script with EAP=Stop. (The Python gate `scripts/gate.py` is immune — `subprocess` captures stderr.)
 - **`gh` run commands take the run **id**, not a PowerShell run object**, and need `--repo iakov/trik-gamepad` (the default resolves to upstream and 404s).
 - **`gh run view --json ... --jq "<expr>"` with embedded quotes breaks under PowerShell** ("accepts at most 1 arg(s), received N") — the quoted `--jq` expression gets mangled in argument passing. Use plain `--json status,conclusion` or route the expression through a `.tmp/` file.

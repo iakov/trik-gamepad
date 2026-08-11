@@ -193,6 +193,12 @@ Espresso error is raised.
   precision, multi-segment moves) genuinely exercises touch dispatch — keep raw
   `MotionEvents` there, and serialize taps behind bounded `awaitMessage` so a
   tap never lands mid-transition.
+- **Exact-text matchers (`withText`/`withContentDescription`) break silently on
+  rewording** — a UI string change (ellipsis titles, glyph-suffixed
+  descriptions, C15) fails instrumented tests with a `NoMatchingViewException`
+  and no hint. Grep `androidTest` for exact-text matchers before changing any
+  user-visible string and update them in the **same commit** (AGENTS.md
+  "Exact-text UI matchers").
 
 ### Robolectric determinism
 

@@ -25,3 +25,10 @@ repos:
         language: system
         pass_filenames: false
         files: \.kt$
+      # aapt2 hard-fails on "--" inside XML comments; nothing else catches it at
+      # commit time (hit twice in one session, Campaign 15). See check_xml_comments.py.
+      - id: xml-comment-double-hyphen
+        name: no double hyphen in XML comments
+        entry: python scripts/check_xml_comments.py
+        language: system
+        files: \.xml$

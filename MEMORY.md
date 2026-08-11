@@ -1970,3 +1970,24 @@ eportIssue-click listener line stays uncovered (no hacky test).
 
 - **jscpd min-tokens 50 caught 5-line test helpers** (dialog-view walk, prefs seeding): extracted
   shared private helpers in SettingsActivityTest.
+
+**Retrospective analysis (good / bad / solutions):**
+
+Good (keep doing): pure-class extraction for testability when Robolectric cannot
+capture framework behavior (ConnectionAnnouncer, MagicSymbolsStore); writing the
+coverage test surfaced a real bug (fresh-install seekbar summary showed 0
+instead of the XML default - fixed); commit-cheaply + gate-at-batches; the
+deterministic scripted translation guard beats manual review; scoping
+(HUD-stays-dark) before building; @android:string/\* reuse.
+
+Bad (costed): XML -- comments cost 2 aapt2 build cycles (now a pre-commit
+hook); PS Set-Content whole-file rewrite cost a revert+redo (~15 min, now an
+AGENTS quirk); not grepping androidTest for exact-text matchers before reworking
+strings cost 2 instrumented runs (now an AGENTS guardrail); coverage dip after
+new app code cost 3 gate iterations (now "budget the coverage pass with the
+code"); jscpd clones from inline test helpers cost 2 refactors (write the shared
+helper first); a python -c one-liner was mangled by shell escaping (route via
+.tmp/); detekt TooManyFunctions fails at == threshold.
+
+Solutions institutionalized: A/B/C AGENTS guardrails, the xml-comment pre-commit
+hook (D), and this TESTING.md note (F).
