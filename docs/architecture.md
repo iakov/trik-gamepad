@@ -9,7 +9,11 @@ best-practice reference** (threading, ViewModel/StateFlow, SurfaceView, sensors,
 build tooling). Written for new contributors and future sessions; keep it
 code-accurate (it is reviewed against `app/src` whenever it is touched).
 Decisions (problem → alternatives → why → out-of-scope) live in
-`DECISIONS.md`, not here.
+`DECISIONS.md`, not here. Live gate values/commands live in the build scripts
+(see AGENTS.md "Sources of truth") — reference, don't restate.
+Structure: Module map → TCP command protocol → Input handling → MJPEG video
+pipeline → Settings → Test layering → Cross-cutting constraints → Domain
+knowledge & best-practice reference → Known pitfalls & quirks.
 
 ## Module map
 

@@ -7,6 +7,10 @@ retrospectives. Hold every *why* and *detail* that AGENTS.md rules refer to;
 decisions (problem → alternatives → why → out-of-scope) live in
 `DECISIONS.md`. AGENTS.md is the "what to do" front door; this file is the
 store it points into.
+This file does NOT hold: decisions (→ `DECISIONS.md`), the test strategy / QA
+discipline (→ `TESTING.md`), or live gate values/commands (→ the build scripts
+— `app/build.gradle`, `scripts/gate.py`, `.github/workflows/ci.yml`). Dated
+records may quote then-current numbers; they document evolution history.
 Structure: Build & layout → Testing → App protocol → CI quirks → Workflows →
 Design decisions & retrospectives (decisions live in `DECISIONS.md`; this
 section keeps dated retrospectives, execution records, and reference quirks).
