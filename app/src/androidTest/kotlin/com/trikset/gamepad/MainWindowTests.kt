@@ -219,7 +219,9 @@ class MainWindowTests {
         // connect->video-reload work and silently dropped the second tap in the sequence
         // (hit 2026-08-11, whichever button was second). The wiring under test is the button
         // listener -> command; pad touch handling is covered by SquareButtonTest.
-        onView(withContentDescription("Button $i")).perform(performClickAction())
+        // The description is "Button N · <glyph>" (a11y), so match the "Button N" prefix.
+        onView(withContentDescription(org.hamcrest.Matchers.startsWith("Button $i")))
+            .perform(performClickAction())
         // The listener fires an async send (connect + write on a real executor); bounded-await
         // each command so the socket write lands (TESTING.md: never a bare assert on
         // server-received content).
