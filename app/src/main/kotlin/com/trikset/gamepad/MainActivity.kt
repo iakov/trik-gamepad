@@ -179,9 +179,15 @@ class MainActivity :
       }
     }
 
-    // Surface a captured crash exactly once (share / copy / dismiss); see CrashReportDialog.
-    CrashReportDialog(this, CrashLogStore(this)) { senderViewModel.connectionState.value }
-        .showIfNeeded()
+    // Surface a captured crash exactly once (share / copy / dismiss); see
+    // CrashReportDialog. Posted after the first frame: showing an AlertDialog
+    // during onCreate on an edge-to-edge fullscreen activity can be dropped
+    // before the window attaches, so the dialog is deferred until the gamepad
+    // is visible.
+    window.decorView.post {
+      CrashReportDialog(this, CrashLogStore(this)) { senderViewModel.connectionState.value }
+          .showIfNeeded()
+    }
   }
 
   override fun onCreateOptionsMenu(menu: Menu): Boolean {

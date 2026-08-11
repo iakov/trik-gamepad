@@ -27,6 +27,8 @@ class MainActivityCrashDialogTest : RobolectricTestBase() {
   fun crashDialogIsShownWhenACrashWasCaptured() {
     CrashLogStore(RuntimeEnvironment.getApplication()).save("java.lang.RuntimeException: boom")
     val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+    // The dialog is posted after the first frame, so let the main looper run it.
+    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
     assertNotNull(
         "the crash dialog must appear after a captured crash",
         ShadowDialog.getLatestDialog(),
@@ -37,6 +39,7 @@ class MainActivityCrashDialogTest : RobolectricTestBase() {
   @Test
   fun noDialogWithoutACrash() {
     val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
     assertNull("no crash -> no dialog", ShadowDialog.getLatestDialog())
     activity.finish()
   }
