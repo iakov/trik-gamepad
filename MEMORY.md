@@ -935,10 +935,11 @@ Timeout". Never touch `git config` (Repo hygiene) — commit with
 **Coverage-report tooling.** The JaCoCo report is at
 `app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml` (note the
 extra `jacocoTestReport/` directory — the plan file once referenced a path one
-level shorter). The XML carries **method-level** `<counter type="BRANCH">`
-entries but **no line-level branch detail** — analyze per-method branch misses
-to plan tests. When reading totals, remember LINE and BRANCH differ hugely
-(LINE ~97% vs BRANCH ~73% at campaign start).
+level shorter). The technique for planning coverage tests from the XML
+(per-line `mb`/`cb` branch attributes, the Kotlin-synthetic-branch caveat, the
+PowerShell parse trap) lives in `TESTING.md` "Measuring and driving coverage".
+When reading totals, remember LINE and BRANCH differ hugely (LINE ~97% vs
+BRANCH ~73% at campaign start).
 
 **Kotlin accessor clash.** Implementing an interface method whose name
 collides with a property's accessors breaks compilation with "Platform

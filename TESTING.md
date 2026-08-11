@@ -1,14 +1,22 @@
-# Testing
+# Testing — quality-assurance discipline
 
 <!-- encoding: utf-8 -->
 
-Scope: Test strategy, how to run tests, mocking/synchronization patterns, and
-known gaps for the canonical `app/` layout.
-Aim: Document how tests work, what is covered, and hard-won lessons about
-Robolectric timing, emulator prerequisites, and the test TCP servers (unit
-`TestTcpServer` + instrumented `DummyServer`).
+Aim: how this app's quality is enforced, measured, and kept honest — written
+for the next developer or agent to use as a reference when writing, running, or
+debugging tests, and for a smart power user to read and trust the app. This is
+NOT a changelog and NOT a metrics dashboard:
+
+- **History** (campaign records, ratchet chronology, dated verifications) →
+  `MEMORY.md` / `DECISIONS.md` / `docs/ROADMAP.md`.
+- **Live numbers** (gate thresholds, measured coverage, token totals) → the
+  build scripts + CI (`app/build.gradle`, `scripts/gate.py`,
+  `.github/workflows/ci.yml`); re-measure at the end of each campaign and
+  record the result in that campaign's record — never here.
+- **Decisions** (problem → alternatives → why → out-of-scope) → `DECISIONS.md`.
+
 Structure: Overview → Running tests → Diagnostic discipline → Patterns →
-Edge-case audit → Known gaps.
+Edge-case audit → Test quality discipline → Known gaps.
 
 ## Overview
 
@@ -47,10 +55,9 @@ Local instrumented run (per-platform acceleration prerequisites):
 
 1. Verify acceleration: `emulator -accel-check` (must return `0`).
 1. Boot the **`aosp_atd` image** AVD `Atd_API36` — the lightweight, headless,
-   CI-oriented image (adopted after it passed 9/9 locally with `-gpu host`;
-   lighter/faster boot than the `default` image; rationale + alternatives:
-   `DECISIONS.md` "Local instrumented: adopt aosp_atd"). Correct launch (~instant
-   via snapshot, suite ~5 min):
+   CI-oriented image (lighter/faster boot than the `default` image; rationale +
+   alternatives: `DECISIONS.md` "Local instrumented: adopt aosp_atd"). Correct
+   launch (~instant via snapshot, suite ~5 min):
    `emulator -avd Atd_API36 -no-window -no-audio -no-boot-anim -gpu host`
    (drop `-no-window` to see the UI; keep snapshots enabled for fast reboots).
 1. Wait for `adb shell getprop sys.boot_completed` → `1`.
@@ -60,18 +67,14 @@ Local instrumented run (per-platform acceleration prerequisites):
    keeps focus away from the app. Espresso then fails every interaction with
    `RootViewWithoutFocusException`. Pre-empt it once per AVD:
    `adb shell settings put secure immersive_mode_confirmations confirmed`.
-1. `./gradlew connectedDebugAndroidTest`.
+1. `./gradlew connectedDebugAndroidTest` — **with `--no-configuration-cache`**
+   (under the configuration cache the task fails with an AGP/UTP serialization
+   error, `field __testRunnerFactory__ ... DefaultConfigurableFileCollection`);
+   on Windows also add `--no-daemon` for tool-driven runs (daemon
+   handle-inheritance hang — AGENTS.md "Windows/PowerShell quirks").
 
-> **Local invocation quirk:** under the configuration cache,
-> `connectedDebugAndroidTest` fails with an AGP/UTP serialization error
-> (`field __testRunnerFactory__ ... DefaultConfigurableFileCollection`). Run it
-> with `--no-configuration-cache`; on Windows also add `--no-daemon` for
-> tool-driven runs (daemon handle-inheritance hang — see AGENTS.md
-> "Windows/PowerShell quirks"). Verified invocation on this machine (two
-> emulators, Atd_API36 + Swiftshader_API36): `./gradlew connectedDebugAndroidTest --no-configuration-cache --no-daemon` → 9/9 pass.
-
-> **Long-session emulator degradation (hit 2026-08-11):** after an emulator has
-> been up through many suites, the suite fails *broadly* — logcat floods with
+> **Long-session emulator degradation:** after an emulator has been up through
+> many suites, the suite fails *broadly* — logcat floods with
 > `Sending oneway calls to frozen process` (the app-freezer under memory
 > pressure freezes the app process, so the SenderService executor cannot run and
 > commands after the first are dropped), the package service can go down
@@ -79,7 +82,7 @@ Local instrumented run (per-platform acceleration prerequisites):
 > `adb reboot` does **not** clear it (the emulator process keeps its memory);
 > kill + relaunch with the exact launch flags (`adb -s <port> emu kill`, then
 > relaunch; Swiftshader_API36 uses `-no-snapshot` so every launch is cold) and
-> settle ~30-60 s before re-running.
+> settle ~30-60 s before re-running. (Full story: MEMORY.md "Testing".)
 
 > **Do NOT use `-gpu swiftshader_indirect` locally.** Verified: with the
 > software GPU the app window never receives focus and the same suite fails
@@ -87,17 +90,15 @@ Local instrumented run (per-platform acceleration prerequisites):
 > and verification in `DECISIONS.md` "Local instrumented: adopt aosp_atd").
 > Local runs must use `-gpu host`.
 
-> **CI focus flake — root-caused and fixed (2026-08-07).** The
-> `RootViewWithoutFocusException` storm on CI was traced to the immersive
-> pre-empt racing the settings provider: `sys.boot_completed` reports `1`
-> while the provider is still starting, so a single `settings put` during a
-> slow headless boot was silently lost, and the `ImmersiveModeConfirmation`
-> overlay then stole focus for the whole suite. The ci.yml pre-empt now
-> **retries the settings write until `settings get` confirms it** (up to 60 s),
-> and `FocusAwareActivityTestRule` waits (and bounded-BACK-dismisses) for
-> window focus, skipping the wait for non-view tests. Validated on CI: the
-> first ~5 tests pass and no focus assertions fire (previously 0/9).
-> **Remaining CI instrumented instability:** swiftshader rendering errors
+> **CI focus flake.** The `RootViewWithoutFocusException` storm on CI was traced
+> to the immersive pre-empt racing the settings provider: `sys.boot_completed`
+> reports `1` while the provider is still starting, so a single `settings put`
+> during a slow headless boot was silently lost, and the
+> `ImmersiveModeConfirmation` overlay then stole focus for the whole suite. The
+> ci.yml pre-empt now **retries the settings write until `settings get` confirms
+> it** (up to 60 s), and `FocusAwareActivityTestRule` waits (and
+> bounded-BACK-dismisses) for window focus, skipping the wait for non-view
+> tests. **Remaining CI instrumented instability:** swiftshader rendering errors
 > (`Failed to find ColorBuffer`) can still hang Espresso interactions under
 > load on 2-4-core runners — a software-GPU resource issue, not a code
 > regression. Treat those (not focus) as the known CI flake.
@@ -122,8 +123,8 @@ Local instrumented run (per-platform acceleration prerequisites):
 
 ### Test TCP servers — ephemeral unit server vs fixed-port instrumented server
 
-- `app/src/test/.../TestTcpServer.kt` is the **shared unit** server (Campaign 6
-  B1, merging the old inner `DummyServer` + `ReadUntilStopServer`). It binds an
+- `app/src/test/.../TestTcpServer.kt` is the **shared unit** server (merging
+  the old inner `DummyServer` + `ReadUntilStopServer`). It binds an
   **ephemeral port** (`ServerSocket(0)`), exposes `port`, `awaitConnection()`,
   `awaitCount()`, the bounded-poll `awaitReceived()` (with a caller-supplied
   drain), and `closeClient()`. Always `use {}` it.
@@ -136,12 +137,12 @@ Local instrumented run (per-platform acceleration prerequisites):
   (single emulator process); the unit server must stay ephemeral (3 parallel
   JVMs).
 
-### Synthetic MJPEG server (Campaign 4) — the third test server
+### Synthetic MJPEG server — the third test server
 
 `app/src/test/.../mjpeg/SyntheticMjpegServer.kt` is a real HTTP
 `multipart/x-mixed-replace` MJPEG server (ephemeral port) that streams seeded
 JPEG frames to the app's real `VideoStreamLoader`/`MjpegInputStream` decode path
-and can **drop the connection after N frames** to exercise R12 reconnect.
+and can **drop the connection after N frames** to exercise the reconnect.
 Companion `SyntheticMjpegServerTest.kt`:
 
 - **Must run under `@GraphicsMode(GraphicsMode.Mode.NATIVE)`** — default
@@ -181,11 +182,10 @@ touch-injected tap that lands while the main thread is mid-transition is
 **silently dropped** — the button's DOWN/UP never fires its listener and no
 Espresso error is raised.
 
-- **Signature (hit 2026-08-11, ~2 h):** the outer buttons of a row fire
-  (`[btn 1 down, btn 5 down]`) while the middle/second taps never send. Proven
-  not a layout issue (uiautomator bounds: buttons y 945-1077, pill y 486-594,
-  overlay ends y 942 — no overlap), not a socket issue (one connect, no
-  disconnect, no `NotSent`).
+- **Signature:** the outer buttons of a row fire (`[btn 1 down, btn 5 down]`)
+  while the middle/second taps never send. Proven not a layout issue
+  (uiautomator bounds: buttons y 945-1077, pill y 486-594, overlay ends y 942 —
+  no overlap), not a socket issue (one connect, no disconnect, no `NotSent`).
 - **Not an app bug:** real-device input is queued and processed in order; this
   is an injection-vs-main-thread race. Longer dwell and Espresso `click()`
   reduce but do not eliminate it; `performClick()` is deterministic.
@@ -212,8 +212,12 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
   branch and the wheel path silently stays uncovered even though the test
   passes. Set `event.values`, and stub the sensor lookup. Trying
   `shadowOf(Class<Sensor>)` or the wrong constructor is a compile error
-  (`no suitable method found for shadowOf`) that the sensor-test saga hit
-  twice (see MEMORY.md "Coverage drive to 85%": MainActivityTest).
+  (`no suitable method found for shadowOf`).
+- **`ShadowLog.isLoggable` defaults to `level >= INFO`** (Robolectric 4.16),
+  so `Log.isLoggable(TAG, Log.DEBUG)` is **false** unless a test raises the
+  tag with `ShadowLog.setLoggable(TAG, Log.DEBUG)` — the 2-arg form (there is
+  no boolean overload). The false side is covered by every ordinary test; to
+  cover the true side of a `DEBUG`-gate, raise the tag in that test.
 - **After adding a coverage test, confirm it moved the needle.** A passing
   test can still cover nothing (the sensor wheel path was "covered" by a
   passing test that used the wrong sensor type). Diff the JaCoCo per-class
@@ -228,8 +232,7 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
 - **3 identical failures → stop and read the shadow source.** If the *same*
   test fails identically N≥3 consecutive runs (same exception, same line, log
   sizes near-identical), stop retrying and read the shadow's real API from the
-  Robolectric jar/source instead of tweaking-and-rerunning. The sensor saga
-  burned ~15 local runs this way before the `createSensorEvent(3)` fix.
+  Robolectric jar/source instead of tweaking-and-rerunning.
 
 ## Edge-case audit
 
@@ -243,7 +246,7 @@ Every batch of changes touching `SenderService` or the tests should consider:
 - Instrumented: orientation (landscape-only activity), fullscreen/immersive UI,
   settings-driven host/port/video-URI changes.
 
-## Test quality metrics
+## Test quality discipline
 
 Tests are code: keep logical SLOC low and re-use what is similar. Two metrics
 (rationale + alternatives: `DECISIONS.md` "[2026-08-09] Test logical SLOC
@@ -252,22 +255,31 @@ metric"):
 - **Logical SLOC = summed per-class `token_count`** from
   `lizard -l kotlin app/src/test app/src/androidTest` (a Halstead-N proxy:
   operators + operands, comments/blanks excluded). Reported as a **trend**
-  against the A0 baseline below; re-measured at the end of each campaign.
+  against the A0 baseline below; re-measure at the end of each campaign and
+  record the result in that campaign's record.
 - **Duplication hard gate**: `npx jscpd app/src/test app/src/androidTest --config .jscpd.json` (min-tokens 50, threshold 0) — fails the gate on any
   new duplicated block ≥ 50 tokens. jscpd's `paths` config key does not
   restrict the scan, so the two source dirs are always positional args.
   Import lines are excluded (`ignorePattern: ["import.*"]`); the residual
-  import-header clones (52–76 tokens) are language boilerplate, not logic
-  duplication. Wired into `scripts/gate.py` + the CI build job (Campaign 6 D1;
-  `scripts/gate.ps1` replaced by `gate.py` in Campaign 7).
+  import-header clones are language boilerplate, never logic duplication.
+  Wired into `scripts/gate.py` + the CI build job.
 
 > **detekt `TooManyFunctions` is `>=`, not `>`**: a class at exactly the
 > threshold still fails ("31 detected, threshold 31" → violation). Keep at
 > least one function of headroom; when a class keeps growing thin helpers,
-> prefer merging them (e.g. `showVideoLoading`/`hideVideoLoading` →
-> `setVideoLoading(visible)`) over bumping the threshold again.
+> prefer merging them over bumping the threshold again.
 
-A0 baseline (2026-08-09; `main` sources excluded):
+**What moves the token number:** dedup (shared helpers) — not table-ization.
+Data-driven tables buy clearer intent, not fewer tokens; the `cases` literals
+are the test. Expect dedup to cut tokens; don't chase the number by adding
+rows.
+
+**Stateful-table trap:** a table row's expected value must not depend on state
+an earlier row set (e.g. a non-numeric wheel step *keeps* the current step, so
+after a `"42"` row the expected default became 42). Reset the fixture per row
+where a row's outcome depends on prior state (`ui.step = 7` before each case).
+
+A0 baseline (2026-08-09; `main` sources excluded) — the fixed trend anchor:
 
 | File | tokens |
 |------|-------:|
@@ -296,61 +308,45 @@ A0 baseline (2026-08-09; `main` sources excluded):
 | SenderViewModelTest | 69 |
 | **Total** | **12,659** |
 
-jscpd baseline: 11 clones, 754 duplicated tokens (3.36%) at min-tokens 50 —
-dominated by the 17-class `@Config` triple, the two nested TCP test servers,
-and the androidTest tap/`initNetworkSettings` duplication (Campaign 6 B1/B4/B8).
+### Measuring and driving coverage (JaCoCo report)
 
-**What moves the token number (Campaign 6 result):** 12,659 → 11,234 (-11.3%) came
-almost entirely from **dedup** (B-block, shared `TestTcpServer`/`HttpRequestHead`/
-`setPref`/`RobolectricTestBase`/frame-builder/helpers); data-driven **tables**
-(C-block) buy fewer methods + clearer intent, not fewer tokens — the `cases`
-literals are the test. Expect dedup to cut tokens; don't chase the number with
-table-ization.
-
-**Re-measure (Campaign 8 + cleanup, 2026-08-10):** **12,412** (11,839 after the
-Campaign 8 tests, then 12,412 after the coverage-margin + loading-indicator
-tests). Still below the 12,659 A0 baseline; new tests are shared-helper based so
-jscpd stays at 0 clones.
-
-**Re-measure (Campaign 10, 2026-08-10):** **17,361** tokens — the growth is new
-tested components (`HardwareGamepadController`/`RobotPresetStore`/
-`MagicButtonSymbols` + their test files); jscpd stays at 0 clones (new test
-clones were deduped as they landed).
-
-**Re-measure (Campaign 12, 2026-08-11):** **18,007** tokens (17,442 after
-Campaign 11) — growth from the video-only-mode test additions
-(`VideoStreamErrorNotifierTest`, empty-host gate tests, the `performClick`
-magic-buttons rewrite); jscpd stays at 0 clones.
-
-**Stateful-table trap:** a table row's expected value must not depend on state an
-earlier row set (e.g. a non-numeric wheel step *keeps* the current step, so after
-a `"42"` row the expected default became 42). Reset the fixture per row where a
-row's outcome depends on prior state (`ui.step = 7` before each case).
+- The report is at
+  `app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml` (note the
+  extra `jacocoTestReport/` directory), and it measures only the debug
+  unit-test run (`app/build/jacoco/testDebugUnitTest.exec`).
+- The XML carries **per-class** `<counter type="BRANCH">`/`LINE` totals AND
+  **per-line branch detail**: each `<line>` under `<sourcefile>` has `mb`
+  (missed branches) and `cb` (covered branches) attributes. To plan a coverage
+  campaign, list the lines with `mb > 0` sorted by `mb` desc — that is the
+  exact set of hittable missed branches, class by class. The HTML report adds
+  per-method tables.
+- **Kotlin-synthetic branches cap the achievable ratio.** `?.`/`?:`/
+  `isNullOrBlank` compile to null-check branches that are structurally
+  unhittable when the receiver can never be null (a view always populated by
+  `findViewById`, a host address a settings `register()` always defaults, a
+  thread created in `init()`). Measure the delta per targeted class and keep
+  a ratchet with headroom over the gate — don't chase 100% or exclude more
+  logic.
+- **Confirm the needle moved** after each added test (see "Robolectric shadow
+  traps") before moving to the next target.
+- PowerShell: parse with `[xml](Get-Content -Raw …)`; `XmlDocument.Load()`
+  throws on the `report.dtd` reference.
 
 ## Known gaps
 
-- Coverage gate is a JaCoCo ratchet at **95% line / 85% branch**
-  (`jacocoTestCoverageVerification`, raised from 85/60 through the Phase 3
-  post-migration coverage push, then to 92/71 after the ROADMAP Phase 2-E/2-F/3
-  extractions, then to 95/80 after Campaign 2's coverage push, then to 95/85
-  after Campaign 13);
-  `jacocoTestReport` always produces the full
-  report. Measured **0.971 LINE / 0.867 BRANCH** (Campaign 13, 2026-08-11; up
-  from 0.965/0.834 after Campaign 12 — the 0.80 gate was raised to 0.85 with
-  a 1.7 pt margin. The new gamepad/status/preset branches dipped to 0.796
-  mid-Campaign-10 and were covered back up — see MEMORY "Campaign 10").
-  MjpegView's render-thread
-  plumbing (`MjpegView$MjpegRenderThread`/`MjpegViewThread`) is excluded from
-  the gate with a recorded rationale (untestable thread lifecycle; the render
-  logic lives in the covered `MjpegFrameRenderer`); so are Kotlin-inline
-  synthetics (`**/*$special$$inlined$*.class` — the `by viewModels()` delegate
-  boilerplate, see MEMORY "Coverage" design decisions).
+- Coverage is enforced as a JaCoCo ratchet gate — the current thresholds live
+  in `app/build.gradle` (`jacocoTestCoverageVerification`); `jacocoTestReport`
+  always produces the full report. MjpegView's render-thread plumbing
+  (`MjpegView$MjpegRenderThread`/`MjpegViewThread`) is excluded with a
+  recorded rationale (untestable thread lifecycle; the render logic lives in
+  the covered `MjpegFrameRenderer`); so are Kotlin-inline synthetics
+  (`**/*$special$$inlined$*.class` — the `by viewModels()` delegate
+  boilerplate). Both rationales: MEMORY "Coverage" design decisions.
 - Instrumented tests exercise only what runs on the emulator; real TRIK robot
   interaction is never in CI.
 - Espresso tests drive the settings UI through extracted helpers
   (`openSettings()`/`editPreference()`) with no `Thread.sleep` — Espresso's
-  `onView(...).perform()` idles until views are shown (de-slept in Phase 4-I;
-  previously the suite was ~2 minutes of fixed sleeps). Keepalive negative
+  `onView(...).perform()` idles until views are shown. Keepalive negative
   assertions use `DummyServer.anyMessageWithin()` bounded windows, never
   `Thread.sleep`.
 - `MainActivity` forces landscape + immersive; instrumented tests run against
