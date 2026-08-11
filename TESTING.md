@@ -252,22 +252,23 @@ Tests are code: keep logical SLOC low and re-use what is similar. Two metrics
 (rationale + alternatives: `DECISIONS.md` "[2026-08-09] Test logical SLOC
 metric"):
 
-- **Logical SLOC = summed per-class `token_count`** from
-  `lizard -l kotlin app/src/test app/src/androidTest` (a Halstead-N proxy:
-  operators + operands, comments/blanks excluded). Reported as a **trend**
-  against the A0 baseline below; re-measure at the end of each campaign and
-  record the result in that campaign's record.
-- **Duplication hard gate**: `npx jscpd app/src/test app/src/androidTest --config .jscpd.json` (min-tokens 50, threshold 0) — fails the gate on any
-  new duplicated block ≥ 50 tokens. jscpd's `paths` config key does not
-  restrict the scan, so the two source dirs are always positional args.
-  Import lines are excluded (`ignorePattern: ["import.*"]`); the residual
-  import-header clones are language boilerplate, never logic duplication.
-  Wired into `scripts/gate.py` + the CI build job.
+- **Logical SLOC = summed per-class `token_count`** from `lizard` (a
+  Halstead-N proxy: operators + operands, comments/blanks excluded); the run +
+  the trend report live in `scripts/gate.py`. Reported as a **trend** against
+  the A0 baseline below; re-measure at the end of each campaign and record the
+  result in that campaign's record.
+- **Duplication hard gate** — configuration + thresholds live in `.jscpd.json`;
+  it runs inside `scripts/gate.py` and the CI build job (invocation: see
+  AGENTS.md Commands). Fails on any new duplicated block ≥ the configured
+  threshold. jscpd's `paths` config key does not restrict the scan, so the
+  source dirs stay positional args in the script; the residual import-header
+  clones are language boilerplate, never logic duplication.
 
 > **detekt `TooManyFunctions` is `>=`, not `>`**: a class at exactly the
 > threshold still fails ("31 detected, threshold 31" → violation). Keep at
 > least one function of headroom; when a class keeps growing thin helpers,
-> prefer merging them over bumping the threshold again.
+> prefer merging them over bumping the threshold again. Thresholds:
+> `app/config/detekt/detekt.yml`.
 
 **What moves the token number:** dedup (shared helpers) — not table-ization.
 Data-driven tables buy clearer intent, not fewer tokens; the `cases` literals

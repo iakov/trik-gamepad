@@ -31,7 +31,7 @@ LOG_DIR = os.path.join(ROOT, ".tmp")
 LOG = os.path.join(LOG_DIR, "gate.log")
 
 # A0 baseline for the logical-SLOC token trend (see TESTING.md
-# "Test quality metrics"). Reported as a trend, not a gate.
+# "Test quality discipline"). Reported as a trend, not a gate.
 A0_BASELINE = 12659
 
 GRADLE_STEPS = [
