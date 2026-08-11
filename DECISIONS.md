@@ -30,6 +30,7 @@ Each note follows the same shape:
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-11] User-facing diagnostics & crash reporting (offline-first) |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-09] Why .PLAN.md exists |
+| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme | [2026-08-11] Campaign 15: UX & accessibility scope |
 
 ______________________________________________________________________
 
@@ -1023,3 +1024,52 @@ ______________________________________________________________________
 - **Out of scope / consequences:** `.PLAN.md` is referenced only here (why/what
   it is for) and in AGENTS.md "Current work" (what is in it / when to read it);
   all other docs deliberately carry no `.PLAN.md` references.
+
+## UX & accessibility & i18n
+
+### [2026-08-11] Campaign 15: UX & accessibility scope (a11y, WCAG, i18n, theme)
+
+- **Problem:** the settings/HUD/connection surfaces had known UX gaps — hardcoded
+  user-visible strings, color-only connection state (invisible to screen readers),
+  sub-48dp touch targets, no system theme/language support, and no WCAG
+  guardrails — plus an approved settings-refinement plan that needed absorbing
+  into a full UX & accessibility campaign.
+- **Alternatives considered:** a11y depth (TalkBack-only vs +basic keyboard focus
+  vs full Switch Access — chose TalkBack + basic focus; Switch Access out of
+  scope); light-theme scope (HUD stays dark-over-video vs full-app light — chose
+  dark HUD, light Settings/dialogs); campaign structure (keep the settings plan
+  separate vs absorb — absorbed as one Campaign 15); feedback-driven review
+  sweep (Play/F-Droid reviews + C14 reports — dropped: no access from the dev
+  environment); translation sign-off (maintainer eyes all four locales vs
+  back-translation only — RU gets a native-speaker human review, fr/de/vi are
+  machine-drafted + machine back-translation verified); sync-guard placement
+  (pre-commit vs canonical gate — gate only); back-translation enforcement
+  (recurring pre-push gate vs one-off — one-off, literals change rarely);
+  video stall detection ("no video signal" badge — included only if cheap, then
+  skipped, see Why).
+- **Chosen solution:** one commit-per-concern campaign: settings refinements
+  (consolidated magic-symbols dialog with pre-filled defaults, current-value
+  summaries, ellipsis on input rows, About copies the short spec only, string
+  externalization); accessibility (deduped, target-gated
+  nnounceForAccessibility state announcements, state-aware gear
+  contentDescription, glyph-aware magic-button descriptions, 48dp touch
+  targets, ripple, contrast fixes, importantForAccessibility hygiene);
+  WCAG regression tests (contrast ratios + touch targets read the live
+  resources); connection pill shows the target (Connecting to host:port…)
+  and a reconnect badge distinguishes reloads of a previously-playing stream;
+  localization (en+ru+fr+de+vi, @android:string/\* reuse for exact matches,
+  Android 13+ localeConfig, gate-wired check_translations.py --sync parity
+  guard, one-off MyMemory back-translation review); DayNight theme with a
+  deliberately dark HUD. All conventions recorded in the new DESIGN.md.
+- **Why:** Android/Material/WCAG guidelines plus the codebase inventory showed
+  concrete, verifiable gaps; "every value-bearing setting shows its value" and
+  "state is never color-only" fix real usability/a11y defects; the deterministic
+  --sync guard (scripting) beats manual drift review; @android:string/\*
+  reuse gives free per-device OS localization. Stall detection was skipped
+  because a robot with video disabled legitimately keeps the spinner cycling —
+  a "no video signal" badge would misreport that designed state.
+- **Out of scope / consequences:** full Switch Access, keyboard/D-pad fallback
+  for the raw-touch pads, first-run onboarding (ROADMAP deferred item F), a
+  light-mode HUD, and video stall detection. Coverage gate re-verified
+  (LINE 0.975 / BRANCH 0.866); instrumented suite 9/9 on both API-36 emulators;
+  translations sync guard runs in the canonical gate.

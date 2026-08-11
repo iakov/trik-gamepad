@@ -1923,3 +1923,50 @@ diagnostics change):**
   logic-only path is exactly what Robolectric sees, so only a device check
   caught it). `MainActivity` posts `showIfNeeded()` via `window.decorView.post`
   so the dialog appears after the first frame.
+
+### [2026-08-11] Campaign 15 execution run - UX & accessibility (a11y, WCAG, i18n, theme)
+
+Scope and decisions: DECISIONS.md "[2026-08-11] Campaign 15: UX & accessibility scope";
+conventions: DESIGN.md. Commits c817649..1b0115e (10 commits), pushed to the fork.
+
+Verified: canonical gate green twice (LINE 0.9752, BRANCH 0.8661; jscpd 0 clones;
+detekt/spotbugs/lint clean; check_translations.py --sync OK for 111 keys x 4 locales);
+3-variant est run twice (second with --rerun-tasks); instrumented 9/9 on both
+Atd_API36 + Swiftshader_API36. Screenshot proof (.tmp/settings_light.png + \_dark.png,
+pixel-sampled 250,250,250 vs 48,48,48 - DayNight works); the gamepad HUD dump verified the
+state-aware gear description, glyph-aware button descriptions, target-hosting pill.
+
+Quirks hit (all new, none previously documented):
+
+- **XML comments reject "--"** (aapt2: "The string -- is not permitted within comments");
+  hit twice in one session (strings.xml + activity_main.xml). Any -- inside a comment must go.
+- **PowerShell Set-Content rewrites whole-file EOLs + adds a BOM** (PS 5.1 -Encoding utf8);
+  a single-line regex replace turned a 1-line diff into 385-line EOL churn and a BOM. Fix:
+  git checkout the file and redo the edit with the edit tool (EOL-preserving), or route a
+  byte-preserving Python script through .tmp/ (the d'abord -apostrophe fix).
+- **Robolectric ndroid.R.color.darker_gray is not #555555** (measured 2.32:1 with white, i.e.
+  a mid-gray): own the fill as @color/magic_button_fill_default so runtime + WCAG test agree.
+- **nnounceForAccessibility events are not reliably capturable** via ShadowAccessibilityManager
+  in Robolectric; the decision logic (mapping, dedup, target gating) was extracted into the pure
+  ConnectionAnnouncer (fully tested); the view call stays a thin one-liner.
+- **detekt semantics**: TooManyFunctions fails at exactly the threshold (31/31); merging the two
+  target providers into one argetProvider: () -> String? fixed both LongParameterList and the
+  function count in one move.
+- **E1 moved inline "Wheel" titles into strings.xml** - lint DuplicateStrings then fired on the
+  en/ru/fr/de/vi duplicates; fixed with a string-to-string reference
+  (pref_wheel_enabled -> @string/pref_category_wheel), DRY across locales.
+- **lint TypographyQuotes rejects ' escapes** in French strings; use the typographic U+2019.
+- **aosp images have no locale switch**: cmd locale set-system-locale and cmd app locale are
+  missing, and settings put system system_locales does not propagate to activities without a
+  reboot - so a RU-locale screenshot could not be captured on the emulator; the RU rendering is
+  covered by the sync guard + back-translation + the pending native-speaker review instead.
+- **Instrumented tests match UI text exactly**: the new ellipsis titles and the glyph-suffixed
+  magic-button contentDescriptions ("Button 1 - triangle") broke SettingsTests and
+  MainWindowTests; fixed with ellipsis-prefixed titles and startsWith("Button N").
+- **ReportSharer.share (public, FileProvider) throws under Robolectric** ("Failed to find
+  configured root"); it is device-valid but not Robolectric-coverable, so the
+
+eportIssue-click listener line stays uncovered (no hacky test).
+
+- **jscpd min-tokens 50 caught 5-line test helpers** (dialog-view walk, prefs seeding): extracted
+  shared private helpers in SettingsActivityTest.

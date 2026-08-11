@@ -257,6 +257,32 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
   strings** — lint `PrivateResource`. Prefix app-specific button strings
   (`copy_button`) or reference the string from your own XML.
 
+### WCAG & accessibility regression tests
+
+- **Contrast and touch targets are code-enforced, not eyeballed.**
+  `WcagContrastTest` reads the *live* color resources and asserts WCAG AA
+  relative-luminance ratios (≥4.5:1 normal text, ≥3.0:1 large text / UI
+  components); `TouchTargetSizeTest` asserts the 48dp minimum on the gear, the
+  status pill and the magic-button row. A palette or layout change that drops
+  below the thresholds fails the suite.
+- **Accessibility announcements are logic-tested via the pure
+  `ConnectionAnnouncer`** (state→text mapping, dedup, target gating). The thin
+  `announceForAccessibility` call in `ConnectionFeedback` is exercised by
+  ordinary tests; Robolectric cannot reliably capture the emitted events via
+  `ShadowAccessibilityManager`.
+- **Do not rely on `android.R.color/darker_gray`'s value in Robolectric** — it
+  resolves differently than on device. Own such colors as app resources
+  (`magic_button_fill_default`) so the WCAG test and the drawable always agree.
+- **Real TalkBack is not on the aosp emulator images** (not installable in CI
+  locally); live-region/announce logic is unit-tested instead.
+
+### Translation sync guard
+
+- `scripts/check_translations.py --sync` (key parity + format-specifier parity
+  across `values-*/strings.xml`) runs inside the canonical gate — Android lint
+  has no such check. `--back-translate` (MyMemory API) is a one-off semantic
+  review aid, never a gate (rate-limited, network-dependent).
+
 ## Edge-case audit
 
 Every batch of changes touching `SenderService` or the tests should consider:

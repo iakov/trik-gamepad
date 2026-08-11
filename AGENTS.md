@@ -248,6 +248,7 @@ demand:
 
 | Topic | Section |
 |-------|---------|
+| **UX/design decisions & conventions** | **DESIGN.md** (named sections: Defaults-as-useful, Every-setting-shows-its-value, Ellipsis-on-dialog-rows, Option-descriptions, Color-is-not-enough, Touch-targets, Magic-button-symbols, About-vs-Copy-report, System-theme, Localization, WCAG, Connection-and-video-state) |
 | Layout, keystore path, versioning | MEMORY.md "Build & layout" |
 | Test suite structure, TCP test servers, emulator prerequisites | MEMORY.md "Testing" + TESTING.md |
 | SenderService protocol, keepalive, MJPEG | MEMORY.md "App protocol" |
@@ -266,13 +267,19 @@ demand:
 
 ## Conventions
 
-- Resources are English-only (`resourceConfigurations += ['en']`); `lint.xml` downgrades `MissingTranslation` so missing translations are expected, not an error (rationale in DECISIONS.md).
+- Resources ship `en` + `ru` + `fr` + `de` + `vi` (`resourceConfigurations`,
+  `values-*/strings.xml`, `res/xml/locales_config.xml`). Every locale keeps full
+  key + format-specifier parity — enforced deterministically by
+  `scripts/check_translations.py --sync` inside `scripts/gate.py`, so
+  translations can never drift into a commit. Typical buttons/labels reuse
+  `@android:string/*` where an exact match exists (the OS localizes those).
+  Details: `DESIGN.md "Localization"`.
 - `buildFeatures.buildConfig = true` — `BuildConfig.VERSION_NAME` is used by the About section.
-- **Every option carries a description.** A setting with no explanation
-  (summary / summaryOn+Off) is a bug: users must understand what flipping a
-  switch or picking a list value does, and state-aware descriptions guide them
-  (e.g. "Share logs without editing": off → "Check to share directly
-  unchanged", on → "Uncheck to share to editor app for review").
+- **Every option carries a description** and value-bearing settings show their
+  current value; rows that open an input dialog end with "…"; defaults are the
+  most useful choice and are pre-filled (never a blank). See
+  `DESIGN.md "Option descriptions"`, `"Every setting shows its current value"`,
+  `"Ellipsis on dialog rows"`, `"Defaults are as useful as possible"`.
 - SIMPLE ENGLISH for all globally-visible content (release notes, PR
   descriptions, commits, docs, comments); reply to GitHub issues/comments in
   the language the author used.

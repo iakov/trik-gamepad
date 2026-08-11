@@ -540,3 +540,53 @@ Campaign 14)". Retrospective + elapsed: MEMORY.md "Campaign 14 execution run".
   clean; pushed `18f6e1c..b07b570`. Instrumented suite + emulator screenshot
   proof tracked after the docs step. **CAMPAIGN 14 COMPLETE** (implementation
   commits `c8c5a64..b07b570`).
+
+## Campaign 15 — UX & accessibility (a11y, WCAG, i18n, system theme)
+
+Scope (user decision 2026-08-11): end-user UX + accessibility across gamepad,
+networking, video, HUD and Settings, grounded in Android/Material/WCAG
+guidance. Decision + rationale: DECISIONS.md "[2026-08-11] Campaign 15: UX &
+accessibility scope"; conventions: DESIGN.md; retrospective + quirks:
+MEMORY.md "Campaign 15 execution run".
+
+| Estimated | Actual |
+|-----------|--------|
+| ~6 h | ≈3 h 30 m (impl + gates + instrumented + docs) |
+
+- **Settings** — strings externalized to alues/strings.xml (E1); the five
+  per-button glyph rows replaced by one "Button symbols…" dialog (pre-filled
+  defaults ▲ ■ ● ✕ ◆, "Use default symbols", saves the array independent of the
+  count); current-value summaries for videoURI/seekbars/verbosity (with a
+  fresh-install default fix: seekbars now show the XML default, not 0);
+  ellipsis on input-dialog rows; About system copies the short spec only
+  ("Copy report" stays the full-report row); Advanced summary mentions
+  diagnostics.
+- **Accessibility** — deduped, target-gated nnounceForAccessibility
+  announcements (ConnectionAnnouncer); the gear's contentDescription carries
+  the connection state; magic-button descriptions include the glyph; the pill
+  is a real 48dp touch target; magic buttons got 48dp minima, an explicit
+  contrast-safe text color and Material ripple; importantForAccessibility
+  hygiene on the spinner.
+- **WCAG regression tests** — WcagContrastTest (relative-luminance ratios on
+  the live color resources, ≥4.5:1 text / ≥3.0:1 UI) and TouchTargetSizeTest
+  (48dp on gear/pill/button-row).
+- **Connection & video** — the pill shows Connecting to host:port…; a reload
+  of a previously-playing stream shows a "Video reconnecting…" badge. Stall
+  detection was deliberately not added (a video-disabled robot legitimately
+  keeps the spinner cycling).
+- **Localization** — ships en+ru+fr+de+vi (
+  esourceConfigurations,
+  alues-*/strings.xml, Android 13+ localeConfig); exact-match typical
+  strings reuse @android:string/* (copy/cancel); deterministic
+  scripts/check_translations.py --sync parity guard wired into the canonical
+  gate; one-off MyMemory back-translation review ran for all four locales
+  (RU will also get a native-speaker review).
+- **System theme** — Theme.AppCompat.DayNight for Settings/dialogs; the
+  gamepad HUD stays dark-over-video (black window background,
+  orceDarkAllowed=false). Verified by pixel-sampled screenshots
+  (.tmp/settings_light.png / settings_dark.png).
+- **Verification** — canonical gate green twice (LINE **0.9752** / BRANCH
+  **0.8661**, jscpd 0 clones, translations sync OK); 3-variant est ×2
+  (second with --rerun-tasks); instrumented **9/9 on both API-36 emulators**
+  (two instrumented tests updated for the ellipsis titles / glyph-suffixed
+  button descriptions); commits c817649..1b0115e. **CAMPAIGN 15 COMPLETE.**
