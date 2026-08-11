@@ -334,13 +334,17 @@ DummyServer port collides if ever sharded.
 
 ### JaCoCo
 
-Branch > line as a signal; a 95/80 gate matches the recommended shape.
+Branch > line as a signal; the coverage gate keeps branch stricter than line.
+The current thresholds are not repeated here — they live and are enforced in
+`app/build.gradle` (`jacocoTestCoverageVerification`) via `scripts/gate.py` and
+CI; the QA discipline around them is in TESTING.md.
 `includeNoLocationClasses` defaults false (Kotlin classes silently excluded →
 report can look better than reality). Verification task reports only the FIRST
 violated rule. Instrumented tests aren't covered by the JVM agent (offline
-instrumentation needed) — the 95/80 gate measures Robolectric + JVM only.
+instrumentation needed) — the coverage gates measure Robolectric + JVM only.
 Coverage measures what RAN, not correctness — the wheel-step and TYPE_ALL bugs
-passed a 95/80 gate because their tests assert "no crash", not real behavior.
+passed the coverage gates because their tests assert "no crash", not real
+behavior.
 
 ## Known pitfalls & quirks
 

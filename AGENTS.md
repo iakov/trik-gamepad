@@ -15,7 +15,8 @@ Removing a documented rule changes agent behavior — only delete if provably in
 
 Android app (pure Kotlin, 0 `.java` files) that mimics a gamepad to control
 TRIK robots. It sends plain-text commands over a TCP socket and streams MJPEG
-video over HTTP. Coverage gate: 95% line / 85% branch (measured: TESTING.md).
+video over HTTP. Coverage gate: thresholds live in `app/build.gradle`
+(`jacocoTestCoverageVerification`); QA discipline: TESTING.md.
 Improvement roadmap: `docs/ROADMAP.md`.
 
 ## Layout
@@ -40,8 +41,8 @@ Improvement roadmap: `docs/ROADMAP.md`.
   ports and reset SharedPreferences per test (they persist across methods in a
   JVM; the old SenderService static-state trap was removed in ROADMAP Phase 3 —
   see TESTING.md).
-- **Verify coverage measures the live class output.** The 95 line / 85 branch
-  gate reads `intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes`
+- **Verify coverage measures the live class output.** The coverage gate reads
+  `intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes`
   under AGP 9's built-in Kotlin — a stale `tmp/kotlin-classes` path silently
   under-measures and lets new app classes bypass the gate (hit 2026-08-09, see
   DECISIONS.md). After any toolchain migration, add a new app class and confirm
