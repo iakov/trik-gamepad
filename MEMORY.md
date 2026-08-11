@@ -1917,3 +1917,9 @@ diagnostics change):**
 - **`MaterialAlertDialogBuilder` needs a Material theme** — the app theme is
   `Theme.AppCompat`, so the crash dialog uses `androidx.appcompat.app.AlertDialog`
   (it also resolves under Robolectric).
+- **Showing a dialog during `onCreate` can be dropped on an edge-to-edge
+  fullscreen activity** (verified on the API-36 emulator: the dialog logic ran
+  — the crash got marked prompted — but no dialog window ever rendered; the
+  logic-only path is exactly what Robolectric sees, so only a device check
+  caught it). `MainActivity` posts `showIfNeeded()` via `window.decorView.post`
+  so the dialog appears after the first frame.
