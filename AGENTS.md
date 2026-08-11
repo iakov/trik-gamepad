@@ -268,6 +268,11 @@ demand:
 
 - Resources are English-only (`resourceConfigurations += ['en']`); `lint.xml` downgrades `MissingTranslation` so missing translations are expected, not an error (rationale in DECISIONS.md).
 - `buildFeatures.buildConfig = true` — `BuildConfig.VERSION_NAME` is used by the About section.
+- **Every option carries a description.** A setting with no explanation
+  (summary / summaryOn+Off) is a bug: users must understand what flipping a
+  switch or picking a list value does, and state-aware descriptions guide them
+  (e.g. "Share logs without editing": off → "Check to share directly
+  unchanged", on → "Uncheck to share to editor app for review").
 - SIMPLE ENGLISH for all globally-visible content (release notes, PR
   descriptions, commits, docs, comments); reply to GitHub issues/comments in
   the language the author used.

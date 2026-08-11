@@ -233,6 +233,29 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
   test fails identically N≥3 consecutive runs (same exception, same line, log
   sizes near-identical), stop retrying and read the shadow's real API from the
   Robolectric jar/source instead of tweaking-and-rerunning.
+- **`FileProvider.getUriForFile` throws under Robolectric** ("Failed to find
+  configured root that contains ...") — path-XML resolution is unsupported in
+  the sandbox. Keep the FileProvider call out of the testable path: inject a
+  `Uri` into the sharing logic and leave the FileProvider line device-only
+  (that is what `ReportSharer` does).
+- **Robolectric has no `buildApplication`/`setupApplication`** (4.16.1). The
+  runner creates the Application from the manifest, so
+  `RuntimeEnvironment.getApplication()` *is* your declared `App`; to observe
+  `App.onCreate` wiring, clear the pref and call `onCreate()` again on it.
+- **`android.app.Dialog.getButton` is absent from the compile-SDK stub** (API
+  36\) — `dialog.getButton(...)` will not compile. Cast the shown dialog to
+  `androidx.appcompat.app.AlertDialog` (whose `getButton` is public) to reach
+  the buttons. Also: appcompat button clicks post a `ButtonHandler` message to
+  the main looper, so `performClick()` alone "does nothing" — run
+  `shadowOf(getMainLooper()).idle()` before asserting the effect.
+- **A shared singleton (like the `AppLog` buffer) is written by background
+  threads from other test classes** (e.g. leaked keepalive schedulers), so
+  exact-count assertions flake. Assert *presence* (`any { ... }`), and move
+  exact capacity/order semantics into a pure class (`LogRingBuffer`) with
+  hermetic tests.
+- **`@string/copy` (and friends) collide with private androidx.preference
+  strings** — lint `PrivateResource`. Prefix app-specific button strings
+  (`copy_button`) or reference the string from your own XML.
 
 ## Edge-case audit
 

@@ -27,7 +27,7 @@ Each note follows the same shape:
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-09] Dev tooling is cross-platform via uv (Python gate) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-11] Branch-coverage ratchet 80% → 85% |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode | [2026-08-11] Empty-host video-only mode + connect-UX hardening |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-11] User-facing diagnostics & crash reporting (offline-first) |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-09] Why .PLAN.md exists |
 
@@ -764,6 +764,75 @@ ______________________________________________________________________
   during the connect→Connected transition is dropped is a test-environment
   artifact (Espresso `click()` vs direct `performClick()`) — documented in
   MEMORY "Campaign 12 execution run", not fixed in the app.
+
+### [2026-08-11] User-facing diagnostics & crash reporting (offline-first, Campaign 14)
+
+- **Problem:** when users hit an issue (UI renders wrong, a crash, a
+  network/stream problem) they have to describe it to developers, and the
+  developers have to reproduce it to fix it. The app's only diagnostic
+  affordance was "About system", copying `Version; Android; SDK; Resolution; PPI` to the clipboard — no device model, no app settings snapshot, no
+  connection state, no event trace, and no crash capture at all (a crash was
+  only visible via adb on the device). The app targets **all stores** (Play,
+  F-Droid, Galaxy, Amazon, AppGallery), which rules out Google-Play-only
+  telemetry and requires F-Droid (source-built, privacy-sensitive,
+  no-proprietary-SDK) compliance.
+- **Alternatives considered:** **remote crash reporting (ACRA/Sentry)** —
+  automatic off-device upload, but needs a server or SaaS, opt-in consent +
+  a privacy policy (GDPR), is scrutinized by F-Droid for data egress, and
+  adds ops load to a zero-infra indie app → **deferred**, not rejected
+  (a configurable self-hosted endpoint could be added later); **direct
+  `ACTION_SEND` share** — no review/edit step, users send raw dumps with no
+  chance to redact or annotate → rejected for the review flow; **reading
+  `logcat`** for the event trace — `READ_LOGS` is signature-granted, a normal
+  app cannot read its own logcat on any modern Android → impossible; **an
+  in-app copy-only report** — keeps the existing UX, but forces paste-into-
+  mail and never sees the report file → extended with the editor flow.
+- **Chosen solution (user decisions 2026-08-11):** **offline-first
+  diagnostics**. (1) An `AppLog` facade mirrors every log call to logcat and
+  into a **500-line thread-safe ring buffer**; the **buffer floor defaults to
+  INFO** (WARN/ERROR always captured, VERBOSE never) and is user-tunable via
+  a "Diagnostics verbosity" list — Errors only / Info (default) / Debug /
+  Verbose — so the default report is clean (the per-command DEBUG trace is
+  excluded) and a dev can ask a user to raise verbosity to capture the full
+  command flow. (2) A markdown **diagnostic report** (one file = one data
+  block) carries app version/versionCode/build type, device
+  manufacturer/model/product, Android release/API, display resolution/density/
+  font scale, locale, the live connection state, the full settings snapshot
+  (non-defaults marked), robot presets, the log tail and the last crash trace.
+  (3) The report is written to `cacheDir/diagnostics` and exposed via a
+  **FileProvider** (`exported=false`, cache-path only); **"Report an issue"**
+  opens it in a **text editor** for review/edit before the user shares from
+  the editor's own share menu (mail/IM) — the chooser title is exactly
+  "Choose a text editor to review and edit before sharing to developers", and
+  a default-off **"Share logs without editing"** switch (with state-aware
+  descriptions) skips the editor with a direct share sheet. "Copy report" and
+  an in-app "View log" dialog complete the About rows; the About-system tap
+  now copies the full report. (4) **Crash capture**: a chaining
+  `UncaughtExceptionHandler` (installed by a new `App` Application) persists
+  bounded crash stack traces; the next MainActivity launch shows a
+  once-per-crash dialog (Review & share / Copy / Dismiss) honoring the
+  share-without-editing switch.
+- **Why:** zero new permissions (FileProvider + internal/cache storage need
+  none; INTERNET already exists for the app's core function), **no silent data
+  egress** — the user reviews and explicitly shares, so there is no consent
+  layer and no privacy-policy burden, and F-Droid builds from source with
+  nothing proprietary. The stacktrace + spec + settings + event trace is the
+  standard reproduction payload (the app is a TCP client + MJPEG player, so
+  the connect/keepalive/stream-error trace is what makes network bugs
+  reproducible without a device). The editor step is the key UX decision:
+  users review (redact a host, add "what I was doing") before sending, which
+  improves report quality and trust. 500 lines at INFO with the keepalive
+  heartbeat (~1 line / 4.7 s) ≈ 30–40 min of history; under a failure storm
+  (~1–2 lines/s) it still retains ~4–8 min — enough context, small enough to
+  mail/IM as an attachment.
+- **Out of scope / consequences:** remote auto-reporting is deliberately
+  deferred (server/consent/F-Droid scrutiny); the connection state is not
+  reachable from SettingsFragment (the SenderService is activity-scoped), so
+  the Settings-sourced report shows "not running (open the gamepad to capture
+  the live state)" while the crash dialog carries the live state; Robolectric
+  cannot resolve FileProvider path XML or query intent activities, so the
+  sharer takes an injectable report URI and the FileProvider call is
+  device-only (16 report lines stay uncovered, documented in MEMORY C14).
 
 ______________________________________________________________________
 

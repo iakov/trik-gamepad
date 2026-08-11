@@ -502,3 +502,41 @@ Retrospective + elapsed: MEMORY.md "Campaign 12 execution run".
   empty-host video-only state: `.tmp/empty_host_final.png` (no pill — 0 orange
   pixels — no controls, placeholder shown).
   **CAMPAIGN 12 COMPLETE.**
+
+## Campaign 14 — user-facing diagnostics & crash reporting (offline-first)
+
+Scope (user decision 2026-08-11): give users a way to hand developers a
+reproduction bundle (app+device spec, app settings, connection state, an event
+trace, crash stacktraces) so an indie maintainer spends as little time as
+possible reproducing bugs — across all stores incl. F-Droid (no Play-only
+telemetry, no new permissions, no silent data egress). Rationale/alternatives:
+DECISIONS.md "User-facing diagnostics & crash reporting (offline-first,
+Campaign 14)". Retrospective + elapsed: MEMORY.md "Campaign 14 execution run".
+
+| Estimated | Actual |
+|-----------|--------|
+| ~2 h | ≈1 h 20 m (impl + gate iterations) + docs |
+
+- **AppLog + 500-line ring buffer** — every log call mirrors to logcat and
+  into a thread-safe ring buffer; the buffer floor defaults to INFO and is
+  user-tunable via "Diagnostics verbosity" (Errors only / Info / Debug /
+  Verbose). Keepalive/connect logs were promoted to INFO so they land in the
+  default report; per-command sends stay DEBUG.
+- **Diagnostic report** — one markdown data block (version/versionCode/build,
+  device model, Android/API, display+density+font scale, locale, connection
+  state, full settings snapshot with `(default)` markers, presets, log tail,
+  last crash trace).
+- **Review-then-share flow** — "Report an issue" writes the report file
+  (`cacheDir/diagnostics/`, FileProvider, cache-path only) and opens it in a
+  text editor (chooser title = "Choose a text editor to review and edit before
+  sharing to developers"); the default-off "Share logs without editing" switch
+  skips the editor with a direct share sheet (also the no-editor fallback).
+  "Copy report" + in-app "View log" round out the About rows.
+- **Crash capture + next-launch dialog** — chaining `UncaughtExceptionHandler`
+  via a new `App` Application; bounded crash store; once-per-crash dialog with
+  Review & share / Copy / Dismiss.
+- **Verification** — canonical gate green (LINE **0.952**, BRANCH **0.865**,
+  gates 0.95/0.85; jscpd 0 clones), full 3-variant `test` ×2, pre-commit
+  clean; pushed `18f6e1c..b07b570`. Instrumented suite + emulator screenshot
+  proof tracked after the docs step. **CAMPAIGN 14 COMPLETE** (implementation
+  commits `c8c5a64..b07b570`).

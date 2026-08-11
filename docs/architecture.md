@@ -55,6 +55,10 @@ constants in `SettingsFragment`.
   from `com.demo.mjpeg` in Phase 5): `MjpegView` (SurfaceView + render
   thread), `MjpegInputStream` (frame parser), `MjpegFrameRenderer` (decoding
   - letterbox + FPS overlay).
+- `com.trikset.gamepad.diagnostics` — user-facing diagnostics (Campaign 14):
+  `AppLog` (logcat + ring buffer) + `LogRingBuffer`, `DiagLevel`, `DiagnosticsReport`,
+  `ReportDiagnosticsWriter`/`ReportSharer`, `CrashLogStore`, `CrashHandler`,
+  `CrashReportDialog`. `App` (Application) lives in the root package.
 
 ## TCP command protocol (`SenderService`)
 
@@ -164,6 +168,48 @@ step. The video URI is never implicitly overwritten on host change — the
 explicit "Reset video URI to robot default" preference fills it. Extracted
 from `MainActivity`'s inline listener (ROADMAP Phase 2-E) so the logic is
 directly testable without reflection.
+
+## Diagnostics & user-facing reporting (Campaign 14)
+
+Offline-first: all diagnostic data stays on-device until the user reviews and
+explicitly shares it — no new permissions, no proprietary SDKs, works on every
+store incl. F-Droid (rationale: DECISIONS.md). The pieces live in the
+`com.trikset.gamepad.diagnostics` package:
+
+- **`AppLog`** — the single log channel. Every `d/i/w/e/v` call mirrors to
+  logcat (gated by `Log.isLoggable`, preserving the old DEBUG-gated behavior)
+  and, when it passes the buffer floor (`minBufferLevel`, default INFO), into a
+  **500-line synchronized ring buffer** (`LogRingBuffer`, extracted pure class).
+  The floor is set by the "Diagnostics verbosity" list (Errors only / Info /
+  Debug / Verbose) via `DiagLevel`, applied at `App` startup and in
+  SettingsFragment. Level rebalance (Campaign 14): connect/disconnect and the
+  keepalive heartbeat log at INFO (they land in the default report); per-command
+  "Sending" stays DEBUG (excluded by default).
+- **`DiagnosticsReport`** — builds the one-file markdown data block: app
+  version/versionCode/build type, device manufacturer/model/product, Android
+  release/API, display resolution/density/font scale, locale, the live
+  `ConnectionState` (the crash dialog passes it; SettingsFragment has no
+  sender, so it reports "not running"), the full settings snapshot with
+  `(default)` markers, robot presets, the log tail and the last crash trace.
+- **`ReportDiagnosticsWriter` + `ReportSharer`** — write
+  `cacheDir/diagnostics/trik-gamepad-report-<ts>.md` and open it via a
+  FileProvider (`exported=false`, `<cache-path diagnostics/>` only; manifest
+  also declares the `<queries>` intent for `ACTION_EDIT`/`text/plain` so
+  `queryIntentActivities` sees editors on API 30+). Default flow: **text editor
+  for review/edit** (chooser title = the instruction), then share from the
+  editor (mail/IM). The "Share logs without editing" switch (default off) or a
+  missing editor falls back to a direct `ACTION_SEND` share sheet with the file
+  attached. The FileProvider call is a thin device-only seam (Robolectric
+  cannot resolve path XML); the intent logic takes an injected `Uri`.
+- **Crash capture** — `App : Application` installs a chaining
+  `CrashHandler`; `CrashLogStore` persists the newest ≤3 stack traces to
+  internal storage and owns the once-per-crash prompt state. `CrashReportDialog`
+  (shown by MainActivity at launch) offers Review & share / Copy / Dismiss,
+  honoring the share-without-editing switch.
+- **About rows** — "Report an issue", "Share logs without editing", "Copy
+  report", "View log" (in-app 200-line tail dialog); the About-system tap now
+  copies the full report. Every option carries a description (summary /
+  summaryOn+Off), per the repo convention.
 
 ## Test layering
 

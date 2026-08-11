@@ -1808,3 +1808,112 @@ LINE 1156/1191 = 0.971 (was 0.965); `jacocoTestCoverageVerification` with
 `minimum = 0.85` green; canonical gate (`uv run python scripts/gate.py`) green;
 full 3-variant `test` suite run 3× (once via gate.py, twice `--rerun-tasks`).
 Test logical-SLOC 18,425 tokens (up 418 from C12 — the new branches).
+
+### [2026-08-11] Campaign 14 execution run - user-facing diagnostics & crash reporting
+
+Scope (user decision 2026-08-11): offline-first diagnostics so users can hand
+developers a reproduction bundle — app+device spec, app settings, connection
+state, an event trace, and crash stacktraces — across all stores incl. F-Droid.
+Rationale + alternatives: DECISIONS.md "User-facing diagnostics & crash
+reporting (offline-first, Campaign 14)". **Timing (by commit timestamps):
+Estimated ~2 h, Actual ~1 h 20 m implementation + gate iterations, then docs
+after push.**
+
+**What landed (8 prod commits + 2 gate-fix commits, `c8c5a64..b07b570`):**
+
+- **AppLog facade + LogRingBuffer** — every log call mirrors to logcat
+  (`Log.isLoggable`-gated, preserving the old DEBUG-gated behavior) and feeds a
+  500-line synchronized ring buffer; the buffer floor defaults to INFO. The
+  pure `LogRingBuffer` is extracted from the singleton so eviction/ordering is
+  hermeticly testable.
+- **Diagnostics verbosity setting** (`diagLevel`: Errors only / Info / Debug /
+  Verbose) — maps to the buffer floor via `DiagLevel`, applied in
+  SettingsFragment and re-applied by `App` at process start.
+- **Log-site migration + level rebalance** — all 33 `Log.*` sites route
+  through AppLog; connect/disconnect + the keepalive heartbeat were promoted
+  DEBUG→INFO (they land in the default report), per-command "Sending" stays
+  DEBUG (excluded by default). The removed `isLoggable` branches moved into
+  AppLog (covered there); SenderServiceTest's `ShadowLog.setLoggable` setup is
+  gone.
+- **DiagnosticsReport** — one markdown data block: app version/versionCode/
+  build type, device manufacturer/model/product, Android release/API, display
+  resolution/density/font scale, locale, live `ConnectionState` (or "not
+  running"), full settings snapshot with `(default)` markers, robot presets,
+  log tail, optional crash trace — all in fenced text blocks.
+- **Report file + share** — `ReportDiagnosticsWriter` writes
+  `cacheDir/diagnostics/trik-gamepad-report-<ts>.md`; a FileProvider
+  (`exported=false`, `<cache-path diagnostics/>` only) exposes it; `ReportSharer`
+  opens it in a **text editor** (chooser title = the review hint) or, with the
+  "Share without editing" switch or no editor present, a direct `ACTION_SEND`
+  share sheet with the file attached. Manifest gains a `<queries>` intent for
+  `ACTION_EDIT`/`text/plain` (without it `queryIntentActivities` returns empty
+  on API 30+ and the editor flow silently dies).
+- **About rows** — "Report an issue", "Share logs without editing" switch,
+  "Copy report", "View log" (in-app dialog, 200-line tail); the About-system
+  tap now copies the **full** report.
+- **Crash capture** — new `App : Application` (manifest `android:name`)
+  installs a chaining `CrashHandler` persisting bounded crash stacktraces via
+  `CrashLogStore`; `MainActivity` shows a once-per-crash `CrashReportDialog`
+  (Review & share / Copy / Dismiss; the label honors the switch). The dialog
+  presenter is extracted from MainActivity (detekt function count).
+
+**Verification (measured):** LINE **1482/1557 = 0.952**, BRANCH **621/718 =
+0.865** (gates 0.95/0.85); canonical gate green (lint/detekt/spotbugs/jscpd/
+lizard); full 3-variant `test` suite ×2; pre-commit clean; pushed
+`18f6e1c..b07b570`. The gate dropped line coverage to 0.946 mid-campaign; it
+was lifted back with targeted tests (throwable-DEBUG log path, CrashHandler
+failed-capture path, `CrashLogStore.markPrompted` no-op, the crash-dialog copy
+action). Test logical-SLOC: 21,855 tokens (gate print) — up from 18,425 (C13)
+because the new classes + their tests are sizeable; the lizard trend line was
+updated accordingly (the gate prints the running total).
+
+**Quirks hit this campaign (each cost a gate/test cycle — read before the next
+diagnostics change):**
+
+- **Pre-commit aborts `git commit` when a new .kt is unformatted.** The
+  spotless-apply hook reformats staged files and pre-commit fails (files were
+  modified) → the commit does NOT happen; `git status` shows `AM`. Fix:
+  `git add` again and recommit. Happened on 3 consecutive commits (C4/C5/C6)
+  before the rhythm sunk in — run `./gradlew spotlessApply` before staging new
+  files.
+- **`FileProvider.getUriForFile` throws under Robolectric** ("Failed to find
+  configured root that contains ...") — path-XML resolution isn't supported in
+  the sandbox. Seam: `ReportSharer` takes an injectable report `Uri`; the
+  FileProvider call lives only in the public `share()`, untested. Those ~16
+  lines (public share + `hasEditHandler`) are the campaign's accepted
+  coverage gap.
+- **Robolectric has no `buildApplication`/`setupApplication`** (verified in
+  4.16.1 bytecode). The runner creates the Application from the manifest, so
+  the runtime app IS `App`; drive it via `RuntimeEnvironment.getApplication()`
+  and re-run `onCreate()` to observe the wiring.
+- **`android.app.Dialog.getButton` is not in the compile SDK stub** (API 36
+  android.jar) — `dialog.getButton(...)` does not compile. Cast the shown
+  dialog to `androidx.appcompat.app.AlertDialog` (whose `getButton` is public)
+  to reach the buttons.
+- **appcompat AlertDialog button clicks post a `ButtonHandler` message to the
+  main looper** — `performClick()` alone "does nothing"; `shadowOf( getMainLooper()).idle()` must run before asserting the effect (the clipboard
+  was null until idled). `ShadowDialog.clickOn()` is not a substitute — it
+  does `findViewById(android.R.id.button3).performClick()` and the id is null.
+- **`@string/copy` collides with a private androidx.preference resource**
+  (lint `PrivateResource`). Renamed to `copy_button`. Any future `copy`/
+  `share`/`dismiss` string that mirrors an androidx.preference private string
+  will hit the same lint.
+- **`<queries>` is required for `queryIntentActivities` on API 30+** — lint
+  `QueryPermissionsNeeded` (warningsAsErrors) AND real behavior (empty result
+  → editor flow dead). Declare the exact intent queried.
+- **Kotlin's `takeLast` doesn't resolve on `java.util.ArrayDeque`** (extension
+  needs a `List`); use `kotlin.collections.ArrayDeque`.
+- **detekt `TooManyFunctions` counts object members and flags at
+  `count >= threshold`** (11 detected vs threshold 11 fails). AppLog dropped
+  to 11 by making `format` top-level; MainActivity re-extracted
+  `CrashReportDialog` to stay at ≤ 31.
+- **`System.currentTimeMillis()` filenames collide** for back-to-back saves
+  (the 5-save capacity test wrote one file). `CrashLogStore` uses
+  `System.nanoTime()` (monotonic) in the filename and sorts records by name.
+- **Background keepalive threads pollute the shared AppLog buffer across
+  tests** — other test classes' real schedulers append INFO lines mid-test, so
+  count-based assertions flaked. AppLogTest asserts **presence** (`any { ... }`), and exact eviction/order semantics moved to the pure
+  `LogRingBufferTest`. The app itself is safe (synchronized ring).
+- **`MaterialAlertDialogBuilder` needs a Material theme** — the app theme is
+  `Theme.AppCompat`, so the crash dialog uses `androidx.appcompat.app.AlertDialog`
+  (it also resolves under Robolectric).
