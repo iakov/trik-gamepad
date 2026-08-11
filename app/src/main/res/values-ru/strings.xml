@@ -48,7 +48,7 @@
     <string name="diag_level">Подробность диагностики…</string>
     <string name="diag_level_summary">%1$s · Насколько подробны диагностические отчёты: только ошибки, общие, отладочные, подробные</string>
     <string name="diag_level_label_errors">Только ошибки</string>
-    <string name="diag_level_label_info">Общая</string>
+    <string name="diag_level_label_info">Инфо</string>
     <string name="diag_level_label_debug">Отладочная</string>
     <string name="diag_level_label_verbose">Подробная</string>
     <string-array name="diag_level_labels">

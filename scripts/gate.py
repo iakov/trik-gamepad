@@ -104,6 +104,23 @@ def run_lizard_trend() -> None:
     append_log(trend)
 
 
+def run_check_translations() -> None:
+    print("==> check_translations (translation sync guard)")
+    result = subprocess.run(
+        [sys.executable, os.path.join(ROOT, "scripts", "check_translations.py"), "--sync"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.stdout:
+        print(result.stdout.rstrip())
+    if result.stderr:
+        append_log(result.stderr)
+    if result.returncode != 0:
+        print(f"FAILED: translations out of sync (see {LOG})")
+        sys.exit(result.returncode)
+
+
 def main() -> None:
     os.makedirs(LOG_DIR, exist_ok=True)
     with open(LOG, "w", encoding="utf-8"):
@@ -115,6 +132,7 @@ def main() -> None:
             sys.exit(rc)
     run_jscpd()
     run_lizard_trend()
+    run_check_translations()
     print("GATE PASSED - all steps green. Log: .tmp/gate.log")
 
 
