@@ -1,5 +1,6 @@
 package com.trikset.gamepad
 
+import com.trikset.gamepad.diagnostics.AppLog
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -37,9 +38,7 @@ internal class KeepAliveTimer(
     val out = sender.mOut
     if (out != null) {
       val command = "keepalive ${sender.getKeepaliveTimeout()}"
-      if (android.util.Log.isLoggable(TCP_TAG, android.util.Log.DEBUG)) {
-        android.util.Log.d(TCP_TAG, "Sending $command message")
-      }
+      AppLog.i(TCP_TAG, "Sending $command message")
       sender.postCommand(command)
     } else {
       stop()

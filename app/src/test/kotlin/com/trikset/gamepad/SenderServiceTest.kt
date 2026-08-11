@@ -1,7 +1,6 @@
 package com.trikset.gamepad
 
 import android.os.Looper.getMainLooper
-import android.util.Log
 import java.util.Locale
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -13,7 +12,6 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.util.concurrent.PausedExecutorService
 import org.robolectric.annotation.LooperMode
 import org.robolectric.annotation.LooperMode.Mode.PAUSED
-import org.robolectric.shadows.ShadowLog
 
 @RunWith(RobolectricTestRunner::class)
 @LooperMode(PAUSED)
@@ -131,11 +129,7 @@ class SenderServiceTest : RobolectricTestBase() {
   }
 
   @Test
-  fun sendAndDisconnectWithDebugLoggingEnabledShouldLog() {
-    // Robolectric's default isLoggable returns level >= INFO, so the DEBUG log
-    // gates are false by default; raise the TCP tag to DEBUG to cover the true
-    // branches in send()/disconnect().
-    ShadowLog.setLoggable("TCP", Log.DEBUG)
+  fun sendAndDisconnectShouldCompleteTheSendPath() {
     TestTcpServer().use { server ->
       client = SenderService(mExecutor)
       client!!.setTarget(TestTcpServer.HOST, server.port)

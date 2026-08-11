@@ -6,7 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
-import android.util.Log
+import com.trikset.gamepad.diagnostics.AppLog
 import java.io.InputStream
 import java.util.Locale
 import org.apache.commons.io.input.BoundedInputStream
@@ -82,7 +82,7 @@ class MjpegFrameRenderer(
     if (previous != null && decoded !== previous) {
       // Was not reused
       previous.recycle()
-      Log.v(TAG, "Bitmap was not reused, recycled.")
+      AppLog.v(TAG, "Bitmap was not reused, recycled.")
     }
     bitmap = decoded
     return destRect(decoded.width, decoded.height, dispWidth, dispHeight)

@@ -4,13 +4,13 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.util.AttributeSet
-import android.util.Log
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.widget.RelativeLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
+import com.trikset.gamepad.diagnostics.AppLog
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
@@ -152,7 +152,7 @@ class SquareTouchPadLayout : RelativeLayout {
         true
       }
       else -> {
-        Log.e("TouchEvent", "Unknown:$event")
+        AppLog.e(TAG, "Unknown touch event: $event")
         true
       }
     }
@@ -167,5 +167,6 @@ class SquareTouchPadLayout : RelativeLayout {
     const val DEFAULT_SIZE = 100
     const val CIRCLE_RADIUS_DIVISOR = 20
     const val OPAQUE_ALPHA = 255
+    const val TAG = "TouchPad"
   }
 }

@@ -1,6 +1,6 @@
 package com.trikset.gamepad.mjpeg
 
-import android.util.Log
+import com.trikset.gamepad.diagnostics.AppLog
 import java.io.BufferedInputStream
 import java.io.DataInputStream
 import java.io.IOException
@@ -117,26 +117,24 @@ class MjpegInputStream(input: InputStream) :
         return s
       }
     } catch (e: IOException) {
-      Log.d(TAG, "catch exn hit", e)
+      AppLog.d(TAG, "Frame parse recovery", e)
     } catch (e: IllegalArgumentException) {
-      Log.d(TAG, "catch exn hit", e)
+      AppLog.d(TAG, "Frame parse recovery", e)
     }
     try {
       if (contentLength < 0) {
-        Log.e(TAG, "Skipping to recover")
+        AppLog.e(TAG, "Skipping to recover")
         contentLength = getStartOfSequence(CONTENT_LENGTH_MARKER)
       } else {
-        Log.i(TAG, "Frame dropped.")
+        AppLog.i(TAG, "Frame dropped.")
       }
-      if (Log.isLoggable(TAG, Log.VERBOSE)) {
-        Log.v(TAG, "$contentLength bytes to skip until next frame header.")
-      }
+      AppLog.v(TAG, "$contentLength bytes to skip until next frame header.")
       val skipped = skipBytes(contentLength)
       if (skipped != contentLength) {
-        Log.w(TAG, "Skipped only$skipped bytes instead of $contentLength")
+        AppLog.w(TAG, "Skipped only $skipped bytes instead of $contentLength")
       }
     } catch (e: IOException) {
-      Log.e(TAG, "Failed to skip bad data:$e\n${e.stackTrace.contentToString()}")
+      AppLog.e(TAG, "Failed to skip bad data", e)
     }
     return null
   }

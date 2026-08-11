@@ -2,9 +2,9 @@ package com.trikset.gamepad
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
+import com.trikset.gamepad.diagnostics.AppLog
 import java.net.MalformedURLException
 import java.net.URI
 import java.net.URISyntaxException
@@ -122,11 +122,11 @@ class MainActivitySettingsController(
       ui.setVideoUrl(if (videoStreamURI.isEmpty()) null else URI(videoStreamURI).toURL())
     } catch (e: URISyntaxException) {
       ui.toast("Illegal video stream URL")
-      Log.e(TAG, "onPreferenceChanged: ", e)
+      AppLog.e(TAG, "onPreferenceChanged: ", e)
       ui.setVideoUrl(null)
     } catch (e: MalformedURLException) {
       ui.toast("Illegal video stream URL")
-      Log.e(TAG, "onPreferenceChanged: ", e)
+      AppLog.e(TAG, "onPreferenceChanged: ", e)
       ui.setVideoUrl(null)
     }
 

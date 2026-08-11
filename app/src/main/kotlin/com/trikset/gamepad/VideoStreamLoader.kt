@@ -2,7 +2,7 @@ package com.trikset.gamepad
 
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.trikset.gamepad.diagnostics.AppLog
 import com.trikset.gamepad.mjpeg.MjpegInputStream
 import com.trikset.gamepad.mjpeg.MjpegView
 import java.io.IOException
@@ -56,10 +56,10 @@ constructor(
             connection.inputStream
           }
       val mjpeg = MjpegInputStream(stream)
-      Log.i("JPGReader", "Restarted connection.")
+      AppLog.i(TAG, "Restarted connection.")
       mjpeg
     } catch (e: IOException) {
-      Log.e("JPGReader", "Failed to open MJPEG stream.", e)
+      AppLog.e(TAG, "Failed to open MJPEG stream.", e)
       null
     }
   }
@@ -67,5 +67,6 @@ constructor(
   private companion object {
     const val CONNECT_TIMEOUT_MS = 5000
     const val READ_TIMEOUT_MS = 5000
+    const val TAG = "JPGReader"
   }
 }

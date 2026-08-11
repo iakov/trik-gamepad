@@ -6,9 +6,9 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.util.AttributeSet
-import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import com.trikset.gamepad.diagnostics.AppLog
 import java.io.IOException
 import org.apache.commons.io.input.BoundedInputStream
 
@@ -101,7 +101,7 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
         try {
           current.close()
         } catch (e: IOException) {
-          Log.e(TAG, "Failed to close MJPEG stream on stop", e)
+          AppLog.e(TAG, "Failed to close MJPEG stream on stop", e)
         }
       }
       viewThread?.join()
@@ -139,7 +139,7 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
           current.join(JOIN_TIMEOUT_MS)
           retry = false
         } catch (e: InterruptedException) {
-          Log.e(javaClass.simpleName, Log.getStackTraceString(e))
+          AppLog.e(TAG, "Render thread join interrupted", e)
         }
       }
       thread = null

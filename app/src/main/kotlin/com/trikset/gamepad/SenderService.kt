@@ -2,7 +2,7 @@ package com.trikset.gamepad
 
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
+import com.trikset.gamepad.diagnostics.AppLog
 import java.io.IOException
 import java.io.OutputStreamWriter
 import java.io.PrintWriter
@@ -80,7 +80,7 @@ class SenderService(
   internal fun connectToTRIK() {
     synchronized(syncFlag) {
       try {
-        Log.e("TCP Client", "C: Connecting...")
+        AppLog.i(TCP_TAG, "Connecting to $mHostAddr:$mHostPort")
         val socket = Socket()
         socket.connect(InetSocketAddress(mHostAddr, mHostPort), TIMEOUT)
         socket.tcpNoDelay = true
@@ -95,7 +95,7 @@ class SenderService(
           mOut = PrintWriter(osw, true)
           _connectionState.value = ConnectionState.Connected
         } catch (e: Exception) {
-          Log.e("TCP", "GetStream: Error", e)
+          AppLog.e(TCP_TAG, "GetStream: Error", e)
           socket.close()
           osw.close()
           // Failed to finish the handshake: leave the state machine at Disconnected, not stuck at
@@ -103,7 +103,7 @@ class SenderService(
           _connectionState.value = ConnectionState.Disconnected("")
         }
       } catch (e: IOException) {
-        Log.e("TCP", "Connect: Error", e)
+        AppLog.e(TCP_TAG, "Connect: Error", e)
         // A refused/unresolvable target must not leave the pill stuck at "Connecting…".
         // Empty reason -> MainActivity does not double-notify (the "Connection to X error."
         // Snackbar from onConnectionFinished is the single notification).
@@ -127,7 +127,7 @@ class SenderService(
       mainHandler.post {
         val out = mOut
         if (out == null || out.checkError()) {
-          Log.e("TCP", "NotSent: $command")
+          AppLog.e(TCP_TAG, "NotSent: $command")
           disconnect("Send failed.")
         }
       }
@@ -140,9 +140,7 @@ class SenderService(
     if (out != null) {
       out.close()
       mOut = null
-      if (Log.isLoggable(TCP_TAG, Log.DEBUG)) {
-        Log.d(TCP_TAG, "Disconnected.")
-      }
+      AppLog.i(TCP_TAG, "Disconnected.")
       onDisconnectedListener?.onEvent(reason)
       _connectionState.value = ConnectionState.Disconnected(reason)
     }
@@ -154,9 +152,7 @@ class SenderService(
     if (mOut == null) {
       connectAsync() // synchronized on the same object as postCommand
     }
-    if (Log.isLoggable(TCP_TAG, Log.DEBUG)) {
-      Log.d(TCP_TAG, "Sending '$command'")
-    }
+    AppLog.d(TCP_TAG, "Sending '$command'")
     postCommand(command)
     keepAliveTimer.restart()
   }
