@@ -650,4 +650,46 @@ class MainActivityTest : RobolectricTestBase() {
         )
     )
   }
+
+  @Test
+  fun dispatchKeyEventWithUnknownActionShouldFallThrough() {
+    // A non DOWN/UP action hits the when's else branch and falls through to super.
+    assertFalse(
+        activity.dispatchKeyEvent(
+            android.view.KeyEvent(
+                android.view.KeyEvent.ACTION_MULTIPLE,
+                android.view.KeyEvent.KEYCODE_VOLUME_UP,
+            )
+        )
+    )
+  }
+
+  @Test
+  fun setSenderServiceWithNullShouldBeSafe() {
+    activity.setSenderService(null)
+    // Null guard: the original sender is kept.
+    assertNotNull(activity.getSenderService())
+  }
+
+  @Test
+  fun onDestroyWithNullCollaboratorsShouldBeSafe() {
+    // Null the collaborators so the null branches in onDestroy run.
+    setField(activity, "mSensorManager", null)
+    setField(activity, "mVideo", null)
+    setField(activity, "mSettingsController", null)
+    method(activity, "onDestroy").invoke(activity)
+  }
+
+  @Test
+  fun nullVideoRetryControllerShouldBeSafeAcrossLifecycle() {
+    // Null the retry controller so the ?. null branches in onPause/onResume and
+    // the Connected edge-trigger all run.
+    setField(activity, "videoRetryController", null)
+    val sender = activity.getSenderService()
+    awaitControlConnection(sender)
+    method(activity, "onPause").invoke(activity)
+    method(activity, "onResume").invoke(activity)
+    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    sender.disconnect("test done")
+  }
 }

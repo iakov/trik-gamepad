@@ -176,4 +176,40 @@ class MjpegInputStreamTest : RobolectricTestBase() {
         )
     assertNull(stream.readMjpegFrame())
   }
+
+  @Test
+  fun readMjpegFrameWithHeaderEndingAtEofShouldStillParse() {
+    // The header block ends at the SOI marker without a trailing CRLF: the line
+    // scanner hits EOF inside the header and still resolves Content-Length.
+    val stream =
+        MjpegInputStream(
+            ByteArrayInputStream(
+                frameWithHeaders(
+                    "Content-Length: 5",
+                    byteArrayOf(0xFF.toByte(), 0xD8.toByte()) + jpegBytes(5),
+                )
+            )
+        )
+    val frame = stream.readMjpegFrame()
+    assertNotNull("header-without-newline must still yield a frame", frame)
+    frame?.close()
+  }
+
+  @Test
+  fun readMjpegFrameWithMalformedHeaderShouldRecover() {
+    // The first "Content-Length" text sits in a colon-less, non-content-length
+    // line, so the parser walks the whole bounded header: a bare-LF empty line,
+    // then EOF on a non-CL line. Exercises the empty-line skip and the
+    // EOF-in-header recovery (returns null instead of throwing).
+    val stream =
+        MjpegInputStream(
+            ByteArrayInputStream(
+                frameWithHeaders(
+                    "X Content-Length A 5\n\nContent-Type: image/jpeg",
+                    byteArrayOf(0xFF.toByte(), 0xD8.toByte()) + ByteArray(10),
+                )
+            )
+        )
+    assertNull(stream.readMjpegFrame())
+  }
 }

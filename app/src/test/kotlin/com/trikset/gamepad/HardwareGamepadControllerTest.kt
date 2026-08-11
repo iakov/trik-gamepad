@@ -62,8 +62,13 @@ class HardwareGamepadControllerTest : RobolectricTestBase() {
   fun dpadShouldDrivePad1() {
     assertTrue(controller.onKeyDown(KeyEvent.KEYCODE_DPAD_UP, 0))
     assertTrue(controller.onKeyDown(KeyEvent.KEYCODE_DPAD_RIGHT, 0))
+    assertTrue(controller.onKeyDown(KeyEvent.KEYCODE_DPAD_DOWN, 0))
+    assertTrue(controller.onKeyDown(KeyEvent.KEYCODE_DPAD_LEFT, 0))
     assertTrue(controller.onKeyUp(KeyEvent.KEYCODE_DPAD_UP))
-    assertEquals(listOf("pad 1 0 100", "pad 1 100 0", "pad 1 up"), sent)
+    assertEquals(
+        listOf("pad 1 0 100", "pad 1 100 0", "pad 1 0 -100", "pad 1 -100 0", "pad 1 up"),
+        sent,
+    )
   }
 
   @Test
@@ -164,5 +169,13 @@ class HardwareGamepadControllerTest : RobolectricTestBase() {
   @Test
   fun nonGamepadSourceShouldNotBeConsumed() {
     assertFalse(controller.onMotionEvent(stickEvent(source = InputDevice.SOURCE_MOUSE)))
+  }
+
+  @Test
+  fun gamepadOnlySourceShouldDriveSticks() {
+    // SOURCE_GAMEPAD without SOURCE_JOYSTICK: the source mask check's second
+    // condition evaluates to false and the move drives the pads.
+    assertTrue(controller.onMotionEvent(stickEvent(x = 0.5f, source = InputDevice.SOURCE_GAMEPAD)))
+    assertEquals(listOf("pad 1 50 0"), sent)
   }
 }
