@@ -78,7 +78,7 @@
     <string name="pref_advanced">Advanced settings</string>
     <string name="pref_advanced_summary">Wheel, pads, network, magic buttons, robot presets, diagnostics</string>
     <string name="pref_category_wheel">Wheel</string>
-    <string name="pref_wheel_enabled">Wheel</string>
+    <string name="pref_wheel_enabled">@string/pref_category_wheel</string>
     <string name="pref_wheel_enabled_on">Accelerometer wheel on</string>
     <string name="pref_wheel_enabled_off">Accelerometer wheel off</string>
     <string name="pref_wheel_sens">Wheel sensitivity…</string>

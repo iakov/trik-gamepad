@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!--
         Base application theme, dependent on API level. This theme is replaced
@@ -21,8 +21,9 @@
         <!-- Explicit HUD backdrop: without a stream the SurfaceView is transparent and would
              otherwise show the theme's (light) window background behind the placeholder/HUD. -->
         <item name="android:windowBackground">@android:color/black</item>
-        <!-- Our HUD is deliberately dark-over-video; never let the system force-dark invert it. -->
-        <item name="android:forceDarkAllowed">false</item>
+        <!-- Our HUD is deliberately dark-over-video; never let the system force-dark invert it.
+             No-op before API 29 (force-dark did not exist). -->
+        <item name="android:forceDarkAllowed" tools:targetApi="29">false</item>
         <!-- All customizations that are NOT specific to a particular API-level can go here. -->
     </style>
 
@@ -33,7 +34,7 @@
         <item name="android:windowActionBar">false</item>
         <item name="android:windowFullscreen">true</item>
         <item name="android:windowContentOverlay">@null</item>
-        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:forceDarkAllowed" tools:targetApi="29">false</item>
         <item name="colorPrimary">@color/greendark</item>
         <item name="colorPrimaryDark">@color/greendark</item>
         <item name="colorAccent">@color/greenlight</item>

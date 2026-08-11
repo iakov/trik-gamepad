@@ -76,7 +76,7 @@
     <string name="pref_advanced">Cài đặt nâng cao</string>
     <string name="pref_advanced_summary">Vô lăng, bàn điều khiển, mạng, nút ma thuật, mẫu robot, chẩn đoán</string>
     <string name="pref_category_wheel">Vô lăng</string>
-    <string name="pref_wheel_enabled">Vô lăng</string>
+    <string name="pref_wheel_enabled">@string/pref_category_wheel</string>
     <string name="pref_wheel_enabled_on">Bật vô lăng cảm biến gia tốc</string>
     <string name="pref_wheel_enabled_off">Tắt vô lăng cảm biến gia tốc</string>
     <string name="pref_wheel_sens">Độ nhạy vô lăng…</string>

@@ -78,7 +78,7 @@
     <string name="pref_advanced">Дополнительные настройки</string>
     <string name="pref_advanced_summary">Колесо, площадки, сеть, кнопки с символами, пресеты робота, диагностика</string>
     <string name="pref_category_wheel">Колесо</string>
-    <string name="pref_wheel_enabled">Колесо</string>
+    <string name="pref_wheel_enabled">@string/pref_category_wheel</string>
     <string name="pref_wheel_enabled_on">Акселерометр-колесо включено</string>
     <string name="pref_wheel_enabled_off">Акселерометр-колесо выключено</string>
     <string name="pref_wheel_sens">Чувствительность колеса…</string>
