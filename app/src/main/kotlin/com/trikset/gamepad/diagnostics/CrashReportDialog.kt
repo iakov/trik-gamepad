@@ -41,7 +41,7 @@ class CrashReportDialog(
         ) { _, _ ->
           ReportSharer.share(activity, reportText)
         }
-        .setNeutralButton(R.string.copy_button) { _, _ -> copyReport(reportText) }
+        .setNeutralButton(android.R.string.copy) { _, _ -> copyReport(reportText) }
         .setNegativeButton(R.string.dismiss, null)
         .show()
   }

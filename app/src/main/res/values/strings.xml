@@ -42,7 +42,6 @@
     <string name="crash_dialog_message">A report with the crash details is ready. You can review and edit it before sending it to the developers.</string>
     <string name="review_and_share">Review &amp; share</string>
     <string name="share">Share</string>
-    <string name="copy_button">Copy</string>
     <string name="dismiss">Dismiss</string>
     <string name="diag_level">Diagnostics verbosity…</string>
     <string name="diag_level_summary">%1$s · How much detail diagnostic reports include: errors, info, debug, verbose</string>

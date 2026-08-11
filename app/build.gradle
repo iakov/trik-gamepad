@@ -33,7 +33,7 @@ android {
         versionCode (minSdk * 10000 + abiCode * 1000 +  appMajorVersion * 100  + appMinorVersion)
         versionName ('' + appMajorVersion + '.' + appMinorVersion)
         versionNameSuffix ('-API' + minSdk)
-        resourceConfigurations += ['en']
+        resourceConfigurations += ['en', 'ru', 'fr', 'de', 'vi']
         // Only sign with the local keystore when it actually exists (CI has no
         // keystore and must fall back to the debug keystore). See MEMORY.md.
         if (keystoreFile.exists()) {
