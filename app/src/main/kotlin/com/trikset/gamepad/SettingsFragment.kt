@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
-import android.util.DisplayMetrics
 import android.widget.Toast
 import androidx.core.content.edit
 import androidx.preference.EditTextPreference
@@ -60,6 +59,17 @@ class SettingsFragment : PreferenceFragmentCompat() {
     private const val DEFAULT_MAGIC_BUTTON_COUNT = 3
 
     fun magicSymbolKey(buttonNumber: Int): String = "magicSymbol$buttonNumber"
+
+    /**
+     * Reads a SeekBarPreference value (Int storage, honoring legacy String values), else [default].
+     * Shared with MainActivitySettingsController, which has no fragment instance.
+     */
+    fun readSeekBarValue(prefs: SharedPreferences, key: String, default: Int): Int =
+        when (val value = prefs.all[key]) {
+          is Int -> value
+          is String -> value.toIntOrNull() ?: default
+          else -> default
+        }
   }
 
   /** One-tap copy of the configured robot IP (debugging convenience). */
@@ -105,8 +115,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
   private fun initializeAboutSystemField() {
     val myActivity = activity ?: return
-    val displayMetrics = DisplayMetrics()
-    myActivity.windowManager.defaultDisplay.getMetrics(displayMetrics)
+    // Resources.getDisplayMetrics() is the non-deprecated source of the default
+    // display metrics on every supported API level (the
+    // windowManager.defaultDisplay.getMetrics() chain is deprecated since API 30).
+    val displayMetrics = myActivity.resources.displayMetrics
     val systemInfo =
         String.format(
             Locale.ENGLISH,
@@ -248,16 +260,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
       }
     }
   }
-
-  /**
-   * Reads a SeekBarPreference value (Int storage, honoring legacy String values), else [default].
-   */
-  internal fun readSeekBarValue(prefs: SharedPreferences, key: String, default: Int): Int =
-      when (val value = prefs.all[key]) {
-        is Int -> value
-        is String -> value.toIntOrNull() ?: default
-        else -> default
-      }
 
   /** "Button symbols…": dialog to edit the 5 glyphs; summary = the resolved glyphs joined. */
   private fun initializeMagicSymbolsField() {

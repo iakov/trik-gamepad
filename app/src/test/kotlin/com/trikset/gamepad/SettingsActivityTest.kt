@@ -298,12 +298,16 @@ class SettingsActivityTest : RobolectricTestBase() {
     prefs.edit().putString(SettingsFragment.SK_WHEEL_STEP, "12").commit()
     // Direct call: the fragment's own initialization cannot reach the String branch without the
     // SeekBarPreference view crashing first (prefs.getInt on a String value throws), but the
-    // defensive parser must still honor it (mirrors MainActivitySettingsController.readInt).
-    assertEquals(12, SettingsFragment().readSeekBarValue(prefs, SettingsFragment.SK_WHEEL_STEP, 7))
+    // defensive parser must still honor it (the same shared helper MainActivitySettingsController
+    // uses for the live pads-alpha/wheel-step settings).
+    assertEquals(
+        12,
+        SettingsFragment.readSeekBarValue(prefs, SettingsFragment.SK_WHEEL_STEP, 7),
+    )
     assertEquals(
         "unparseable String falls back to the default",
         7,
-        SettingsFragment().readSeekBarValue(prefs, SettingsFragment.SK_WHEEL_STEP + ".nope", 7),
+        SettingsFragment.readSeekBarValue(prefs, SettingsFragment.SK_WHEEL_STEP + ".nope", 7),
     )
   }
 

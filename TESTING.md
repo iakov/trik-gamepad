@@ -416,6 +416,39 @@ A0 baseline (2026-08-09; `main` sources excluded) — the fixed trend anchor:
 - PowerShell: parse with `[xml](Get-Content -Raw …)`; `XmlDocument.Load()`
   throws on the `report.dtd` reference.
 
+### Compiler warnings as errors (K2 `-Wextra`)
+
+- `app/build.gradle` sets `extraWarnings` **and** `allWarningsAsErrors` on the
+  `kotlin { compilerOptions {} }` extension (AGP 9 built-in Kotlin wires the real
+  KGP `KotlinAndroidProjectExtension`; AGP 9.3.1 bundles KGP 2.2.10). This covers
+  **every** Kotlin compilation in the module — main, unit test, androidTest — so
+  a new warning (deprecation, redundant code, unreachable code, `-Wextra` extra
+  checks) fails the build. Enablement history: DECISIONS.md "K2 -Wextra
+  warnings-as-errors".
+- The Kotlin compiler does **not** do boolean algebra, so it cannot flag
+  tautologies like `X || !X` as function arguments — that class is covered by the
+  "Tests must be able to fail" discipline above, not by compiler warnings.
+- **Accepted suppressions** (each carries a rationale comment in code; keep this
+  registry in sync):
+  - `@Suppress("DEPRECATION")`:
+    - `SettingsActivityTest` `seekBarSummariesHonorLegacyStringStorage` + the two
+      `getParcelableExtra(String)` calls in `ReportSharerTest` — the typed
+      replacement overload is API 33+, and these tests run at minSdk 23
+      (Robolectric `[23]`).
+    - `MainActivityTest` `updateConfiguration(config, metrics)` (2-arg) — the
+      1-arg form was removed in SDK 36.
+    - `MainActivityTest` `dispatchKeyEventWithUnknownActionShouldFallThrough` —
+      `ACTION_MULTIPLE` is deprecated but is the only KeyEvent action that is
+      neither DOWN nor UP, which is exactly what the test needs.
+    - `ConnectionFeedbackTest` `TYPE_ANNOUNCEMENT` — the only way to recognize an
+      announcement in a sent-event list.
+    - `FocusAwareActivityTestRule` (file-level) — deliberately extends the
+      deprecated `ActivityTestRule` to add focus-wait/back-dismiss logic that
+      `ActivityScenarioRule` does not expose.
+  - `@Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")`:
+    - `DummyServer`'s monitor `Object()` — `kotlin.Any` has no `wait`/`notifyAll`
+      monitor methods.
+
 ## Known gaps
 
 - Coverage is enforced as a JaCoCo ratchet gate — the current thresholds live

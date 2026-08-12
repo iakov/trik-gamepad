@@ -109,7 +109,7 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun onCreateShouldRegisterPreferencesAndLifecycle() {
     // .setup() ran onCreate+onResume; tear down to cover onPause/onDestroy.
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
 
   @Test
@@ -184,7 +184,9 @@ class MainActivityTest : RobolectricTestBase() {
     val resources = activity.resources
     val config = android.content.res.Configuration(resources.configuration)
     config.fontScale = 1.3f
-    resources.updateConfiguration(config, resources.displayMetrics)
+    // The 1-arg updateConfiguration(Configuration) was removed in SDK 36, so the
+    // deprecated 2-arg form is the only way to drive a font-scale change here.
+    @Suppress("DEPRECATION") resources.updateConfiguration(config, resources.displayMetrics)
 
     val row = activity.findViewById<android.view.ViewGroup>(R.id.buttons)!!
     row.measure(
@@ -235,7 +237,7 @@ class MainActivityTest : RobolectricTestBase() {
     setField(activity, "mVideo", null)
     setField(activity, "mSensorManager", null)
     method(activity, "onResume").invoke(activity)
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
 
   @Test
@@ -243,7 +245,7 @@ class MainActivityTest : RobolectricTestBase() {
     val video = MjpegView(activity)
     setField(activity, "mVideo", video)
     method(activity, "restartVideoStream").invoke(activity)
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
 
   @Test
@@ -281,7 +283,7 @@ class MainActivityTest : RobolectricTestBase() {
     // mVideo null -> runOnUiThread closure returns early.
     val m = method(activity, "restartVideoStream")
     m.invoke(activity)
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
 
   @Test
@@ -298,7 +300,7 @@ class MainActivityTest : RobolectricTestBase() {
     // post time to reach the main looper so the onLoadFailed path is deterministically covered.
     val settleDeadline = System.currentTimeMillis() + 2000
     while (System.currentTimeMillis() < settleDeadline) {
-      org.robolectric.Robolectric.flushForegroundThreadScheduler()
+      org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
       Thread.sleep(20)
     }
     sender.disconnect("test done")
@@ -310,7 +312,7 @@ class MainActivityTest : RobolectricTestBase() {
     // mVideoURL != null (false) and nothing is armed.
     val sender = activity.getSenderService()
     awaitControlConnection(sender)
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
     sender.disconnect("test done")
   }
 
@@ -324,7 +326,7 @@ class MainActivityTest : RobolectricTestBase() {
           sender.connectionState.value !is ConnectionState.Connected &&
               System.currentTimeMillis() < deadline
       ) {
-        org.robolectric.Robolectric.flushForegroundThreadScheduler()
+        org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
         Thread.sleep(10)
       }
       assertTrue(sender.connectionState.value is ConnectionState.Connected)
@@ -338,7 +340,7 @@ class MainActivityTest : RobolectricTestBase() {
     setField(activity, "mVideo", MjpegView(activity))
     setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
     method(activity, "restartVideoStream").invoke(activity)
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
 
   @Test
@@ -373,7 +375,7 @@ class MainActivityTest : RobolectricTestBase() {
       setField(activity, "mVideoURL", videoUrl)
     }
     method(activity, "restartVideoStream").invoke(activity)
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
     val indicator = activity.findViewById<android.widget.ProgressBar>(R.id.videoLoading)
     assertEquals(android.view.View.GONE, indicator!!.visibility)
   }
@@ -446,18 +448,8 @@ class MainActivityTest : RobolectricTestBase() {
     setField(activity, "mAngle", 0)
     setField(activity, "mWheelStep", 7)
 
-    // createSensorEvent(size, type): type must be TYPE_ACCELEROMETER (the
-    // 1-arg createSensorEvent(size) defaults to TYPE_GRAVITY, which never
-    // reaches the wheel path).
-    val event =
-        org.robolectric.shadows.ShadowSensorManager.createSensorEvent(
-            3,
-            android.hardware.Sensor.TYPE_ACCELEROMETER,
-        )
-    event.values[0] = 0.7f
-    event.values[1] = 0.7f
-    event.values[2] = 0f
-    activity.onSensorChanged(event)
+    // Accelerometer samples reach the wheel path only when the sensor type matches.
+    activity.onSensorChanged(sensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER))
     // Wheel enabled -> the accelerometer sample is processed: mAngle changes from 0
     // (mirrors onSensorChangedWhenWheelDisabledShouldReturnEarly asserting mAngle == 0).
     assertNotEquals(0, field(activity, "mAngle") as Int)
@@ -469,28 +461,14 @@ class MainActivityTest : RobolectricTestBase() {
     setField(activity, "mAngle", 0)
     setField(activity, "mWheelStep", 7)
 
-    val event =
-        org.robolectric.shadows.ShadowSensorManager.createSensorEvent(
-            3,
-            android.hardware.Sensor.TYPE_ACCELEROMETER,
-        )
-    event.values[0] = 0.7f
-    event.values[1] = 0.7f
-    activity.onSensorChanged(event)
+    activity.onSensorChanged(sensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER))
     // Wheel disabled -> no command sent, mAngle unchanged.
     assertEquals(0, field(activity, "mAngle") as Int)
   }
 
   @Test
   fun onSensorChangedWithNonAccelerometerShouldLogOnly() {
-    val event =
-        org.robolectric.shadows.ShadowSensorManager.createSensorEvent(
-            3,
-            android.hardware.Sensor.TYPE_GRAVITY,
-        )
-    event.values[0] = 0.7f
-    event.values[1] = 0.7f
-    activity.onSensorChanged(event)
+    activity.onSensorChanged(sensorEvent(android.hardware.Sensor.TYPE_GRAVITY))
     // Non-accelerometer sensors hit the else branch; no wheel command.
     assertEquals(0, field(activity, "mAngle") as Int)
   }
@@ -507,7 +485,7 @@ class MainActivityTest : RobolectricTestBase() {
     val btnSettings = activity.findViewById<android.widget.Button>(R.id.btnSettings)
     assertNotNull(btnSettings)
     btnSettings!!.performClick()
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
 
   @Test
@@ -518,7 +496,7 @@ class MainActivityTest : RobolectricTestBase() {
     val btnSettings = activity.findViewById<android.widget.Button>(R.id.btnSettings)
     assertNotNull(btnSettings)
     btnSettings!!.performClick()
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
     // No assertion on the final visibility: the 3s auto-hide runnable fires
     // during the flush and re-hides the bar. The click already exercised the
     // show path (branch coverage).
@@ -656,14 +634,15 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun dispatchKeyEventWithUnknownActionShouldFallThrough() {
     // A non DOWN/UP action hits the when's else branch and falls through to super.
-    assertFalse(
-        activity.dispatchKeyEvent(
-            android.view.KeyEvent(
-                android.view.KeyEvent.ACTION_MULTIPLE,
-                android.view.KeyEvent.KEYCODE_VOLUME_UP,
-            )
+    // ACTION_MULTIPLE is deprecated (API 33) but remains the only KeyEvent action
+    // that is neither DOWN nor UP, which is exactly what this test needs.
+    @Suppress("DEPRECATION")
+    val keyEvent =
+        android.view.KeyEvent(
+            android.view.KeyEvent.ACTION_MULTIPLE,
+            android.view.KeyEvent.KEYCODE_VOLUME_UP,
         )
-    )
+    assertFalse(activity.dispatchKeyEvent(keyEvent))
   }
 
   @Test
@@ -691,7 +670,14 @@ class MainActivityTest : RobolectricTestBase() {
     awaitControlConnection(sender)
     method(activity, "onPause").invoke(activity)
     method(activity, "onResume").invoke(activity)
-    org.robolectric.Robolectric.flushForegroundThreadScheduler()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
     sender.disconnect("test done")
   }
+
+  /** Builds a SensorEvent of [type] via the modern SensorEventBuilder API. */
+  private fun sensorEvent(type: Int): android.hardware.SensorEvent =
+      org.robolectric.shadows.SensorEventBuilder.newBuilder()
+          .setSensor(org.robolectric.shadows.ShadowSensor.newInstance(type))
+          .setValues(floatArrayOf(0.7f, 0.7f, 0f))
+          .build()
 }

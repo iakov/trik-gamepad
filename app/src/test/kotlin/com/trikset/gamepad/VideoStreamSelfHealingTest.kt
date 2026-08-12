@@ -110,7 +110,7 @@ class VideoStreamSelfHealingTest : RobolectricTestBase() {
       loader: VideoStreamLoader,
       url: URL,
   ): Pair<VideoRetryController, () -> Unit> {
-    lateinit var controller: VideoRetryController
+    var controller: VideoRetryController? = null
     val reloadAction = {
       loader.load(url) { ok -> if (ok) controller?.onLoadSuccess() else controller?.onLoadFailed() }
     }

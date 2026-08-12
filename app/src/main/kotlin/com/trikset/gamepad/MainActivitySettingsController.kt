@@ -80,16 +80,6 @@ class MainActivitySettingsController(
     preferences.unregisterOnSharedPreferenceChangeListener(listener)
   }
 
-  /**
-   * Reads an int preference; SeekBarPreference stores Int, legacy EditTextPreference stored String.
-   */
-  private fun readInt(prefs: SharedPreferences, key: String, default: Int): Int =
-      when (val value = prefs.all[key]) {
-        is Int -> value
-        is String -> value.toIntOrNull() ?: default
-        else -> default
-      }
-
   fun onPreferenceChanged(sharedPreferences: SharedPreferences) {
     val addr = sharedPreferences.getString(SettingsFragment.SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS)!!
     var portNumber = DEFAULT_PORT
@@ -107,7 +97,12 @@ class MainActivitySettingsController(
 
     val defAlpha = PADS_ALPHA_DEFAULT
     // SeekBarPreference stores Int; legacy String values are still honored.
-    val padsAlpha = readInt(sharedPreferences, SettingsFragment.SK_SHOW_PADS, defAlpha)
+    val padsAlpha =
+        SettingsFragment.readSeekBarValue(
+            sharedPreferences,
+            SettingsFragment.SK_SHOW_PADS,
+            defAlpha,
+        )
     val alpha = Math.max(0, Math.min(ALPHA_MAX, padsAlpha)) / ALPHA_MAX.toFloat()
     ui.animatePadsAlpha(alpha, prevAlpha)
     prevAlpha = alpha
@@ -130,7 +125,12 @@ class MainActivitySettingsController(
       ui.setVideoUrl(null)
     }
 
-    val wheelStep = readInt(sharedPreferences, SettingsFragment.SK_WHEEL_STEP, ui.getWheelStep())
+    val wheelStep =
+        SettingsFragment.readSeekBarValue(
+            sharedPreferences,
+            SettingsFragment.SK_WHEEL_STEP,
+            ui.getWheelStep(),
+        )
     ui.setWheelStep(Math.max(WHEEL_STEP_MIN, Math.min(WHEEL_STEP_MAX, wheelStep)))
 
     val wheelEnabled = sharedPreferences.getBoolean(SettingsFragment.SK_WHEEL_ENABLED, false)

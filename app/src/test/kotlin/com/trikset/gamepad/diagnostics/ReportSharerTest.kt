@@ -31,6 +31,9 @@ class ReportSharerTest : RobolectricTestBase() {
   private fun startedInnerIntent(): Intent {
     val chooser = shadowOf(activity).nextStartedActivity
     assertNotNull("a chooser must have been started", chooser)
+    // The typed getParcelableExtra(String, Class) overload is API 33+; these tests run at
+    // minSdk (23), so the deprecated single-arg form is the only one available.
+    @Suppress("DEPRECATION")
     return chooser.getParcelableExtra(Intent.EXTRA_INTENT)!!
   }
 
@@ -66,6 +69,9 @@ class ReportSharerTest : RobolectricTestBase() {
     val inner = startedInnerIntent()
     assertEquals(Intent.ACTION_SEND, inner.action)
     assertEquals("text/plain", inner.type)
+    // The typed getParcelableExtra(String, Class) overload is API 33+; these tests run at
+    // minSdk (23), so the deprecated single-arg form is the only one available.
+    @Suppress("DEPRECATION")
     assertEquals(reportUri, inner.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
     assertEquals("report", inner.getStringExtra(Intent.EXTRA_TEXT))
     assertEquals(

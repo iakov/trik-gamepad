@@ -25,7 +25,7 @@ class TestTcpServer : AutoCloseable {
     const val HOST = "localhost"
   }
 
-  private val lock = Object()
+  private val lock = Any()
   private val messages = ArrayList<String>()
   private val connectedLatch = CountDownLatch(1)
   private val serverSocket = ServerSocket(0)

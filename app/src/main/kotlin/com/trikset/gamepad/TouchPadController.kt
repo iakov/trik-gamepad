@@ -24,8 +24,8 @@ class TouchPadController {
    * both axes from the previous command (no command should be sent).
    */
   fun nextCoordinates(x: Float, y: Float, maxX: Float, maxY: Float): Command? {
-    val rX = (COORDINATE_SCALE * SCALE * (x / maxX - CENTER_OFFSET).toDouble()).toInt()
-    val rY = -(COORDINATE_SCALE * SCALE * (y / maxY - CENTER_OFFSET).toDouble()).toInt()
+    val rX = (COORDINATE_SCALE * SCALE * (x / maxX - CENTER_OFFSET)).toInt()
+    val rY = -(COORDINATE_SCALE * SCALE * (y / maxY - CENTER_OFFSET)).toInt()
     val curX = max(-MAX_COORDINATE, min(rX, MAX_COORDINATE))
     val curY = max(-MAX_COORDINATE, min(rY, MAX_COORDINATE))
     if (abs(curX - prevX) > SENSITIVITY || abs(curY - prevY) > SENSITIVITY) {

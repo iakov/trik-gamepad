@@ -1,6 +1,7 @@
 package com.trikset.gamepad.diagnostics
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -16,8 +17,9 @@ class ReportDiagnosticsWriterTest {
     val file = ReportDiagnosticsWriter.write(context, "hello report")
 
     assertTrue(file.name.endsWith(".md"))
-    assertEquals("diagnostics", file.parentFile.name)
-    assertEquals(context.cacheDir.absolutePath, file.parentFile.parentFile.absolutePath)
+    assertNotNull("written report must have a parent dir", file.parentFile)
+    assertEquals("diagnostics", file.parentFile!!.name)
+    assertEquals(context.cacheDir.absolutePath, file.parentFile!!.parentFile?.absolutePath)
     assertTrue(file.exists())
     assertEquals("hello report", file.readText())
   }

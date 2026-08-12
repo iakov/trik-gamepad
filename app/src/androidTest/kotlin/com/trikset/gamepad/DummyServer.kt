@@ -17,7 +17,9 @@ class DummyServer {
     const val DEFAULT_PORT = 12345
   }
 
-  private val lock = Object()
+  // java.lang.Object is needed for its monitor methods (wait/notifyAll) used as a
+  // message-arrival condition; kotlin.Any exposes no wait/notify.
+  @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN") private val lock = Object()
   val receivedMessages = ArrayList<String>()
   @Volatile private var canStopListening = false
 

@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION") // Depends on the deprecated rule by design (see KDoc).
+
 package com.trikset.gamepad
 
 import android.app.Activity

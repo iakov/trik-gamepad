@@ -66,7 +66,7 @@ class MjpegInputStream(input: InputStream) :
    * header has no parseable Content-Length.
    */
   private fun parseContentLength(header: InputStream): Int? {
-    var line = ByteArray(0)
+    lateinit var line: ByteArray
     val lineBuffer = java.io.ByteArrayOutputStream()
     while (true) {
       val b = header.read()
@@ -103,8 +103,12 @@ class MjpegInputStream(input: InputStream) :
 
     try {
       val headerLen = getStartOfSequence(SOI_MARKER)
-      val headerIn = BoundedInputStream(this, headerLen.toLong())
-      headerIn.setPropagateClose(false)
+      val headerIn =
+          BoundedInputStream.builder()
+              .setInputStream(this)
+              .setMaxCount(headerLen.toLong())
+              .setPropagateClose(false)
+              .get()
       contentLength = parseContentLength(headerIn) ?: -1
       headerIn.close()
 
@@ -112,9 +116,11 @@ class MjpegInputStream(input: InputStream) :
         // We must be at the very beginning of data already, but ....
         val skip = getStartOfSequence(SOI_MARKER)
         if (skipBytes(skip) < skip) return null
-        val s = BoundedInputStream(this, contentLength.toLong())
-        s.setPropagateClose(false)
-        return s
+        return BoundedInputStream.builder()
+            .setInputStream(this)
+            .setMaxCount(contentLength.toLong())
+            .setPropagateClose(false)
+            .get()
       }
     } catch (e: IOException) {
       AppLog.d(TAG, "Frame parse recovery", e)

@@ -137,7 +137,11 @@ private constructor(
               ChunkedInputStream(input)
             } else {
               val length = head.headers["content-length"]?.toLongOrNull()
-              if (length != null) BoundedInputStream(input, length) else input
+              if (length != null) {
+                BoundedInputStream.builder().setInputStream(input).setMaxCount(length).get()
+              } else {
+                input
+              }
             }
         return RawSocketHttpStream(socket, body)
       } catch (e: IOException) {

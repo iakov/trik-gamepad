@@ -109,6 +109,23 @@ android {
     }
 }
 
+// K2's extra compiler checks (-Wextra): additional declaration, expression and
+// type checks that emit warnings. Configured at the kotlin-extension level so
+// it covers every Kotlin compilation in this module (main, unit test,
+// androidTest). AGP 9's built-in Kotlin wires the real KGP
+// KotlinAndroidProjectExtension (AGP 9.3.1 bundles KGP 2.2.10).
+//
+// allWarningsAsErrors promotes every warning (including -Wextra) to an error, so
+// a new warning fails the build. Deliberately-kept deprecation usage is
+// suppressed per-site with a rationale comment (search "@Suppress("DEPRECATION")"
+// / "PLATFORM_CLASS_MAPPED_TO_KOTLIN"); the accepted set lives in TESTING.md.
+kotlin {
+    compilerOptions {
+        extraWarnings.set(true)
+        allWarningsAsErrors.set(true)
+    }
+}
+
 // javac -Xlint:all as the baseline static-analysis safety net (D8; Error Prone
 // deferred). Warnings do not fail the build yet.
 tasks.withType(JavaCompile).configureEach {

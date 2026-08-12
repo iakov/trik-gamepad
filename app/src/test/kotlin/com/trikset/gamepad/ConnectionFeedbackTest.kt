@@ -122,6 +122,9 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
         context.getSystemService(Context.ACCESSIBILITY_SERVICE)
             as android.view.accessibility.AccessibilityManager
     return org.robolectric.Shadows.shadowOf(manager).sentAccessibilityEvents.filter {
+      // TYPE_ANNOUNCEMENT (deprecated API 33) is the only way to recognize an
+      // announceForAccessibility announcement in a sent-event list.
+      @Suppress("DEPRECATION")
       it.eventType == android.view.accessibility.AccessibilityEvent.TYPE_ANNOUNCEMENT
     }
   }
