@@ -368,8 +368,8 @@ parked for a future campaign.
 
 **Verification (2026-08-10):** full gate green (test lint detekt spotbugs
 jacoco 95/80 spotlessCheck jscpd lizard) — branch coverage **0.8063** (new
-code pulled it under 0.80 mid-campaign; covered with `readInt` Int-storage
-tests + `ConnectionFeedback` null-path tests, see MEMORY retrospective).
+code pulled it under 0.80 mid-campaign; covered with Int-storage
+seekbar tests + `ConnectionFeedback` null-path tests, see MEMORY retrospective).
 3-variant `test` suite run twice (`--rerun-tasks` on the second pass — an
 up-to-date second run silently skips). Instrumented **9/9 on both API-36
 emulators** (`connectedDebugAndroidTest --no-configuration-cache`); the wheel
@@ -590,3 +590,43 @@ MEMORY.md "Campaign 15 execution run".
   (second with --rerun-tasks); instrumented **9/9 on both API-36 emulators**
   (two instrumented tests updated for the ellipsis titles / glyph-suffixed
   button descriptions); commits c817649..1b0115e. **CAMPAIGN 15 COMPLETE.**
+
+## Campaign 16 — K2 `-Wextra` warnings-as-errors (build hardening)
+
+Scope (user decision 2026-08-12): make Kotlin compiler warnings a build failure
+across all compilations (main, unit test, androidTest) by enabling K2's
+`-Wextra` extra checks + `allWarningsAsErrors`, then resolving every warning
+that surfaced (fix the fixable, suppress the genuinely-unfixable per-site with
+a rationale). Decision + rationale: DECISIONS.md "[2026-08-12] K2 -Wextra
+warnings-as-errors"; accepted-suppression registry: TESTING.md "Compiler
+warnings as errors"; retrospective + quirks: MEMORY.md "Campaign 16 execution
+run".
+
+| Estimated | Actual |
+|-----------|--------|
+| ~4 h | ≈7 h 45 m (impl + fixes + gates ×4 + commit + green CI; includes a 15-min cold-daemon hang) |
+
+- **Config** — `kotlin { compilerOptions { extraWarnings.set(true); allWarningsAsErrors.set(true) } }` in `app/build.gradle` (extension level =
+  every Kotlin compilation; AGP 9 built-in Kotlin wires the real KGP 2.2.10
+  `KotlinAndroidProjectExtension`, verified empirically via javap).
+- **Fixes** — 38 warnings resolved: redundant `.toDouble()` ×2
+  (TouchPadController), redundant initializer (MjpegInputStream),
+  `BoundedInputStream` → builder API ×4 (MjpegInputStream/RawSocketHttpStream),
+  `Object()` → `Any()` (TestTcpServer), written-once `lateinit` → nullable var
+  (VideoStreamSelfHealingTest), `flushForegroundThreadScheduler()` →
+  `ShadowLooper.runUiThreadTasksIncludingDelayedTasks()` ×10,
+  `createSensorEvent` → `SensorEventBuilder` ×3, About display metrics →
+  `resources.displayMetrics`, unsafe `parentFile` null-calls (report tests).
+- **Dedup** — `MainActivitySettingsController.readInt` (private) collapsed into
+  the shared `SettingsFragment.readSeekBarValue` companion member.
+- **Suppressed (rationale-commented, registry in TESTING.md)** —
+  `getParcelableExtra(String)` ×2 (typed overload is API 33+; tests run at
+  minSdk 23), `updateConfiguration(config, metrics)` (1-arg removed in SDK 36),
+  `ACTION_MULTIPLE` (only non-DOWN/UP KeyEvent action), `TYPE_ANNOUNCEMENT`,
+  `ActivityTestRule` (file-scope), `Object()` monitor in DummyServer
+  (`PLATFORM_CLASS_MAPPED_TO_KOTLIN`).
+- **Verification** — all three compilations build with ZERO warnings under
+  warnings-as-errors; 3-variant test ×4 green (`--rerun-tasks`, 2m22s–2m40s);
+  canonical gate green twice (LINE **0.9753** / BRANCH **0.8661**, jscpd 0 in
+  gate scope); lint/detekt/spotbugs clean. Commit `3855815`, pushed; CI run
+  31567580412 green. **CAMPAIGN 16 COMPLETE.**

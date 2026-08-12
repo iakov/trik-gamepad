@@ -49,6 +49,13 @@ Improvement roadmap: `docs/ROADMAP.md`.
   parallel JVMs — unit tests must use ephemeral ports and reset
   SharedPreferences per test (they persist across methods in a JVM; the old
   SenderService static-state trap is gone — see TESTING.md).
+- **Kotlin warnings are build errors.** `app/build.gradle` sets K2
+  `extraWarnings` + `allWarningsAsErrors` (all compilations: main, unit test,
+  androidTest), so a new warning fails the build with the exact `file:line`.
+  Any `@Suppress(...)` added must carry a rationale comment and be registered
+  in TESTING.md "Compiler warnings as errors" (acceptance is a decision;
+  Kotlin has no per-warning `-Wno-error`, so a downgrade suppresses entirely).
+  Rationale: DECISIONS.md "[2026-08-12] K2 -Wextra warnings-as-errors".
 - **Verify coverage measures the live class output.** The coverage gate reads
   `intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes`
   under AGP 9's built-in Kotlin — a stale `tmp/kotlin-classes` path silently

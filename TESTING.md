@@ -211,14 +211,15 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
 ### Robolectric shadow traps
 
 - **Sensor tests need a `SensorEvent`, not a `Sensor`.** To feed the
-  accelerometer path, build the event via
-  `ShadowSensorManager.createSensorEvent(3, Sensor.TYPE_ACCELEROMETER)` — the
-  2-arg form. The 1-arg `createSensorEvent(3)` defaults the sensor to
-  **TYPE_GRAVITY (9)**, so `onSensorChanged` never matches the accelerometer
+  accelerometer path, build the event via the modern `SensorEventBuilder` API:
+  `SensorEventBuilder.newBuilder().setSensor(ShadowSensor.newInstance(Sensor.TYPE_ACCELEROMETER)).setValues(floatArrayOf(...)).build()`
+  (MainActivityTest has a `sensorEvent(type)` helper). The deprecated
+  `ShadowSensorManager.createSensorEvent(3)` (1-arg form) defaults the sensor
+  to **TYPE_GRAVITY (9)**, so `onSensorChanged` never matches the accelerometer
   branch and the wheel path silently stays uncovered even though the test
-  passes. Set `event.values`, and stub the sensor lookup. Trying
-  `shadowOf(Class<Sensor>)` or the wrong constructor is a compile error
-  (`no suitable method found for shadowOf`).
+  passes. Set the values via `setValues`/`event.values`, and stub the sensor
+  lookup. Trying `shadowOf(Class<Sensor>)` or the wrong constructor is a
+  compile error (`no suitable method found for shadowOf`).
 - **`ShadowLog.isLoggable` defaults to `level >= INFO`** (Robolectric 4.16),
   so `Log.isLoggable(TAG, Log.DEBUG)` is **false** unless a test raises the
   tag with `ShadowLog.setLoggable(TAG, Log.DEBUG)` — the 2-arg form (there is
@@ -431,9 +432,8 @@ A0 baseline (2026-08-09; `main` sources excluded) — the fixed trend anchor:
 - **Accepted suppressions** (each carries a rationale comment in code; keep this
   registry in sync):
   - `@Suppress("DEPRECATION")`:
-    - `SettingsActivityTest` `seekBarSummariesHonorLegacyStringStorage` + the two
-      `getParcelableExtra(String)` calls in `ReportSharerTest` — the typed
-      replacement overload is API 33+, and these tests run at minSdk 23
+    - The two `getParcelableExtra(String)` calls in `ReportSharerTest` — the
+      typed replacement overload is API 33+, and these tests run at minSdk 23
       (Robolectric `[23]`).
     - `MainActivityTest` `updateConfiguration(config, metrics)` (2-arg) — the
       1-arg form was removed in SDK 36.

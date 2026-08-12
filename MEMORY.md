@@ -142,9 +142,10 @@ guaranteed listening before the client connects.
 `shadowOf(getMainLooper()).idle()`.
 
 **Sensor shadow trap (MainActivityTest):** to feed the accelerometer wheel
-path, build the event with
-`ShadowSensorManager.createSensorEvent(3, Sensor.TYPE_ACCELEROMETER)` (the
-2-arg form). The 1-arg `createSensorEvent(3)` delegates to
+path, build the event with the modern `SensorEventBuilder` API
+(`SensorEventBuilder.newBuilder().setSensor(ShadowSensor.newInstance(Sensor.TYPE_ACCELEROMETER)).setValues(floatArrayOf(...)).build()`
+— a `sensorEvent(type)` helper lives in MainActivityTest). The deprecated
+1-arg `ShadowSensorManager.createSensorEvent(3)` defaults the sensor to
 `createSensorEvent(3, 9)` — sensor type **9 = TYPE_GRAVITY** — so
 `onSensorChanged`'s `if (event.sensor.type == TYPE_ACCELEROMETER)` never
 matches and the wheel path stays uncovered even though the test "passes"
@@ -619,7 +620,9 @@ Java-interop/lint traps; each cost a build cycle to pin down.
   or path-scoping the suppression in lint.xml with rationale (MainActivity —
   the reflection contract forces private names).
 - **Kotlin does not widen `Int`→`Long`/`Float`/`Double`** in calls:
-  `BoundedInputStream(this, len.toLong())`, `setDuration(ms.toLong())`,
+  `BoundedInputStream.builder().setMaxCount(len.toLong())` (the
+  `BoundedInputStream(this, len)` ctor is deprecated since commons-io 2.22),
+  `setDuration(ms.toLong())`,
   `Math.atan2(y.toDouble(), x.toDouble())`, `drawText(x.toFloat())`.
 - **`in` is a Kotlin keyword** — the Java `MjpegInputStream(InputStream in)`
   parameter had to be renamed `input`.
@@ -1413,7 +1416,9 @@ GATE PASSED — jacoco 95/80 (line 0.9746, branch 0.8016), jscpd 0 clones, lizar
   bytecode branch structure. Root cause here: the `MainActivity` wiring test's
   real-executor `load` posted `onResult` to the main looper after teardown,
   racing the flush (0.7989 vs 0.8016). Fixed with a bounded "settle" loop
-  (`flushForegroundThreadScheduler() + Thread.sleep(20)` until deadline) so the
+  (`flushForegroundThreadScheduler() + Thread.sleep(20)` until deadline — the
+  current equivalent is `ShadowLooper.runUiThreadTasksIncludingDelayedTasks()`,
+  see TESTING.md "Robolectric shadow traps") so the
   `onLoadFailed` path is deterministically covered.
 - **New feature branches must be covered or the 95/80 gate fails:** the retry
   controller + MainActivity wiring added ~20 branches; covered via controller
@@ -1526,12 +1531,13 @@ user-visible gaps and decisions in the session. Commit `ffef353`.
   the threshold.
 - **`SeekBarPreference` stores `Int`, not `String`:** a settings test that reads
   `getString(key, "")` for the old `EditTextPreference` breaks on the switch.
-  The controller's `readInt` helper handles both Int (new) and String (legacy)
-  storage; tests must write `putInt` to exercise the `is Int` branch (it was
-  uncovered — found via the coverage gate dip to 0.799).
+  The shared `SettingsFragment.readSeekBarValue` helper handles both Int (new)
+  and String (legacy) storage; tests must write `putInt` to exercise the
+  `is Int` branch (it was uncovered — found via the coverage gate dip to 0.799).
 - **Coverage gate is the real guardian of "did I test the new branches":**
   mid-campaign branch coverage dipped 0.8123 → 0.799 (new code) and the gate
-  caught it; the fix was targeted tests (`readInt` Int path, `ConnectionFeedback`
+  caught it; the fix was targeted tests (`readSeekBarValue` Int path,
+  `ConnectionFeedback`
   null paths, wheel/keep-screen switches). Final 0.8063. Lesson already in
   MEMORY ("coverage margin matters") — apply it *during* a campaign, not at the end.
 - **Menu-item removal breaks index-based Espresso matchers again:** the wheel
@@ -1975,7 +1981,7 @@ eportIssue-click listener line stays uncovered (no hacky test).
   reference): use `KEYBOARD_TAP` for the light-tap tick on magic buttons.
 - **Suspected latent crash: a legacy `String` seekbar value (from the pre-C9 `EditTextPreference`
   era) makes `SeekBarPreference` throw `ClassCastException` on load** (prefs.getInt on a String;
-  observed in Robolectric, device-unconfirmed). `MainActivitySettingsController.readInt` still
+  observed in Robolectric, device-unconfirmed). `SettingsFragment.readSeekBarValue` still
   honors String defensively; a future migration pass should coerce/re-write such values to Int.
 
 **Retrospective analysis (good / bad / solutions):**
@@ -1998,3 +2004,97 @@ helper first); a python -c one-liner was mangled by shell escaping (route via
 
 Solutions institutionalized: A/B/C AGENTS guardrails, the xml-comment pre-commit
 hook (D), and this TESTING.md note (F).
+
+### [2026-08-12] Campaign 16 execution run - K2 -Wextra warnings-as-errors
+
+Scope and decision: DECISIONS.md "[2026-08-12] K2 -Wextra warnings-as-errors".
+Commit `3855815`, pushed to the fork; CI run 31567580412 green.
+
+Verified: all three Kotlin compilations (main/unit-test/androidTest) build with
+`extraWarnings` + `allWarningsAsErrors` with ZERO warnings; full 3-variant `test`
+suite ran four times green (`--rerun-tasks`; 2m22s-2m40s each); canonical gate
+green twice (LINE 0.9753, BRANCH 0.8661; jscpd 0 clones in the gate's
+test-scope; lint/detekt/spotbugs clean).
+
+What -Wextra surfaced (38 warnings total): 8 were NEW -Wextra findings, 30 were
+pre-existing Java-deprecation noise that allWarningsAsErrors would have exposed
+anyway. New findings: 2 redundant `.toDouble()` calls (TouchPadController), 1
+redundant `ByteArray(0)` initializer + 4 deprecated `BoundedInputStream(io, long)`/`setPropagateClose` usages (MjpegInputStream/RawSocketHttpStream - migrated
+to the builder API, `propagateClose=true` default matches the old ctor), 1
+`lateinit var` written-once (VideoStreamSelfHealingTest -> nullable var), 2
+`Object()` monitor locks (TestTcpServer -> `Any()`; DummyServer must stay
+`Object()` for wait/notifyAll -> `@Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")`),
+1 redundant deprecation on androidx `ActivityTestRule` (FocusAwareActivityTestRule,
+file-scoped suppress - the custom focus-wait rule has no ActivityScenarioRule
+equivalent).
+
+Pre-existing deprecations fixed (not suppressed): 10x
+`Robolectric.flushForegroundThreadScheduler()` -> `ShadowLooper.runUiThreadTasksIncludingDelayedTasks()`
+(identical semantics, not deprecated); 3x `ShadowSensorManager.createSensorEvent()`
+-> `SensorEventBuilder.newBuilder().setSensor(ShadowSensor.newInstance(type))`;
+`SettingsFragment` About display metrics -> `resources.displayMetrics` (the
+defaultDisplay.getMetrics() chain is deprecated API 30+); 2x
+`getParcelableExtra(String)` -> typed 2-arg (then REVERTED - the typed overload
+is API 33+ and the tests run at minSdk 23, see quirks); ReportDiagnosticsWriterTest
+unsafe `parentFile` calls -> explicit null-assert.
+
+Suppressed per-site (all carry a rationale comment; registry: TESTING.md
+"Compiler warnings as errors"): updateConfiguration 2-arg (1-arg removed in SDK
+36), ACTION_MULTIPLE (only non-DOWN/UP KeyEvent action), TYPE_ANNOUNCEMENT (only
+way to recognize an announcement), getParcelableExtra(String) x2 (API 33+
+replacement, tests run at 23).
+
+Quirks hit (all new, none previously documented):
+
+- **Kotlin has no per-warning -Wno-error**: allWarningsAsErrors is global;
+  "downgrading" a warning out of the error set means SUPPRESSING it entirely
+  (it stops showing even as a warning). Per-site @Suppress was the user's
+  chosen mechanism; -Xsuppress-warning=NAME is the only global alternative.
+- **The K2 -Wextra diagnostic for `Object()` is NOT `DEPRECATION`** - it is
+  `PLATFORM_CLASS_MAPPED_TO_KOTLIN` (message "This class is not recommended for
+  use in Kotlin. Use 'kotlin.Any' instead."). Discovered by reading the
+  FirErrorsDefaultMessages constant pool after @Suppress("DEPRECATION") failed
+  to silence it.
+- **Kotlin's typed `getParcelableExtra(String, Class)` is API 33+** and throws
+  NoSuchMethodError at Robolectric minSdk 23 (the `[23]` per-SDK suffix in test
+  names is the giveaway). The "clean" 2-arg replacement broke 3 tests; reverted
+  to the deprecated 1-arg + suppress. Same trap would apply to any API-33+
+  "replacement" overload in minSdk-23 tests.
+- **`SettingsFragment().readSeekBarValue(...)` (instance access to a companion
+  member) did NOT resolve** once `readSeekBarValue` moved into the companion —
+  `Unresolved reference 'readSeekBarValue'`. The class-qualified
+  `SettingsFragment.readSeekBarValue(...)` form resolved immediately. Root cause
+  not chased (a test-only call site; the class-qualified form is unambiguous
+  anyway) — if it recurs, read the K2 resolution source before assuming
+  instance-access-to-companion semantics.
+- **Moving a helper into a companion object changes nothing about visibility**
+  for the same-module class that called the old private copy: the dedup
+  (MainActivitySettingsController.readInt -> SettingsFragment.readSeekBarValue
+  companion) exposed the above companion-receiver trap in the test that
+  exercised the old private helper directly.
+- **jscpd (gate) only scans test/androidTest** (`app/src/test app/src/androidTest`
+  args in scripts/gate.py) - a bare `npx jscpd` run from the repo root ALSO scans
+  main sources and flagged a pre-existing main-code clone
+  (readInt/readSeekBarValue) that the gate never saw. The main-code clone was
+  real and is now deduped anyway.
+- **Robolectric's deprecated static shadow helpers have non-deprecated
+  replacements** (SensorEventBuilder, ShadowSensor.newInstance,
+  ShadowLooper.runUiThreadTasksIncludingDelayedTasks) - migrate rather than
+  suppress when one exists.
+
+Retrospective (good / bad / solutions):
+
+Good (keep doing): verifying the DSL empirically against the bundled KGP 2.2.10
+jar before writing config (javap the KotlinAndroidProjectExtension); splitting
+fixable-deprecation from must-suppress before touching code; extracting the
+sensor-event builder into a test helper (also fixed a jscpd clone the inline
+version created); committing after gate-green with the suppression registry
+documented in the same commit.
+
+Bad (costed): the getParcelableExtra "fix" cost 2 test runs before the API-33
+reality check (the [23] suffix was in the log); the readSeekBarValue companion
+move cost 2 compile+test cycles before the class-qualified form; the Object()
+suppress-key guess cost 1 compile cycle (read the constant pool FIRST).
+
+Solutions institutionalized: TESTING.md "Compiler warnings as errors" + suppression
+registry; the docs-drift fix in this MEMORY section; DECISIONS.md decision record.

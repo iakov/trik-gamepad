@@ -24,7 +24,7 @@ Each note follows the same shape:
 
 | Area | Covers | Newest decision |
 |------|--------|-----------------|
-| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-09] Dev tooling is cross-platform via uv (Python gate) |
+| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-12] K2 -Wextra warnings-as-errors |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-11] Branch-coverage ratchet 80% → 85% |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-11] User-facing diagnostics & crash reporting (offline-first) |
@@ -35,6 +35,44 @@ Each note follows the same shape:
 ______________________________________________________________________
 
 ## Build & toolchain
+
+### [2026-08-12] K2 -Wextra warnings-as-errors
+
+- **Problem:** the Kotlin compiler ran with default warnings only, so
+  deprecated-API use and K2's `-Wextra` extra checks (redundant conversions,
+  redundant initializers, platform-class misuse, written-once `lateinit`)
+  accumulated silently — 30 Java-deprecation warnings and 8 `-Wextra` findings
+  were present at enable time, invisible to every gate (lint/detekt/spotbugs do
+  not see Kotlin compiler warnings).
+- **Alternatives considered:** leave warnings at default (warnings accumulate
+  silently — rejected); enable `-Wextra` only as warnings (no enforcement —
+  rejected); enable `-Wextra` + `allWarningsAsErrors` with per-site `@Suppress`
+  downgrades for genuinely-unfixable usage (chosen). A Kotlin lint-like
+  tautology checker was researched (detekt 1.23.8 has no always-true/
+  tautology rule; the K2 compiler does no boolean algebra, so `X || !X` as a
+  function argument is invisible to it) — out of scope, the "tests must be able
+  to fail" discipline covers that class instead.
+- **Chosen solution:** `kotlin { compilerOptions { extraWarnings.set(true); allWarningsAsErrors.set(true) } }` in `app/build.gradle` — the extension level
+  covers main, unit-test AND androidTest compilations. All 38 findings were
+  resolved: fixable ones migrated to modern APIs (commons-io 2.22
+  `BoundedInputStream.builder()`, Robolectric `SensorEventBuilder` +
+  `ShadowLooper.runUiThreadTasksIncludingDelayedTasks()`, `resources.displayMetrics`),
+  genuinely-unfixable ones suppressed per-site with a rationale comment
+  (registry: TESTING.md "Compiler warnings as errors").
+- **Why:** "all warnings are a hidden error" (technical debt) — a warning that
+  is tolerated today silently stays, and `allWarningsAsErrors` makes the next
+  warning a build failure with the exact file:line to fix. The pre-existing 30
+  deprecation warnings were a real signal (3 were test bugs hiding behind
+  deprecated-but-working APIs; 4 were commons-io/Android API misuse).
+- **Out of scope / consequences:** Kotlin has NO per-warning `-Wno-error`
+  flag — a "downgrade" is a full suppression (the warning stops showing even as
+  a warning); the accepted-suppression set is small (7 sites) and each carries a
+  rationale. The JVM `javac -Xlint:all` safety net (main, D8) remains warnings-
+  only (Error Prone still deferred). Coverage unchanged (LINE 0.9753, BRANCH
+  0.8661). Kotlin cannot catch boolean tautologies — that stays a test-discipline
+  concern. The AGP 9 built-in Kotlin DSL was verified empirically against the
+  bundled KGP 2.2.10 (`KotlinAndroidProjectExtension.compilerOptions`), not
+  guessed.
 
 ### [2026-08-05] local.properties lint escape
 

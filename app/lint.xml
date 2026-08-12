@@ -9,15 +9,15 @@
     <issue id="OldTargetApi" severity="ignore" />
     <!-- AndroidGradlePluginVersion fires when lint's environment knows a newer
          Gradle than the wrapper pins (9.5.0, matched to AGP 9.3.1). The version
-         is a deliberate lock and the check is environment-dependent (depends on
-         which Gradle versions lint knows about), so it cannot live in the lint
-         baseline -- the baseline records the machine-specific absolute path of
-         the wrapper file and would silently stop matching on CI. -->
+          is a deliberate lock and the check is environment-dependent (depends on
+          which Gradle versions lint knows about), so it cannot live in the lint
+          baseline: the baseline records the machine-specific absolute path of
+          the wrapper file and would silently stop matching on CI. -->
     <issue id="AndroidGradlePluginVersion" severity="ignore" />
     <!-- GradleDependency (version-availability) now fires on the version
          catalog (gradle/libs.versions.toml), whose baseline location is a
          machine-specific absolute path that would silently stop matching on CI
-         -- the same class of problem as AndroidGradlePluginVersion. The pinned
+         (the same class of problem as AndroidGradlePluginVersion). The pinned
          versions (compileSdk 36, core-ktx 1.16.0) are deliberate locks; ignore
          the check rather than carry an un-baselinable absolute path. -->
     <issue id="GradleDependency" severity="ignore" />
