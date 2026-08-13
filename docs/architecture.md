@@ -348,7 +348,7 @@ migration docs assume TOML). Dependency locking optional at this size. **detekt
 1.23.8 predates AGP 9** (built vs AGP 8.8/Gradle 8.12) — 2.0.0-alpha.3+ adds
 real built-in-Kotlin support; upgrade when stable, don't disable config-cache
 if detekt flakes. ktfmt = deterministic zero-config formatter; ktlint = linter
-(de-facto standard, ships detekt integration). Lint 9.3.1: report-output DSL
+(de-facto standard, ships detekt integration). Lint 9.2.1: report-output DSL
 (`htmlReport`/`textReport`) is deprecated → `SingleArtifact.LINT_*_REPORT`;
 known lint bugs (SDK resolution not a task input → caching, "Could not clean up
 K2 caches"). Generate baselines with the aggregate `lint` task.

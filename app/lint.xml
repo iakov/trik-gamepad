@@ -8,7 +8,7 @@
          cannot pin it. Downgrade to ignore; the version is deliberate. -->
     <issue id="OldTargetApi" severity="ignore" />
     <!-- AndroidGradlePluginVersion fires when lint's environment knows a newer
-         Gradle than the wrapper pins (9.5.0, matched to AGP 9.3.1). The version
+         Gradle than the wrapper pins (9.5.0, matched to AGP 9.2.1). The version
           is a deliberate lock and the check is environment-dependent (depends on
           which Gradle versions lint knows about), so it cannot live in the lint
           baseline: the baseline records the machine-specific absolute path of

@@ -113,7 +113,7 @@ android {
 // type checks that emit warnings. Configured at the kotlin-extension level so
 // it covers every Kotlin compilation in this module (main, unit test,
 // androidTest). AGP 9's built-in Kotlin wires the real KGP
-// KotlinAndroidProjectExtension (AGP 9.3.1 bundles KGP 2.2.10).
+// KotlinAndroidProjectExtension (AGP 9.2.1 bundles KGP 2.2.10).
 //
 // allWarningsAsErrors promotes every warning (including -Wextra) to an error, so
 // a new warning fails the build. Deliberately-kept deprecation usage is
@@ -223,7 +223,7 @@ def debugClasses = fileTree(dir: "${buildDir}/intermediates/javac/debug/compileD
 // AGP 9's built-in Kotlin outputs to intermediates/built_in_kotlinc (the old
 // tmp/kotlin-classes/debug dir went stale under the migration — new classes
 // were invisible to the coverage gate). Verified against the compileDebugKotlin
-// output on AGP 9.3.1; if AGP relocates it, the report will show ~0% and the
+// output on AGP 9.2.1; if AGP relocates it, the report will show ~0% and the
 // gate will fail loudly (better than silently passing).
 def debugKotlinClasses = fileTree(dir: "${buildDir}/intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes", excludes: coverageExcludes)
 
