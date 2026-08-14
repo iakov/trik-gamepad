@@ -39,14 +39,27 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
   }
 
   @Test
-  fun destRectLetterboxesPortraitBitmap() {
-    // Portrait bitmap in a landscape display: height-limited, horizontally centered.
-    // aspect 480/640 = 0.75 -> height 240, width 180, left (320-180)/2 = 70.
+  fun destRectCenterCropsPortraitBitmapVertically() {
+    // Portrait bitmap in a landscape display: width-limited, crops the height
+    // overflow from the center. aspect 480/640 = 0.75; scale = max(320/480,
+    // 240/640) = 0.667 -> 320x426 (int truncation), top = (240-426)/2 = -93.
     val rect = MjpegFrameRenderer().destRect(480, 640, 320, 240)
+    assertEquals(426, rect.height())
+    assertEquals(320, rect.width())
+    assertEquals(0, rect.left)
+    assertEquals(-93, rect.top)
+  }
+
+  @Test
+  fun destRectCenterCropsWideBitmapHorizontally() {
+    // Very-wide bitmap in a portrait-ish display: height-limited, crops the
+    // width overflow from the center. scale = max(320/1000, 240/200) = 1.2 ->
+    // 1200x240, left = (320-1200)/2 = -440 (overflow clipped).
+    val rect = MjpegFrameRenderer().destRect(1000, 200, 320, 240)
+    assertEquals(1200, rect.width())
     assertEquals(240, rect.height())
-    assertEquals(180, rect.width())
+    assertEquals(-440, rect.left)
     assertEquals(0, rect.top)
-    assertEquals(70, rect.left)
   }
 
   @Test
@@ -54,8 +67,10 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
     val renderer = MjpegFrameRenderer(decoder = stubDecoder(bitmap(100, 50)))
     val rect = renderer.extractFrame(emptyFrame(), 320, 240)
     assertNotNull("expected a dest rect", rect)
-    assertEquals(320, rect!!.width())
-    assertEquals(160, rect.height())
+    // scale = max(320/100, 240/50) = 4.8 -> 480x240, left = (320-480)/2 = -80.
+    assertEquals(480, rect!!.width())
+    assertEquals(240, rect.height())
+    assertEquals(-80, rect.left)
   }
 
   @Test

@@ -19,9 +19,10 @@ private fun defaultMjpegDecoder(stream: InputStream, opts: BitmapFactory.Options
 
 /**
  * Device-independent render logic for the MJPEG player: decodes a JPEG frame, computes the
- * letterboxed destination rectangle and draws it with the FPS overlay. Kept separate from
- * [MjpegView]'s render thread so it is testable under Robolectric (inject a decoder and a plain
- * [Canvas]); the renderer owns the reusable bitmap so decoding can reuse it across frames.
+ * center-crop destination rectangle (the frame covers the display, cropping any aspect mismatch
+ * from the center) and draws it with the FPS overlay. Kept separate from [MjpegView]'s render
+ * thread so it is testable under Robolectric (inject a decoder and a plain [Canvas]); the renderer
+ * owns the reusable bitmap so decoding can reuse it across frames.
  */
 class MjpegFrameRenderer(
     private val decoder: (InputStream, BitmapFactory.Options) -> Bitmap? = ::defaultMjpegDecoder,
@@ -38,17 +39,15 @@ class MjpegFrameRenderer(
     const val MILLIS_PER_SECOND = 1000.0f
   }
 
-  /** Letterboxes a [bitmapWidth]x[bitmapHeight] frame into the display area. */
+  /**
+   * Center-crops a [bitmapWidth]x[bitmapHeight] frame to cover the display area (a camera feed
+   * fills the whole screen edge-to-edge; the crop removes the aspect mismatch from the center). The
+   * returned [Rect] may sit partially outside the display — the canvas clips the overflow.
+   */
   fun destRect(bitmapWidth: Int, bitmapHeight: Int, dispWidth: Int, dispHeight: Int): Rect {
-    var bmw = bitmapWidth
-    var bmh = bitmapHeight
-    val aspect = bmw.toFloat() / bmh.toFloat()
-    bmw = dispWidth
-    bmh = (dispWidth / aspect).toInt()
-    if (bmh > dispHeight) {
-      bmh = dispHeight
-      bmw = (dispHeight * aspect).toInt()
-    }
+    val scale = maxOf(dispWidth.toFloat() / bitmapWidth, dispHeight.toFloat() / bitmapHeight)
+    val bmw = (bitmapWidth * scale).toInt()
+    val bmh = (bitmapHeight * scale).toInt()
     val tempX = dispWidth / 2 - bmw / 2
     val tempY = dispHeight / 2 - bmh / 2
     return Rect(tempX, tempY, bmw + tempX, bmh + tempY)
