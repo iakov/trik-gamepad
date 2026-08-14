@@ -68,6 +68,9 @@ android {
         unitTests {
             includeAndroidResources = true
             all {
+                // HUD theme screenshots (HudThemeTest) land here as build-output artifacts,
+                // alongside the XML/HTML test reports (gitignored under build/).
+                systemProperty 'screenshots.dir', "$buildDir/outputs/screenshots"
                 jacoco {
                     // Robolectric loads classes without a file location via its
                     // own classloader; without this the exec file records nothing
@@ -266,7 +269,6 @@ tasks.register('jacocoTestCoverageVerification', JacocoCoverageVerification) {
 
 dependencies {
     implementation libs.appcompat
-    implementation libs.material
     implementation libs.coreKtx
     implementation libs.androidxAnnotation
     implementation libs.preferenceKtx

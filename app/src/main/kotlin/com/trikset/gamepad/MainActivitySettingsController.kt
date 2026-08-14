@@ -26,7 +26,7 @@ class MainActivitySettingsController(
    * UI-side callbacks implemented by [MainActivity] (views, title, toast, video URL, wheel step).
    */
   interface SettingsUi {
-    fun setActionBarTitle(title: String): Boolean
+    fun setTargetChip(host: String)
 
     fun toast(text: String)
 
@@ -91,10 +91,6 @@ class MainActivitySettingsController(
     }
     sender.setTarget(addr, portNumber)
 
-    if (!ui.setActionBarTitle(addr)) {
-      ui.toast(context.getString(R.string.cannot_change_title))
-    }
-
     val defAlpha = PADS_ALPHA_DEFAULT
     // SeekBarPreference stores Int; legacy String values are still honored.
     val padsAlpha =
@@ -113,6 +109,13 @@ class MainActivitySettingsController(
     val defaultVideoUri = if (addr.isBlank()) "" else "http://$addr:8080/?action=stream"
     val videoStreamURI =
         sharedPreferences.getString(SettingsFragment.SK_VIDEO_URI, defaultVideoUri)!!
+
+    // The top-left chip shows the robot target: the host when set; else the video stream's host
+    // when a stream is configured (video-only mode); else a filler so the chip stays readable
+    // instead of empty (DESIGN.md "Defaults are as useful as possible").
+    val videoHost = runCatching { URI(videoStreamURI).host }.getOrNull()
+    ui.setTargetChip(addr.ifBlank { videoHost?.takeIf { it.isNotBlank() } ?: TARGET_CHIP_EMPTY })
+
     try {
       ui.setVideoUrl(if (videoStreamURI.isEmpty()) null else URI(videoStreamURI).toURL())
     } catch (e: URISyntaxException) {
@@ -198,6 +201,9 @@ class MainActivitySettingsController(
     const val WHEEL_STEP_MIN = 1
     const val WHEEL_STEP_MAX = 100
     const val DEFAULT_MAGIC_BUTTON_COUNT = 3
+    // Shown in the top-left IP chip when neither a host nor a video stream is configured
+    // (the chip stays readable instead of empty).
+    const val TARGET_CHIP_EMPTY = "---.---.---.---"
 
     /** Reads the configured magic-button count (0..MAX), honoring both Int and String storage. */
     fun readMagicButtonCount(prefs: SharedPreferences): Int {

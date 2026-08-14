@@ -49,16 +49,28 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val SK_REPORT_ISSUE = "reportIssue"
     const val SK_COPY_REPORT = "copyReport"
     const val SK_VIEW_LOG = "viewLog"
+    const val SK_OPEN_SOURCE_LICENSES = "openSourceLicenses"
+    // Cross-link rows between the app-settings and robot-settings screens.
+    const val SK_OPEN_ROBOT_SETTINGS = "openRobotSettings"
+    const val SK_OPEN_APP_SETTINGS = "openAppSettings"
     const val MAX_MAGIC_BUTTONS = 5
+    /** Preference XML loaded by this fragment: app or robot/target settings. */
+    const val ARG_PREFERENCE_XML = "preferenceXml"
     private const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
     private const val DEFAULT_HOST_PORT = "4444"
     private const val LOG_DIALOG_MAX_LINES = 200
-    // XML defaults for the seekbar settings (mirror pref_general.xml defaultValue).
+    // XML defaults for the seekbar settings (mirror pref_app.xml defaultValue).
     private const val DEFAULT_WHEEL_STEP = 7
     private const val DEFAULT_PADS_ALPHA = 100
     private const val DEFAULT_MAGIC_BUTTON_COUNT = 3
 
     fun magicSymbolKey(buttonNumber: Int): String = "magicSymbol$buttonNumber"
+
+    /** Builds a fragment for the app settings (pref_app.xml) or robot settings (pref_robot.xml). */
+    fun newInstance(preferenceXml: Int): SettingsFragment =
+        SettingsFragment().apply {
+          arguments = Bundle().apply { putInt(ARG_PREFERENCE_XML, preferenceXml) }
+        }
 
     /**
      * Reads a SeekBarPreference value (Int storage, honoring legacy String values), else [default].
@@ -115,6 +127,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
   private fun initializeAboutSystemField() {
     val myActivity = activity ?: return
+    // Only present in the app-settings screen (not the robot/target screen).
+    val aboutSystem = findPreference<Preference>(SK_ABOUT_SYSTEM) ?: return
     // Resources.getDisplayMetrics() is the non-deprecated source of the default
     // display metrics on every supported API level (the
     // windowManager.defaultDisplay.getMetrics() chain is deprecated since API 30).
@@ -131,7 +145,6 @@ class SettingsFragment : PreferenceFragmentCompat() {
             displayMetrics.ydpi.toInt(),
             displayMetrics.xdpi.toInt(),
         )
-    val aboutSystem = requireNotNull(findPreference<Preference>(SK_ABOUT_SYSTEM))
     aboutSystem.summary =
         getString(R.string.about_system_summary, getString(R.string.tap_to_copy), systemInfo)
     // "About system" copies the SHORT device spec (the summary preview). "Copy report" stays the
@@ -194,6 +207,25 @@ class SettingsFragment : PreferenceFragmentCompat() {
       androidx.appcompat.app.AlertDialog.Builder(myActivity)
           .setTitle(R.string.view_log_title)
           .setMessage(message)
+          .setPositiveButton(R.string.dismiss, null)
+          .show()
+      true
+    }
+  }
+
+  /** "Open-source licenses": read-only dialog with the bundled font/license texts (res/raw). */
+  private fun initializeOpenSourceLicensesField() {
+    val myActivity = activity ?: return
+    val licenses = findPreference<Preference>(SK_OPEN_SOURCE_LICENSES) ?: return
+    licenses.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+      val texts =
+          listOf(R.raw.symbol_font_vera_license, R.raw.symbol_font_iec_license).mapNotNull { rawRes
+            ->
+            resources.openRawResource(rawRes).bufferedReader().use { it.readText() }
+          }
+      androidx.appcompat.app.AlertDialog.Builder(myActivity)
+          .setTitle(R.string.open_source_licenses)
+          .setMessage(texts.joinToString("\n\n---\n\n"))
           .setPositiveButton(R.string.dismiss, null)
           .show()
       true
@@ -399,8 +431,29 @@ class SettingsFragment : PreferenceFragmentCompat() {
     return getString(R.string.diag_level_summary, label)
   }
 
+  /**
+   * Cross-links the two settings screens: the app screen gets a "Robot settings" row, the robot
+   * screen gets an "App settings" row (the gamepad's IP chip is the other robot-settings entry).
+   */
+  private fun initializeScreenLinks() {
+    val myActivity = activity ?: return
+    val openRobot = findPreference<Preference>(SK_OPEN_ROBOT_SETTINGS)
+    openRobot?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+      myActivity.startActivity(
+          android.content.Intent(myActivity, RobotSettingsActivity::class.java)
+      )
+      true
+    }
+    val openApp = findPreference<Preference>(SK_OPEN_APP_SETTINGS)
+    openApp?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
+      myActivity.startActivity(android.content.Intent(myActivity, SettingsActivity::class.java))
+      true
+    }
+  }
+
   override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-    setPreferencesFromResource(R.xml.pref_general, rootKey)
+    val preferenceXml = arguments?.getInt(ARG_PREFERENCE_XML, R.xml.pref_app) ?: R.xml.pref_app
+    setPreferencesFromResource(preferenceXml, rootKey)
 
     initializeAboutSystemField()
     initializeDynamicPreferenceSummary()
@@ -412,5 +465,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     initializeReportIssueField()
     initializeCopyReportField()
     initializeViewLogField()
+    initializeOpenSourceLicensesField()
+    initializeScreenLinks()
   }
 }

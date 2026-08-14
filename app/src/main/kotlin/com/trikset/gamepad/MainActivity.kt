@@ -9,12 +9,10 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
 import android.view.KeyEvent
-import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.AlphaAnimation
 import android.widget.Button
 import android.widget.Toast
 import androidx.activity.viewModels
@@ -45,6 +43,9 @@ class MainActivity :
   private var mVideoURL: URL? = null
   private var mSettingsController: MainActivitySettingsController? = null
   private var videoRetryController: VideoRetryController? = null
+  // Base pad/button opacity from the "Arrows transparency" setting (1f until the first apply);
+  // applyHudTone multiplies it by the connection-state dim factor so the two never fight.
+  private var padsAlphaBase = 1f
   private val senderViewModel: SenderViewModel by viewModels()
   private val wheelController = WheelController()
   private val magicButtons = MagicButtonPanel(this) { getSenderService().send(it) }
@@ -69,6 +70,19 @@ class MainActivity :
           sender.getHostAddr()?.let { host -> "$host:${sender.getHostPort()}" }
         },
         connectAction = { getSenderService().connect() },
+    )
+  }
+  private val connectionIndicator = ConnectionIndicator()
+  // Robot-target chip controller: owns the host text, both status glyphs and the chip's dynamic
+  // contentDescription (extracted so MainActivity stays under the detekt TooManyFunctions gate).
+  private val robotChip: RobotChipController by lazy {
+    RobotChipController(
+        context = this,
+        chipProvider = { findViewById(R.id.targetChip) },
+        chipTextProvider = { findViewById(R.id.targetChipText) },
+        controlAccentProvider = {
+          connectionIndicator.accentColorResource(senderViewModel.connectionState.value)
+        },
     )
   }
   private val hardwareGamepadController: HardwareGamepadController by lazy {
@@ -106,13 +120,9 @@ class MainActivity :
     setContentView(R.layout.activity_main)
     systemUiController.setVisibility(false)
     connectionFeedback.attach()
-    val actionBar = supportActionBar
-    if (actionBar != null) {
-      actionBar.setDisplayShowHomeEnabled(true)
-      actionBar.setDisplayUseLogoEnabled(false)
-      actionBar.setLogo(R.mipmap.trik_gamepad_logo_512x512)
-      actionBar.setDisplayShowTitleEnabled(true)
-    }
+    // No action bar on the gamepad HUD: it was the old green IP bar. The IP now lives in the
+    // tappable top-left chip; the gear opens Settings directly (see below).
+    supportActionBar?.hide()
 
     mSensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
@@ -129,18 +139,22 @@ class MainActivity :
     val btnSettings = findViewById<Button>(R.id.btnSettings)
     if (btnSettings != null) {
       btnSettings.setOnClickListener {
-        val actionBar1 = supportActionBar
-        if (actionBar1 != null) {
-          systemUiController.setVisibility(!actionBar1.isShowing)
-        }
+        // The gear is the settings affordance (was: toggle the action bar).
+        startActivity(Intent(this, SettingsActivity::class.java))
       }
     }
 
-    val controlsOverlay = findViewById<View>(R.id.controlsOverlay)
-    if (controlsOverlay != null) {
-      controlsOverlay.bringToFront()
+    val targetChip = findViewById<View>(R.id.targetChip)
+    if (targetChip != null) {
+      // The IP chip opens the robot/target settings (host, port, video, presets).
+      targetChip.setOnClickListener {
+        startActivity(Intent(this, RobotSettingsActivity::class.java))
+      }
     }
 
+    // Child order in activity_main.xml IS the z-order: the pads layer (controlsOverlay) is
+    // declared before the visuals, so the chip/gear/buttons draw and receive touches above the
+    // pads with no runtime bringToFront.
     createPad(R.id.leftPad, "1")
     createPad(R.id.rightPad, "2")
 
@@ -167,10 +181,11 @@ class MainActivity :
       repeatOnLifecycle(Lifecycle.State.STARTED) {
         senderViewModel.connectionState.collect { state ->
           connectionFeedback.update(state)
+          applyHudTone(state)
           if (
               state is ConnectionState.Disconnected &&
                   state.reason.isNotEmpty() &&
-                  state.reason != PAUSE_DISCONNECT_REASON
+                  state.reason != ConnectionState.PAUSE_DISCONNECT_REASON
           ) {
             connectionFeedback.error(getString(R.string.disconnected_notice, state.reason))
           }
@@ -193,19 +208,9 @@ class MainActivity :
     }
   }
 
-  override fun onCreateOptionsMenu(menu: Menu): Boolean {
-    menuInflater.inflate(R.menu.menu, menu)
-    return true
-  }
-
   override fun onOptionsItemSelected(item: MenuItem): Boolean =
-      when (item.itemId) {
-        R.id.settings -> {
-          startActivity(Intent(this, SettingsActivity::class.java))
-          true
-        }
-        else -> super.onOptionsItemSelected(item)
-      }
+      // No action-bar menu on the gamepad: the gear and the IP chip open Settings.
+      super.onOptionsItemSelected(item)
 
   override fun dispatchKeyEvent(event: KeyEvent): Boolean {
     // A hardware gamepad maps to pad/button commands; unmapped keys fall through.
@@ -224,7 +229,7 @@ class MainActivity :
 
   override fun onPause() {
     mSensorManager?.unregisterListener(this)
-    getSenderService().disconnect(PAUSE_DISCONNECT_REASON)
+    getSenderService().disconnect(ConnectionState.PAUSE_DISCONNECT_REASON)
     videoRetryController?.onPause()
     setVideoLoading(false)
     val video = mVideo
@@ -244,9 +249,18 @@ class MainActivity :
       // Reconnect-on-error: the render thread reports a dead stream and we
       // drop the HTTP connection and restart it (R12; see DECISIONS.md
       // "MJPEG: reconnect-on-error").
-      video.setOnStreamErrorListener { videoRetryController?.onStreamError() }
-      // Hide the loading indicator once the first frame of this playback cycle renders.
-      video.setOnFirstFrameListener { runOnUiThread { setVideoLoading(false) } }
+      video.setOnStreamErrorListener {
+        robotChip.setVideoStatus(VideoStatus.UNAVAILABLE)
+        videoRetryController?.onStreamError()
+      }
+      // Hide the loading indicator once the first frame of this playback cycle renders; the chip
+      // eye glyph flips to streaming at the same moment.
+      video.setOnFirstFrameListener {
+        runOnUiThread {
+          setVideoLoading(false)
+          robotChip.setVideoStatus(VideoStatus.PLAYING)
+        }
+      }
       restartVideoStream()
     }
     val sensorManager = mSensorManager
@@ -311,6 +325,12 @@ class MainActivity :
     // hides whenever the spinner hides.
     findViewById<android.widget.TextView>(R.id.videoReconnecting)?.visibility =
         if (visible && reconnecting) View.VISIBLE else View.GONE
+    // Keep the chip eye glyph in sync with the spinner: a load in flight is LOADING, a reload of
+    // a stream that WAS playing is RECONNECTING. Hiding the spinner never overrides a status
+    // (the first-frame listener flips to PLAYING; an error listener flips to UNAVAILABLE).
+    if (visible) {
+      robotChip.setVideoStatus(if (reconnecting) VideoStatus.RECONNECTING else VideoStatus.LOADING)
+    }
   }
 
   override fun onSensorChanged(event: SensorEvent) {
@@ -326,14 +346,8 @@ class MainActivity :
     getSenderService().send("wheel $mAngle")
   }
 
-  override fun setActionBarTitle(title: String): Boolean {
-    val actionBar = supportActionBar
-    return if (actionBar != null) {
-      actionBar.title = title
-      true
-    } else {
-      false
-    }
+  override fun setTargetChip(host: String) {
+    robotChip.setHost(host)
   }
 
   override fun toast(text: String) {
@@ -341,11 +355,11 @@ class MainActivity :
   }
 
   override fun animatePadsAlpha(alpha: Float, previousAlpha: Float) {
-    val alphaUp = AlphaAnimation(previousAlpha, alpha)
-    alphaUp.setFillAfter(true)
-    alphaUp.setDuration(ALPHA_ANIMATION_MS)
-    findViewById<View>(R.id.controlsOverlay)?.startAnimation(alphaUp)
-    findViewById<View>(R.id.buttons)?.startAnimation(alphaUp)
+    padsAlphaBase = alpha
+    // Single alpha authority: applyHudTone recomputes the final alpha from the connection state,
+    // so no competing AlphaAnimation (the old fillAfter animation multiplied with the direct
+    // .alpha set below and washed the pads out to ~15% opacity).
+    applyHudTone(senderViewModel.connectionState.value)
   }
 
   override fun setVideoUrl(url: URL?) {
@@ -355,6 +369,8 @@ class MainActivity :
     // state).
     findViewById<android.widget.TextView>(R.id.videoPlaceholder)?.visibility =
         if (url == null) View.VISIBLE else View.GONE
+    // A configured URL arms a load (amber eye); a null URL means video is disabled (gray eye).
+    robotChip.setVideoStatus(if (url == null) VideoStatus.DISABLED else VideoStatus.LOADING)
   }
 
   override fun setKeepScreenOn(enabled: Boolean) {
@@ -371,6 +387,35 @@ class MainActivity :
     val visibility = if (visible) View.VISIBLE else View.GONE
     findViewById<View>(R.id.controlsOverlay)?.visibility = visibility
     findViewById<View>(R.id.buttons)?.visibility = visibility
+  }
+
+  /**
+   * Applies the connection-state accent (green/amber/sepia/red — see [ConnectionIndicator]) to the
+   * pads, magic buttons and pill, and dims the controls while not Connected so the whole HUD reads
+   * one state. Only the tone/alpha change; the pad touch math and button logic are untouched.
+   */
+  private fun applyHudTone(state: ConnectionState) {
+    val accent = connectionIndicator.accentColorResource(state)
+    findViewById<SquareTouchPadLayout>(R.id.leftPad)?.setAccent(accent)
+    findViewById<SquareTouchPadLayout>(R.id.rightPad)?.setAccent(accent)
+    magicButtons.setAccent(accent)
+    // The robot chip's CONTROL glyph reflects the robot control status (same accent as the
+    // pads/gear); the host text stays neutral white and the VIDEO glyph is painted separately by
+    // robotChip.setVideoStatus.
+    robotChip.paintControlAccent(accent)
+    // Dim the controls to ~40% until connected (a disconnected gamepad is a standby surface, not
+    // a dead one — the tone change + pill text carry the state). The dim is "at most 40%": it
+    // never makes the controls more transparent than the user's "Arrows transparency" base, so a
+    // default installation (pads already at ~39%) keeps its chrome visible while a fully-opaque
+    // setup visibly dims.
+    val targetAlpha =
+        if (state is ConnectionState.Connected) {
+          padsAlphaBase
+        } else {
+          minOf(padsAlphaBase, CONTROLS_DIM_ALPHA)
+        }
+    findViewById<View>(R.id.controlsOverlay)?.alpha = targetAlpha
+    findViewById<View>(R.id.buttons)?.alpha = targetAlpha
   }
 
   override fun setShowFps(enabled: Boolean) {
@@ -426,9 +471,9 @@ class MainActivity :
   private companion object {
     const val TAG = "MainActivity"
     const val HIDE_DELAY_MS = 3000L
-    const val ALPHA_ANIMATION_MS = 2000L
     const val WHEEL_STEP_DEFAULT = 7
-    const val PAUSE_DISCONNECT_REASON = "Inactive gamepad"
     const val ERROR_SUFFIX = " error."
+    // Type 1 HUD: controls opacity while not Connected (see applyHudTone).
+    const val CONTROLS_DIM_ALPHA = 0.4f
   }
 }

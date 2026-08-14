@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Type 1 HUD: glass pill / badge background (fake glass, rounded-full). Shared by the status
+     pill and the "Video reconnecting…" badge. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/hud_glass_fill_strong" />
+    <stroke
+        android:width="1.5dp"
+        android:color="@color/greenlight" />
+    <corners android:radius="@dimen/hud_pill_corner" />
+</shape>

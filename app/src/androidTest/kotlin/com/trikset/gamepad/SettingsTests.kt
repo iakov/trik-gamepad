@@ -40,18 +40,14 @@ class SettingsTests {
 
   @Test
   fun settingsShouldWorkCorrectly() {
-    openSettings()
-
-    // Basic (root) categories hold the connection + video + keep-screen-on prefs;
-    // keepalive moved into the nested "Advanced settings" sub-screen.
+    openRobotSettings()
     editPreference("Robot IP address…", "localhost")
     editPreference("Robot TCP port…", "12345")
     editPreference("URI for video stream to play…", "http://localhost:8080/?action=stream")
-    openAdvanced()
     editPreference("Keep-alive timeout, ms…", "3000")
 
-    // Out of the Advanced sub-screen, then out of Settings.
-    Espresso.pressBack()
+    // Out of the robot settings back to the gamepad (single-level screen since C17's settings
+    // split — the old Advanced sub-screen needed a second back).
     Espresso.pressBack()
 
     val preferences = PreferenceManager.getDefaultSharedPreferences(mActivityTestRule.activity)
@@ -69,11 +65,9 @@ class SettingsTests {
     val initialKeepaliveTimeout =
         mActivityTestRule.activity.getSenderService().getKeepaliveTimeout()
 
-    openSettings()
-    openAdvanced()
+    openRobotSettings()
     editPreference("Keep-alive timeout, ms…", "500") // keepalive below MINIMAL_KEEPALIVE
 
-    Espresso.pressBack()
     Espresso.pressBack()
 
     assertEquals(
@@ -82,26 +76,9 @@ class SettingsTests {
     )
   }
 
-  /** From the gamepad: reveal + tap the action-bar Settings item. */
-  private fun openSettings() {
-    // The gear button is unique, so no child-index matcher is needed; index-based
-    // locators break on any layout reorder (MainActivity's controlsOverlay.bringToFront()
-    // and new children moving btnSettings from rendered child #1).
-    onView(allOf(withId(R.id.btnSettings), isDisplayed())).perform(click())
-
-    onView(
-            allOf(
-                withId(R.id.settings),
-                withText("Settings"),
-                isDisplayed(),
-            )
-        )
-        .perform(click())
-  }
-
-  /** Navigates into the nested "Advanced settings" sub-screen. */
-  private fun openAdvanced() {
-    clickPreference("Advanced settings")
+  /** From the gamepad: open the robot/target settings (top-left IP chip). */
+  private fun openRobotSettings() {
+    onView(allOf(withId(R.id.targetChip), isDisplayed())).perform(click())
   }
 
   /** Scrolls to and clicks the preference row titled [title]. */

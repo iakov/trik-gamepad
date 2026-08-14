@@ -9,4 +9,21 @@ import org.robolectric.annotation.Config
  * differ. Note [Config.OLDEST_SDK] is the sentinel -4, resolved to the app minSdk (23).
  */
 @Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
-open class RobolectricTestBase
+open class RobolectricTestBase {
+
+  /** Walks a dialog's window tree for views matching [predicate] (appcompat dialog internals). */
+  protected fun dialogViews(
+      dialog: androidx.appcompat.app.AlertDialog,
+      predicate: (android.view.View) -> Boolean,
+  ): List<android.view.View> {
+    val found = ArrayList<android.view.View>()
+    fun collect(view: android.view.View) {
+      if (predicate(view)) found.add(view)
+      if (view is android.view.ViewGroup) {
+        for (i in 0 until view.childCount) collect(view.getChildAt(i))
+      }
+    }
+    collect(dialog.window?.decorView ?: return emptyList())
+    return found
+  }
+}

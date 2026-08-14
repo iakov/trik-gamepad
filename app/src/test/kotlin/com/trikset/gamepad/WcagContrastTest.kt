@@ -72,4 +72,22 @@ class WcagContrastTest : RobolectricTestBase() {
     val ratio = contrast(color(R.color.greendark), androidColor(android.R.color.black))
     assertTrue("gear border vs black must be >= 3.0:1 (was $ratio)", ratio >= 3.0)
   }
+
+  @Test
+  fun chipStatusGlyphsOnBlackMeetUiThreshold() {
+    // The robot-chip status glyphs (control/video) are thin-stroke UI components on the dark
+    // glass badge; pure black under the translucent badge is the worst case.
+    val glyphColors =
+        listOf(
+            R.color.greenlight, // control connected / video streaming
+            R.color.amber, // connecting / loading / reconnecting
+            R.color.hud_sepia, // control standby
+            R.color.red, // control error / video unavailable
+            R.color.hud_disabled, // video disabled
+        )
+    for (res in glyphColors) {
+      val ratio = contrast(color(res), androidColor(android.R.color.black))
+      assertTrue("chip glyph $res vs black must be >= 3.0:1 (was $ratio)", ratio >= 3.0)
+    }
+  }
 }

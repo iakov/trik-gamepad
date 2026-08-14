@@ -40,4 +40,32 @@
         <item name="colorAccent">@color/greenlight</item>
     </style>
 
+    <!-- Type 1 HUD theme styles (the "hud_" resource family; a future Type 2/3 theme = a parallel
+         drawable/style/color set with no Kotlin changes — see DESIGN.md "HUD themes"). -->
+    <style name="Hud.GlassPill" parent="">
+        <item name="android:background">@drawable/hud_pill_bg</item>
+        <item name="android:minHeight">@dimen/touch_target_min</item>
+        <item name="android:paddingStart">@dimen/hud_pill_padding_h</item>
+        <item name="android:paddingEnd">@dimen/hud_pill_padding_h</item>
+        <item name="android:paddingTop">@dimen/hud_pill_padding_v</item>
+        <item name="android:paddingBottom">@dimen/hud_pill_padding_v</item>
+        <item name="android:textColor">@color/greenlight</item>
+        <item name="android:textSize">@dimen/connection_status_text_size</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <!-- Top-left robot-target chip: a compact glass capsule (reuses the pill background) holding
+         [control-glyph][host text][video-glyph]. Tap opens the robot/target settings screen.
+         Compact (28dp min-height, tight padding) so it does not dominate the HUD over the video;
+         the sub-48dp touch target is an accepted deviation for this read-only row (the settings
+         screens are the primary interaction surface — see DESIGN.md "Robot-target chip"). The host
+         text is neutral white; the flanking status glyphs carry the connection-state colors. -->
+    <style name="Hud.Chip" parent="">
+        <item name="android:background">@drawable/hud_pill_bg</item>
+        <item name="android:minHeight">@dimen/hud_chip_min_height</item>
+        <item name="android:paddingStart">@dimen/hud_chip_padding_h</item>
+        <item name="android:paddingEnd">@dimen/hud_chip_padding_h</item>
+        <item name="android:paddingTop">@dimen/hud_chip_padding_v</item>
+        <item name="android:paddingBottom">@dimen/hud_chip_padding_v</item>
+    </style>
 </resources>

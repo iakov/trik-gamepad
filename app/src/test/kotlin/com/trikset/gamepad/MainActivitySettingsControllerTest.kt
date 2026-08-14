@@ -19,17 +19,15 @@ import org.robolectric.android.util.concurrent.PausedExecutorService
 class MainActivitySettingsControllerTest : RobolectricTestBase() {
 
   private class FakeUi : MainActivitySettingsController.SettingsUi {
-    var title: String? = null
-    var titleSet = true
+    var chipText: String? = null
     var toasts = mutableListOf<String>()
     var url: URL? = null
     var lastAlpha = 0f
     var previousAlpha = 0f
     var step = 7
 
-    override fun setActionBarTitle(title: String): Boolean {
-      this.title = title
-      return titleSet
+    override fun setTargetChip(host: String) {
+      this.chipText = host
     }
 
     override fun toast(text: String) {
@@ -108,10 +106,23 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
   }
 
   @Test
-  fun onPreferenceChangedWithTitleFailureShouldToast() {
-    ui.titleSet = false
-    controller.onPreferenceChanged(prefs)
-    assertTrue(ui.toasts.any { it.contains("title") })
+  fun onPreferenceChangedShouldSetTargetChipToHost() {
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9")
+    assertEquals("10.0.0.9", ui.chipText)
+  }
+
+  @Test
+  fun onPreferenceChangedWithBlankHostShouldFallBackToVideoHost() {
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "")
+    setPref(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.9:8080/?action=stream")
+    assertEquals("10.0.0.9", ui.chipText)
+  }
+
+  @Test
+  fun onPreferenceChangedWithBlankHostAndNoVideoShouldShowFiller() {
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "")
+    setPref(SettingsFragment.SK_VIDEO_URI, "")
+    assertEquals(MainActivitySettingsController.TARGET_CHIP_EMPTY, ui.chipText)
   }
 
   @Test

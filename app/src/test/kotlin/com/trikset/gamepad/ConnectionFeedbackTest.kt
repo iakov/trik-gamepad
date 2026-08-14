@@ -53,6 +53,28 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
     feedback.error("boom")
   }
 
+  /** Builds a feedback wired to a real [MainActivity]'s gear/pill/root views. */
+  private fun activityFeedback(activity: MainActivity): ConnectionFeedback =
+      ConnectionFeedback(
+          context = activity,
+          settingsButtonProvider = { activity.findViewById(R.id.btnSettings) },
+          rootViewProvider = { activity.findViewById(R.id.main) },
+          statusTextProvider = { activity.findViewById(R.id.connectionStatus) },
+          targetProvider = { targetText },
+          connectAction = {},
+      )
+
+  @Test
+  fun errorShouldShowGlassPillWithMessage() {
+    val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
+    val feedback = activityFeedback(activity)
+    feedback.error("Connection to 192.0.2.1:4444 error.")
+    val pill = activity.findViewById<TextView>(R.id.connectionError)
+    assertEquals(View.VISIBLE, pill.visibility)
+    assertEquals("Connection to 192.0.2.1:4444 error.", pill.text.toString())
+    assertEquals("Connection to 192.0.2.1:4444 error.", pill.contentDescription.toString())
+  }
+
   @Test
   fun updateShouldBeSafeWhenBackgroundIsNotLayerDrawable() {
     feedbackWith(Button(context), null).update(ConnectionState.Connected)
@@ -71,15 +93,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
   @Test
   fun updateShouldPaintGearBorder() {
     val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
-    val feedback =
-        ConnectionFeedback(
-            context = activity,
-            settingsButtonProvider = { activity.findViewById(R.id.btnSettings) },
-            rootViewProvider = { activity.findViewById(R.id.main) },
-            statusTextProvider = { activity.findViewById(R.id.connectionStatus) },
-            targetProvider = { targetText },
-            connectAction = {},
-        )
+    val feedback = activityFeedback(activity)
     val app = org.robolectric.RuntimeEnvironment.getApplication()
     feedback.update(ConnectionState.Connected)
     assertEquals(app.getColor(R.color.greendark), borderStrokeColor(activity))
@@ -133,7 +147,7 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
       announcementEvents().lastOrNull()?.text?.lastOrNull()
 
   @Test
-  fun updateShouldRenderConnectionStatusText() {
+  fun updateShouldRenderConnectionStatusIcon() {
     // update() returns early when the settings button is missing, so use a real
     // button with the gear background (border + status render together).
     val btn = Button(context)
@@ -142,7 +156,10 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
     val feedback = feedbackWith(btn, status)
 
     feedback.update(ConnectionState.Connecting)
-    assertEquals("Connecting to 192.168.77.1:4444…", status.text.toString())
+    // Symbol-only HUD: the pill shows the connecting glyph; the spoken text is the
+    // contentDescription (the robot chip shows the host visually).
+    assertEquals("↺", status.text.toString())
+    assertEquals("Connecting to 192.168.77.1:4444…", status.contentDescription.toString())
     assertEquals(View.VISIBLE, status.visibility)
 
     feedback.update(ConnectionState.Connected)
@@ -150,7 +167,8 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
     assertEquals(View.GONE, status.visibility)
 
     feedback.update(ConnectionState.Disconnected("x"))
-    assertEquals("Tap to connect…", status.text.toString())
+    assertEquals("⏻", status.text.toString())
+    assertEquals("Tap to connect…", status.contentDescription.toString())
     assertEquals(View.VISIBLE, status.visibility)
   }
 

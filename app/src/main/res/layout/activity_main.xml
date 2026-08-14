@@ -23,75 +23,181 @@
         android:textSize="18sp"
         android:visibility="gone" />
 
-    <RelativeLayout
+    <!-- Readability scrim: dark top/bottom edges so the translucent HUD stays legible over bright
+         video frames. Placed above the video, below the controls; this view is not interactive. -->
+    <View
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:background="@drawable/hud_scrim"
+        android:importantForAccessibility="no" />
+
+    <!-- Layer 1 - pads (bottom layer): full-screen, equally divided. Each pad is a 260dp square
+         centered in its half (SquareTouchPadLayout squares to min(width,height), so the explicit
+         260dp keeps the pads smaller than the available space and clear of the status/buttons).
+         Declared BEFORE the visuals so the chip/gear/buttons draw and receive touches above the
+         pads - no runtime bringToFront (see MainActivity). -->
+    <LinearLayout
         android:id="@+id/controlsOverlay"
         android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:background="@android:color/transparent"
+        android:layout_height="fill_parent"
         android:baselineAligned="false"
-        android:orientation="horizontal"
-        android:layout_marginBottom="50dp">
+        android:orientation="horizontal">
 
-        <com.trikset.gamepad.SquareTouchPadLayout
-            android:id="@+id/leftPad"
-            android:layout_width="fill_parent"
-            android:layout_height="fill_parent"
-            android:layout_margin="10dp"
-            android:layout_alignParentStart="true"
-            android:contentDescription="@string/left_pad_description"
-            android:background="@drawable/touchpad_shape"
-            android:src="@drawable/oxygen_actions_transform_move_icon" />
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center">
 
-        <com.trikset.gamepad.SquareTouchPadLayout
-            android:id="@+id/rightPad"
-            android:layout_width="fill_parent"
-            android:layout_height="fill_parent"
-            android:layout_margin="10dp"
-            android:layout_alignParentEnd="true"
-            android:contentDescription="@string/right_pad_description"
-            android:background="@drawable/touchpad_shape"
-            android:src="@drawable/oxygen_actions_transform_move_icon" />
+            <com.trikset.gamepad.SquareTouchPadLayout
+                android:id="@+id/leftPad"
+                android:layout_width="@dimen/hud_pad_size"
+                android:layout_height="@dimen/hud_pad_size"
+                android:layout_gravity="center"
+                android:background="@drawable/hud_pad_glass"
+                android:contentDescription="@string/left_pad_description">
 
-    </RelativeLayout>
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/hud_pad_chrome"
+                    android:tag="padChrome" />
+            </com.trikset.gamepad.SquareTouchPadLayout>
+        </FrameLayout>
 
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:gravity="center">
+
+            <com.trikset.gamepad.SquareTouchPadLayout
+                android:id="@+id/rightPad"
+                android:layout_width="@dimen/hud_pad_size"
+                android:layout_height="@dimen/hud_pad_size"
+                android:layout_gravity="center"
+                android:background="@drawable/hud_pad_glass"
+                android:contentDescription="@string/right_pad_description">
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/hud_pad_chrome"
+                    android:tag="padChrome" />
+            </com.trikset.gamepad.SquareTouchPadLayout>
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- Robot-target chip (top-left): shows the configured host (or the video stream's host in
+         video-only mode, or a filler when neither is set) flanked by two connection-status glyphs:
+         the move-cross (start) reports the CONTROL connection, the eye (end) reports the VIDEO
+         connection. Each glyph is tinted to its own state color at runtime (green/amber/sepia/red
+         for control, green/amber/red/gray for video — see VideoStatus). The host text is neutral
+         white; the glyphs carry the color ("color is never the only signal", DESIGN.md). The chip
+         is one tappable action that opens the robot/target settings; its dynamic contentDescription
+         announces both connection states. The host text is deliberately NOT selectable
+         (tools:ignore): it is an action, so long-press selection would fight the tap. -->
+    <LinearLayout
+        android:id="@+id/targetChip"
+        style="@style/Hud.Chip"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
+        android:layout_margin="@dimen/hud_half_glyph"
+        android:clickable="true"
+        android:contentDescription="@string/target_chip_description"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <!-- Control status badge: the move-cross glyph, tinted to the control connection accent
+             (set at runtime by MainActivity.applyHudTone). -->
+        <FrameLayout
+            android:layout_width="@dimen/hud_status_badge_size"
+            android:layout_height="@dimen/hud_status_badge_size"
+            android:background="@drawable/hud_status_badge">
+
+            <ImageView
+                android:layout_width="@dimen/hud_status_glyph_size"
+                android:layout_height="@dimen/hud_status_glyph_size"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/hud_pad_glyph_move"
+                android:tag="controlStatusIcon" />
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/targetChipText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/hud_chip_badge_gap"
+            android:maxLines="1"
+            android:textColor="@color/white"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            tools:ignore="SelectableText" />
+
+        <!-- Video status badge: the eye glyph, tinted to the video connection state color (set at
+             runtime by MainActivity.applyVideoStatusIcon). -->
+        <FrameLayout
+            android:layout_width="@dimen/hud_status_badge_size"
+            android:layout_height="@dimen/hud_status_badge_size"
+            android:layout_marginStart="@dimen/hud_chip_badge_gap"
+            android:background="@drawable/hud_status_badge">
+
+            <ImageView
+                android:layout_width="@dimen/hud_status_glyph_size"
+                android:layout_height="@dimen/hud_status_glyph_size"
+                android:layout_gravity="center"
+                android:importantForAccessibility="no"
+                android:src="@drawable/hud_pad_glyph_look"
+                android:tag="videoStatusIcon" />
+        </FrameLayout>
+
+    </LinearLayout>
 
     <Button
         android:id="@+id/btnSettings"
-        android:layout_width="50dp"
-        android:layout_height="50dp"
-        android:layout_margin="0dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignStart="@+id/targetChip"
         android:layout_alignParentBottom="true"
-        android:layout_alignParentStart="true"
+        android:layout_marginStart="@dimen/hud_half_glyph"
+        android:layout_marginBottom="@dimen/hud_half_glyph"
+        android:background="@drawable/btn_settings"
         android:contentDescription="@string/settings_button_description"
         android:focusableInTouchMode="false"
+        android:gravity="center"
+        android:minWidth="@dimen/touch_target_min"
+        android:minHeight="@dimen/touch_target_min"
         android:padding="0dp"
-        android:background="@drawable/btn_settings"
-        />
+        android:text="@string/settings_gear_glyph"
+        android:textColor="@color/greenlight"
+        android:textSize="22sp" />
 
     <LinearLayout
         android:id="@+id/buttons"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:minHeight="50dp"
-        android:layout_alignParentBottom="true"
+        android:layout_alignBottom="@+id/btnSettings"
         android:layout_centerHorizontal="true"
-        android:gravity="center_horizontal|center_vertical"
+        android:gravity="center"
+        android:minHeight="@dimen/touch_target_min"
         android:orientation="horizontal"
-        android:layout_marginLeft="20dp"
-        android:layout_marginRight="20dp"
+        android:background="@drawable/hud_action_cluster"
+        android:paddingTop="6dp"
+        android:paddingBottom="6dp"
         >
 
     </LinearLayout>
 
-    <!-- Kept as the LAST child of main (defensive convention): MainActivity calls
-         controlsOverlay.bringToFront(), which reorders the children at runtime
-         (video, btnSettings, buttons, ..., controlsOverlay) — keep new children
-         after the gear button so nothing nudges it out of its rendered position
-         (instrumented tests locate it by id, but a stable order keeps manual
-         inspection and any index-based tooling predictable). The spinner is
-         centered via layout params and stays under the brought-to-front controls
-         overlay. -->
+    <!-- Kept as the LAST children of main (defensive convention): child order is the z-order, so
+         the pads layer (controlsOverlay) is declared before the visuals and the visuals before
+         anything that must stay on top. No runtime bringToFront. The spinner is centered via
+         layout params and stays under the connection pill. -->
     <ProgressBar
         android:id="@+id/videoLoading"
         style="?android:attr/progressBarStyle"
@@ -100,6 +206,7 @@
         android:layout_centerInParent="true"
         android:background="@drawable/video_loading_background"
         android:importantForAccessibility="no"
+        android:indeterminateTint="@color/greenlight"
         android:padding="14dp"
         android:visibility="gone" />
 
@@ -108,45 +215,44 @@
          covers both). Hidden on the first frame / pause (MainActivity.setVideoLoading(false)). -->
     <TextView
         android:id="@+id/videoReconnecting"
+        style="@style/Hud.GlassPill"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
         android:layout_marginTop="80dp"
-        android:background="@drawable/connection_status_background"
-        android:paddingStart="10dp"
-        android:paddingEnd="10dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
         android:text="@string/video_reconnecting"
         android:textColor="@android:color/white"
         android:textSize="16sp"
         android:visibility="gone" />
 
-    <!-- Connection status pill ("Tap to connect…" / "Connecting to host:port…"), hidden once
-         connected (ConnectionFeedback.setStatusText). Centered, drawn over the
-         video-loading spinner center; kept AFTER videoLoading in the child list so
-         the pill renders on top (both are brought-to-front together with the
-         controls overlay; see above). minHeight 48dp = the tap-to-connect touch
-         target; textIsSelectable is OFF and there is no contentDescription so
-         TalkBack reads the live state text (the app announces state changes via
-         announceForAccessibility). -->
+    <!-- Connection status pill (⏻ tap-to-connect / ↺ connecting), hidden once connected
+         (ConnectionFeedback.setStatusText). Centered; minHeight 48dp = the tap-to-connect touch
+         target; the state glyph is bundled-font text set at runtime by ConnectionFeedback. -->
     <TextView
         android:id="@+id/connectionStatus"
+        style="@style/Hud.GlassPill"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
-        android:background="@drawable/connection_status_background"
         android:clickable="true"
         android:focusable="true"
+        android:gravity="center_vertical"
         android:maxLines="1"
-        android:minHeight="@dimen/touch_target_min"
-        android:paddingStart="10dp"
-        android:paddingEnd="10dp"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        android:textColor="@color/status_orange"
-        android:textSize="@dimen/connection_status_text_size"
-        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- Connection-error pill (transient): a content-sized glass bar shown by
+         ConnectionFeedback.error() for real connection errors (not the persistent status pill).
+         wrap_content width = always fits the message; positioned at runtime between the status
+         pill and the magic-button row; fade-in/auto-dismiss handled by ConnectionFeedback. -->
+    <TextView
+        android:id="@+id/connectionError"
+        style="@style/Hud.GlassPill"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:maxLines="2"
+        android:textColor="@color/white"
+        android:textSize="@dimen/hud_snackbar_text_size"
         android:visibility="gone" />
 
 

@@ -1,5 +1,6 @@
 package com.trikset.gamepad
 
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
 import org.junit.Assert.assertEquals
@@ -71,8 +72,11 @@ class MagicButtonPanelTest : RobolectricTestBase() {
     val expected = context.resources.getDimensionPixelSize(R.dimen.touch_target_min)
     for (i in 0 until container.childCount) {
       val btn = container.getChildAt(i) as Button
-      assertEquals("minWidth must be >= 48dp", expected, btn.minimumWidth)
-      assertEquals("minHeight must be >= 48dp", expected, btn.minimumHeight)
+      // The touch target is the fixed square layout params (48dp), not the theme's
+      // minimumWidth (88dp Material default) — the circle drawable stretches to these bounds.
+      val lp = btn.layoutParams as ViewGroup.MarginLayoutParams
+      assertEquals("width must be 48dp", expected, lp.width)
+      assertEquals("height must be 48dp", expected, lp.height)
     }
   }
 

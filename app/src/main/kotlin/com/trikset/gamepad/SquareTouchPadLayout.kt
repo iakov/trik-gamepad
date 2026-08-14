@@ -9,7 +9,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.widget.RelativeLayout
 import androidx.core.content.ContextCompat
-import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.withTranslation
 import com.trikset.gamepad.diagnostics.AppLog
 import java.util.Locale
 import kotlin.math.max
@@ -63,17 +63,132 @@ class SquareTouchPadLayout : RelativeLayout {
     }
     setWillNotDraw(false)
     isHapticFeedbackEnabled = true
-    background =
-        ResourcesCompat.getDrawable(
-            getResources(),
-            R.drawable.oxygen_actions_transform_move_icon,
-            null,
-        )
+  }
+
+  /**
+   * Recolors the Type 1 pad chrome (crosshair vector + mode glyph) and the touch dot to the given
+   * connection-state accent (green/amber/sepia/red — see [ConnectionIndicator]). The pad glass
+   * background and touch behavior are unchanged; tinting the chrome keeps the theme switchable
+   * without code changes per theme.
+   */
+  fun setAccent(@androidx.annotation.ColorRes colorRes: Int) {
+    val color = ContextCompat.getColor(context, colorRes)
+    paint.color = color
+    // The chrome + glyph are child ImageViews tagged "padChrome"/"padGlyph" sharing one accent
+    // color, so a single SRC_IN filter recolors them (alpha preserved, color replaced). Tags are
+    // used (not ids) because both pads host the same tagged views in their own subtrees.
+    findViewWithTag<android.widget.ImageView>("padChrome")?.colorFilter =
+        android.graphics.PorterDuffColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN)
+    findViewWithTag<android.widget.ImageView>("padGlyph")?.colorFilter =
+        android.graphics.PorterDuffColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN)
+    invalidate()
   }
 
   override fun onDraw(canvas: Canvas) {
     super.onDraw(canvas)
-    canvas.drawCircle(absX, absY, maxX / CIRCLE_RADIUS_DIVISOR, paint)
+    // Outer dashed ring (mockup style) — vector drawables cannot express dashes, so it is drawn
+    // here, tinted by the same accent as the chrome/glyph.
+    val center = maxX / 2f
+    val effect = ringDashEffect ?: return
+    val s = paint.style
+    val w = paint.strokeWidth
+    val sw = maxX * OUTER_RING_STROKE_RATIO
+    paint.style = Paint.Style.STROKE
+    paint.strokeWidth = sw
+    paint.pathEffect = effect
+    canvas.drawCircle(center, center, maxX * OUTER_RING_RATIO, paint)
+    paint.pathEffect = null
+    paint.style = s
+    paint.strokeWidth = w
+    drawKnob(canvas)
+  }
+
+  private fun drawKnob(canvas: Canvas) {
+    val radius = maxX * KNOB_RADIUS_RATIO
+    if (radius <= 0f) {
+      return
+    }
+    ensureKnobPaint(radius)
+    val knob = knobPaint
+    val glow = glowPaint
+    val dot = dotPaint
+    if (knob == null || glow == null || dot == null) {
+      return
+    }
+    // Soft glow halo under the knob, then the knob itself, then a bright center dot. The canvas is
+    // translated to the touch point so the (origin-centered) gradient follows the knob for free.
+    canvas.withTranslation(absX, absY) {
+      canvas.drawCircle(0f, 0f, radius * KNOB_GLOW_RATIO, glow)
+      canvas.drawCircle(0f, 0f, radius, knob)
+      canvas.drawCircle(0f, 0f, radius * KNOB_DOT_RATIO, dot)
+    }
+  }
+
+  // The knob is a radial gradient (accent -> darkened edge) with a translucent glow halo and a
+  // small bright center dot; paints are rebuilt only when the accent color or knob radius changes
+  // (setAccent / pad size), so the per-frame draw cost stays flat (no allocation on every touch
+  // move).
+  private var knobPaint: Paint? = null
+  private var glowPaint: Paint? = null
+  private var dotPaint: Paint? = null
+  private var knobAccent = 0
+  private var knobRadius = 0f
+  // Dashed outer ring: the DashPathEffect is sized in onSizeChanged (never inside onDraw, where
+  // lint DrawAllocation forbids allocations). Null until the first layout pass.
+  private var ringDashEffect: android.graphics.DashPathEffect? = null
+
+  private fun ensureKnobPaint(radius: Float) {
+    val accent = paint.color
+    if (knobPaint != null && accent == knobAccent && radius == knobRadius) {
+      return
+    }
+    knobAccent = accent
+    knobRadius = radius
+    val darker =
+        android.graphics.Color.argb(
+            OPAQUE_ALPHA,
+            (android.graphics.Color.red(accent) * KNOB_EDGE_DIM_RATIO).toInt(),
+            (android.graphics.Color.green(accent) * KNOB_EDGE_DIM_RATIO).toInt(),
+            (android.graphics.Color.blue(accent) * KNOB_EDGE_DIM_RATIO).toInt(),
+        )
+    val center =
+        android.graphics.Color.argb(
+            OPAQUE_ALPHA,
+            (android.graphics.Color.red(accent) + OPAQUE_ALPHA * KNOB_CENTER_LIGHT_RATIO)
+                .toInt()
+                .coerceAtMost(OPAQUE_ALPHA),
+            (android.graphics.Color.green(accent) + OPAQUE_ALPHA * KNOB_CENTER_LIGHT_RATIO)
+                .toInt()
+                .coerceAtMost(OPAQUE_ALPHA),
+            (android.graphics.Color.blue(accent) + OPAQUE_ALPHA * KNOB_CENTER_LIGHT_RATIO)
+                .toInt()
+                .coerceAtMost(OPAQUE_ALPHA),
+        )
+    knobPaint =
+        Paint().apply {
+          shader =
+              android.graphics.RadialGradient(
+                  0f,
+                  0f,
+                  radius,
+                  center,
+                  darker,
+                  android.graphics.Shader.TileMode.CLAMP,
+              )
+          style = Paint.Style.FILL
+        }
+    glowPaint =
+        Paint().apply {
+          color = accent
+          alpha = KNOB_GLOW_ALPHA
+          style = Paint.Style.FILL
+        }
+    dotPaint =
+        Paint().apply {
+          color = android.graphics.Color.WHITE
+          alpha = KNOB_DOT_ALPHA
+          style = Paint.Style.FILL
+        }
   }
 
   override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -88,13 +203,26 @@ class SquareTouchPadLayout : RelativeLayout {
         } else {
           DEFAULT_SIZE
         }
+    // The pad chrome + mode glyph are child views (ImageViews tagged "padChrome"/"padGlyph");
+    // they must be measured too, or they collapse to 0x0 and the pad renders as an empty glass
+    // panel (C17 regression: the pad originally had a single background drawable and no children).
+    val squareSpec = MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY)
     setMeasuredDimension(size, size)
+    super.onMeasure(squareSpec, squareSpec)
   }
 
   override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
     super.onSizeChanged(w, h, oldw, oldh)
     maxX = w.toFloat()
     maxY = h.toFloat()
+    // The dashed ring's dash lengths scale with the pad size; rebuild the effect here (not per
+    // frame, or lint DrawAllocation fails).
+    val sw = w.toFloat() * OUTER_RING_STROKE_RATIO
+    ringDashEffect =
+        android.graphics.DashPathEffect(
+            floatArrayOf(sw * RING_DASH_LENGTH_RATIO, sw * RING_GAP_LENGTH_RATIO),
+            0f,
+        )
     if (oldw == 0 && oldh == 0) {
       setAbsXY(w / 2.0f, h / 2.0f)
     }
@@ -165,8 +293,23 @@ class SquareTouchPadLayout : RelativeLayout {
 
   private companion object {
     const val DEFAULT_SIZE = 100
-    const val CIRCLE_RADIUS_DIVISOR = 20
     const val OPAQUE_ALPHA = 255
+    // Mockup-style joystick knob: radius ~12% of the pad, with a glow halo (1.6x) and a small
+    // bright center dot (0.35x). Paints rebuild only on accent change (see ensureKnobPaint).
+    const val KNOB_RADIUS_RATIO = 0.12f
+    const val KNOB_GLOW_RATIO = 1.6f
+    const val KNOB_DOT_RATIO = 0.35f
+    const val KNOB_GLOW_ALPHA = 60
+    const val KNOB_DOT_ALPHA = 200
+    // Outer dashed ring (mockup): diameter ~62% of the pad (radius = 31% of the pad), stroke ~1.2%.
+    const val OUTER_RING_RATIO = 0.31f
+    const val OUTER_RING_STROKE_RATIO = 0.012f
+    // Dashed-ring dash/gap lengths, relative to the stroke width.
+    const val RING_DASH_LENGTH_RATIO = 5f
+    const val RING_GAP_LENGTH_RATIO = 3f
+    // Knob gradient: edge color = accent dimmed, center = accent lightened, both by these ratios.
+    const val KNOB_EDGE_DIM_RATIO = 0.55f
+    const val KNOB_CENTER_LIGHT_RATIO = 0.25f
     const val TAG = "TouchPad"
   }
 }

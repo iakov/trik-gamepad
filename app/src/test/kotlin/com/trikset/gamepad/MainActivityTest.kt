@@ -249,21 +249,8 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun onCreateOptionsMenuShouldInflateMenu() {
+  fun onOptionsItemSelectedUnknownShouldFallThrough() {
     val menu = androidx.appcompat.view.menu.MenuBuilder(activity)
-    assertTrue(activity.onCreateOptionsMenu(menu))
-  }
-
-  @Test
-  fun onOptionsItemSelectedShouldOpenSettingsOrFallThrough() {
-    val menu = androidx.appcompat.view.menu.MenuBuilder(activity)
-    menu.add(0, R.id.settings, 1, "settings")
-
-    // Settings item starts the SettingsActivity.
-    val settings = menu.findItem(R.id.settings)
-    assertTrue(activity.onOptionsItemSelected(settings!!))
-
-    // Unknown item falls through to super.
     menu.add(0, 9999, 2, "unknown")
     assertFalse(activity.onOptionsItemSelected(menu.findItem(9999)!!))
   }
@@ -481,25 +468,23 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun btnSettingsClickShouldToggleActionBar() {
+  fun btnSettingsClickShouldOpenAppSettings() {
     val btnSettings = activity.findViewById<android.widget.Button>(R.id.btnSettings)
     assertNotNull(btnSettings)
     btnSettings!!.performClick()
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+    val intent = org.robolectric.Shadows.shadowOf(activity).nextStartedActivity
+    assertEquals(SettingsActivity::class.java.name, intent?.component?.className)
   }
 
   @Test
-  fun btnSettingsClickWhenActionBarHiddenShouldShowIt() {
-    // Hide the action bar first; the settings button then calls
-    // setVisibility(true), exercising the actionBarProvider()?.show() path.
-    activity.supportActionBar?.hide()
-    val btnSettings = activity.findViewById<android.widget.Button>(R.id.btnSettings)
-    assertNotNull(btnSettings)
-    btnSettings!!.performClick()
+  fun targetChipClickShouldOpenRobotSettings() {
+    val chip = activity.findViewById<View>(R.id.targetChip)
+    assertNotNull(chip)
+    chip!!.performClick()
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
-    // No assertion on the final visibility: the 3s auto-hide runnable fires
-    // during the flush and re-hides the bar. The click already exercised the
-    // show path (branch coverage).
+    val intent = org.robolectric.Shadows.shadowOf(activity).nextStartedActivity
+    assertEquals(RobotSettingsActivity::class.java.name, intent?.component?.className)
   }
 
   @Test

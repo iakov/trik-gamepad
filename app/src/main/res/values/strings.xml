@@ -15,6 +15,15 @@
     <string name="video_placeholder">No video stream — configure a video URI in Settings</string>
     <string name="connection_status_connecting">Connecting to %1$s…</string>
     <string name="connection_status_disconnected">Tap to connect…</string>
+    <!-- Symbol-only HUD: the status pill renders a glyph, not text; the spoken strings above are
+         carried as the pill's contentDescription. ⏻ (U+23FB, IEC power symbol) = tap to connect,
+         ↺ (U+21BA) = connecting. Both are bundled in res/font/symbols_mono.ttf so they render
+         identically on every device; see MEMORY.md "Symbol font". -->
+    <string name="connection_status_disconnected_icon">⏻</string>
+    <string name="connection_status_connecting_icon">↺</string>
+    <!-- Settings gear glyph (⚙ U+2699, bundled symbols_mono font), rendered as the gear button's
+         text; the persistent state color is the button's textColor. -->
+    <string name="settings_gear_glyph">⚙</string>
     <string name="video_stream_unavailable">Video stream unavailable</string>
     <string name="video_reconnecting">Video reconnecting…</string>
     <string name="preset_name_required">Preset name cannot be empty</string>
@@ -75,8 +84,29 @@
     <string name="pref_keep_screen_on">Keep screen on</string>
     <string name="pref_keep_screen_on_on">Screen stays on while the gamepad is open</string>
     <string name="pref_keep_screen_on_off">Screen may sleep while the gamepad is open</string>
+    <string name="pref_category_appearance">Appearance</string>
+    <string name="pref_hud_theme">HUD theme</string>
+    <string name="pref_hud_theme_summary">Type 1 · more themes coming</string>
     <string name="pref_advanced">Advanced settings</string>
-    <string name="pref_advanced_summary">Wheel, pads, network, magic buttons, robot presets, diagnostics</string>
+    <string name="pref_advanced_summary">Wheel, pads, hardware gamepad, magic buttons, diagnostics</string>
+    <string name="robot_settings">Robot settings</string>
+    <string name="pref_open_robot_settings_summary">Host, port, video stream, network and presets</string>
+    <string name="pref_open_app_settings">App settings</string>
+    <string name="pref_open_app_settings_summary">Appearance, controls, advanced options</string>
+    <string name="target_chip_description">Open robot settings</string>
+    <!-- Robot chip screen-reader description: "%1$s" = host, "%2$s" = control-state adjective,
+         "%3$s" = video-state adjective (e.g. "192.168.0.1, control connected, video streaming").
+         The action suffix reuses target_chip_description. -->
+    <string name="target_chip_status_format">%1$s, control %2$s, video %3$s</string>
+    <string name="chip_control_connected">@string/connection_status_connected</string>
+    <string name="chip_control_connecting">connecting</string>
+    <string name="chip_control_standby">standby</string>
+    <string name="chip_control_disconnected">disconnected</string>
+    <string name="chip_video_playing">streaming</string>
+    <string name="chip_video_loading">loading</string>
+    <string name="chip_video_reconnecting">reconnecting</string>
+    <string name="chip_video_unavailable">unavailable</string>
+    <string name="chip_video_disabled">disabled</string>
     <string name="pref_category_wheel">Wheel</string>
     <string name="pref_wheel_enabled">@string/pref_category_wheel</string>
     <string name="pref_wheel_enabled_on">Accelerometer wheel on</string>
@@ -124,6 +154,12 @@
     <string name="about_system_summary">%1$s — %2$s</string>
     <string name="about_system_info_format">Version:%1$s; Android %2$s; SDK %3$d; Resolution %4$dx%5$d; PPI %6$dx%7$d</string>
 
+    <!-- Open-source licenses: the bundled symbol font (DejaVu Sans Mono Nerd Font subset) carries
+         the Bitstream Vera + IEC-power-symbol (MIT) texts in res/raw; the row opens them in a
+         dialog (see SettingsFragment.initializeOpenSourceLicensesField). -->
+    <string name="open_source_licenses">Open-source licenses</string>
+    <string name="open_source_licenses_summary">Fonts and symbol glyphs bundled with the app</string>
+
     <!-- Accessibility: magic-button description carries the glyph so screen-reader users can
          map glyph to meaning. -->
     <string name="button_number_description">Button %1$s · %2$s</string>
@@ -137,7 +173,6 @@
 
     <!-- Connection / input validation notices (previously hardcoded literals). -->
     <string name="port_number_incorrect">Port number %1$s is incorrect.</string>
-    <string name="cannot_change_title">Cannot change title, not a problem</string>
     <string name="illegal_video_uri">Illegal video stream URL</string>
     <string name="disconnected_notice">Disconnected. %1$s</string>
 </resources>

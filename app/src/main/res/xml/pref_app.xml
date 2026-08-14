@@ -1,41 +1,8 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <!-- Basic (root) categories: the settings users change most often. Niche /
-         advanced settings live in the nested "Advanced settings" sub-screen. -->
-    <PreferenceCategory android:title="@string/pref_category_robot_connection">
-        <EditTextPreference
-            android:defaultValue="192.168.77.1"
-            android:inputType="textUri"
-            android:key="hostAddress"
-            android:maxLines="1"
-            android:selectAllOnFocus="true"
-            android:singleLine="true"
-            android:title="@string/pref_host_address" />
-        <EditTextPreference
-            android:defaultValue="4444"
-            android:inputType="number"
-            android:key="hostPort"
-            android:maxLines="1"
-            android:selectAllOnFocus="true"
-            android:singleLine="true"
-            android:title="@string/pref_host_port" />
-    </PreferenceCategory>
-
-    <PreferenceCategory android:title="@string/pref_category_video">
-        <EditTextPreference
-            android:inputType="textUri"
-            android:key="videoURI"
-            android:maxLines="1"
-            android:selectAllOnFocus="true"
-            android:singleLine="true"
-            android:title="@string/pref_video_uri" />
-        <Preference
-            android:key="resetVideoURI"
-            android:summary="@string/pref_reset_video_uri_summary"
-            android:title="@string/pref_reset_video_uri" />
-    </PreferenceCategory>
-
+    <!-- App settings: how the app looks and behaves on THIS device. Robot/target prefs (host, port,
+         video, network, presets) live in RobotSettingsActivity (pref_robot.xml). -->
     <PreferenceCategory android:title="@string/pref_category_controls">
         <SwitchPreference
             android:defaultValue="true"
@@ -44,6 +11,25 @@
             android:summaryOn="@string/pref_keep_screen_on_on"
             android:title="@string/pref_keep_screen_on" />
     </PreferenceCategory>
+
+    <PreferenceCategory android:title="@string/pref_category_appearance">
+        <!-- Single theme today: the row is greyed out (enabled=false) because there is no
+             choice yet. It still shows the current value (Type 1) per DESIGN.md "Every setting
+             shows its current value"; more themes light it up later (see DESIGN.md "HUD themes"). -->
+        <Preference
+            android:enabled="false"
+            android:key="hudTheme"
+            android:selectable="false"
+            android:summary="@string/pref_hud_theme_summary"
+            android:title="@string/pref_hud_theme" />
+    </PreferenceCategory>
+
+    <!-- Cross-link: the robot/target settings are a separate screen (chip on the gamepad also
+         opens it); this row makes them reachable from within Settings too. -->
+    <Preference
+        android:key="openRobotSettings"
+        android:summary="@string/pref_open_robot_settings_summary"
+        android:title="@string/robot_settings" />
 
     <!-- Nested sub-screen: androidx preferences cannot nest PreferenceCategory
          directly, so the Advanced groups open as their own screen. findPreference
@@ -100,32 +86,6 @@
                 android:title="@string/pref_gamepad_swap" />
         </PreferenceCategory>
 
-        <PreferenceCategory android:title="@string/pref_category_network">
-            <EditTextPreference
-                android:defaultValue="5000"
-                android:digits="0123456789"
-                android:inputType="numberDecimal"
-                android:key="keepaliveTimeout"
-                android:maxLines="1"
-                android:singleLine="true"
-                android:title="@string/pref_keepalive_timeout" />
-            <Preference
-                android:key="copyRobotIp"
-                android:summary="@string/pref_copy_robot_ip_summary"
-                android:title="@string/pref_copy_robot_ip" />
-        </PreferenceCategory>
-
-        <PreferenceCategory android:key="robotPresets" android:title="@string/pref_category_presets">
-            <EditTextPreference
-                android:key="saveRobotPreset"
-                android:summary="@string/pref_save_preset_summary"
-                android:title="@string/pref_save_preset" />
-            <Preference
-                android:key="deleteRobotPreset"
-                android:summary="@string/pref_delete_preset_summary"
-                android:title="@string/pref_delete_preset" />
-        </PreferenceCategory>
-
         <PreferenceCategory android:title="@string/pref_category_magic">
             <SeekBarPreference
                 android:defaultValue="3"
@@ -145,6 +105,10 @@
                 android:enabled="true"
                 android:key="aboutSystem"
                 android:title="@string/about_system" />
+            <Preference
+                android:key="openSourceLicenses"
+                android:summary="@string/open_source_licenses_summary"
+                android:title="@string/open_source_licenses" />
             <ListPreference
                 android:defaultValue="info"
                 android:entries="@array/diag_level_labels"

@@ -18,11 +18,36 @@ class ConnectionIndicatorTest {
   }
 
   @Test
-  fun disconnectedShouldMapToRedRegardlessOfReason() {
+  fun realErrorDisconnectShouldMapToRed() {
     assertEquals(
         R.color.red,
         indicator.borderColorResource(ConnectionState.Disconnected("Target changed.")),
     )
-    assertEquals(R.color.red, indicator.borderColorResource(ConnectionState.Disconnected("")))
+  }
+
+  @Test
+  fun idleDisconnectShouldMapToSepia() {
+    // Never connected yet (empty reason) = standby, not an error.
+    assertEquals(R.color.hud_sepia, indicator.borderColorResource(ConnectionState.Disconnected("")))
+    assertEquals(
+        R.color.hud_sepia,
+        indicator.borderColorResource(
+            ConnectionState.Disconnected(ConnectionState.PAUSE_DISCONNECT_REASON)
+        ),
+    )
+  }
+
+  @Test
+  fun accentColorFollowsTheSameSemantics() {
+    assertEquals(R.color.greenlight, indicator.accentColorResource(ConnectionState.Connected))
+    assertEquals(R.color.amber, indicator.accentColorResource(ConnectionState.Connecting))
+    assertEquals(
+        R.color.hud_sepia,
+        indicator.accentColorResource(ConnectionState.Disconnected("")),
+    )
+    assertEquals(
+        R.color.red,
+        indicator.accentColorResource(ConnectionState.Disconnected("Target changed.")),
+    )
   }
 }

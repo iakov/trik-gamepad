@@ -27,7 +27,9 @@ class TouchTargetSizeTest : RobolectricTestBase() {
     val activity = Robolectric.buildActivity(MainActivity::class.java).setup().get()
     val gear = activity.findViewById<View>(R.id.btnSettings)
     assertNotNull(gear)
-    assertTrue("gear must be at least 48dp tall", gear!!.layoutParams.height >= minTarget())
+    // The gear is a wrap-content Button whose circle is sized by minHeight (48dp touch target);
+    // assert the declared minimum (layoutParams stays WRAP_CONTENT for wrap_content).
+    assertTrue("gear minHeight must be at least 48dp", gear!!.minimumHeight >= minTarget())
   }
 
   @Test
