@@ -24,17 +24,41 @@ Each note follows the same shape:
 
 | Area | Covers | Newest decision |
 |------|--------|-----------------|
-| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-12] K2 -Wextra warnings-as-errors |
-| Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-11] Branch-coverage ratchet 80% → 85% |
+| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-13] AGP 9.2.1 — Android Studio 3-release compatibility floor |
+| Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-11] User-facing diagnostics & crash reporting (offline-first) |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-14] Video smart-fit: center-crop cover instead of letterbox |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-09] Why .PLAN.md exists |
-| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme | [2026-08-11] Campaign 15: UX & accessibility scope |
+| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill | [2026-08-14] HUD error pill replaces the Material Snackbar |
+| Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction | [2026-08-14] Timeout-bound tooling: process-TREE kill + host adb shim |
 
 ______________________________________________________________________
 
 ## Build & toolchain
+
+### [2026-08-13] AGP 9.2.1 — Android Studio 3-release compatibility floor
+
+- **Problem:** the project ran AGP 9.3.1 (Gradle 9.5.0), which was only
+  supported by the newest Android Studio (Quail 2 | 2026.1.2, AGP 7.1–9.3).
+  The two previous releases (Quail 1 | 2026.1.1 and Panda 4 | 2025.3.4) cap
+  AGP at 9.2, so a contributor on either Studio could not open the project.
+- **Alternatives considered:** stay on AGP 9.3.1 (narrowest Studio support);
+  drop to AGP 9.2.x (supported by all three latest Studio releases); drop
+  lower (loses nothing for Studio support but forfeits 9.x fixes).
+- **Chosen solution:** pin **AGP 9.2.1** (`gradle/libs.versions.toml` +
+  `settings.gradle`), keeping Gradle 9.5.0 (AGP 9.2 minimum is 9.4.1).
+  AGP 9.2.1 bundles KGP 2.2.10 — identical to 9.3.1 — so built-in Kotlin,
+  `extraWarnings`, and the `built_in_kotlinc` jacoco path are unchanged.
+- **Why:** the maintainability rule adopted the same day requires the
+  toolchain to be openable by at least the 3 latest Android Studio releases
+  (verified against the official Studio↔AGP matrix, developer.android.com
+  "about-agp", 2026-07-16). The intersection of the three latest Studio AGP
+  ranges is **≤ 9.2**, so 9.2.1 is the freshest compliant AGP.
+- **Out of scope / consequences:** Gradle stays 9.5.0 (no wrapper change);
+  the downgrade is verified (gate green, jacoco still measures live
+  `built_in_kotlinc` output, instrumented 9/9). Future AGP bumps must re-check
+  the Studio↔AGP matrix first (rule: AGENTS.md).
 
 ### [2026-08-12] K2 -Wextra warnings-as-errors
 
@@ -1111,3 +1135,190 @@ ______________________________________________________________________
   light-mode HUD, and video stall detection. Coverage gate re-verified
   (LINE 0.975 / BRANCH 0.866); instrumented suite 9/9 on both API-36 emulators;
   translations sync guard runs in the canonical gate.
+
+### [2026-08-12] Type 1 HUD theme + app/robot settings split (Campaign 17)
+
+- **Problem:** the gamepad HUD still used the original 2016-era visuals (a
+  persistent greendark **action bar** displaying the robot IP, square buttons,
+  thin pad strokes), and one settings screen mixed robot-target config with
+  app-behavior config. Users run the app on a phone as a Wi-Fi gamepad; the HUD
+  is the whole product surface.
+- **Alternatives considered:** three HUD directions (glass/arcade, cute/playful,
+  minimal-modern) prototyped in v0.dev; the user's own mockup became the
+  reference. Settings split: two activities (chosen) vs one activity with two
+  roots. Chip content: host vs host:port (chosen host); tap-to-copy vs
+  tap-to-open-robot-settings (chosen the latter). Tone semantics: sepia for
+  idle/standby, red for real errors (chosen over "all disconnects red" — a clean
+  pause is not a failure).
+- **Chosen solution:** a themed, XML-first **Type 1 HUD** (`hud_*` drawables,
+  `Hud.*` styles, one tintable pad-chrome vector) driven by a pure
+  `ConnectionIndicator` accent mapper (green/amber/sepia/red); the action bar is
+  removed and the IP moves to a glass chip (top-left) that opens the robot
+  settings. Settings split into `SettingsActivity` (app) + `RobotSettingsActivity`
+  (robot/target), both via one parameterized `SettingsFragment`, cross-linked.
+  **XML-first rule: everything static goes to resources; Kotlin holds only the
+  runtime accent tint.** Rationale for the code-vs-XML split: Android resources
+  resolve at inflation and `ColorStateList` selectors key on a fixed framework
+  state set — a four-value app-defined connection state has no XML hook, so the
+  tint (Drawable.setTint / setTextColor / GradientDrawable.setStroke) must be
+  imperative; a pure mapper keeps it testable and theme-switchable.
+- **Out of scope / consequences:** real backdrop blur (RenderEffect, API 31+) —
+  translucent "fake glass" chosen for minSdk 23 + cost; joystick spring-back for
+  the left pad and left-handed pad swap (deferred → ROADMAP); the dual-network
+  socket-binding fix for cellular+Wi-Fi connection loss (deferred → .PLAN.md);
+  first-run onboarding still deferred. Verification: canonical gate green
+  (LINE/BRANCH threshold intact, jscpd 0, translations sync 118 keys), 3-variant
+  test suite green, screenshots verified by pixel-census + hash-match.
+
+### [2026-08-12] Pad render + layout (Campaign 18)
+
+- **Problem:** after the C17 restyle the pads were "barely visible" — and the C17
+  "verified" screenshot (byte-identical hash with a fresh capture) proved the
+  pad chrome had **never** rendered: the pads showed only their glass border and
+  a ~15%-opacity wash. Two independent bugs were hiding behind each other:
+  (1) `SquareTouchPadLayout.onMeasure` computed a square `setMeasuredDimension`
+  but never measured its children, so the C17 chrome/glyph ImageViews collapsed
+  to 0×0; (2) `animatePadsAlpha` ran an `AlphaAnimation` with `fillAfter` on the
+  same views `applyHudTone` set `.alpha` on directly, so the two alpha channels
+  multiplied (~0.392² ≈ 0.154 effective opacity). A long-session-degraded
+  emulator (everything black, gear included) initially masked both.
+- **Alternatives considered:** emulator degradation as sole cause (ruled out:
+  the C17 proof screenshot was byte-identical to a cold-boot capture, so the
+  chrome was never rendered); SRC_IN colorFilter as culprit (tested and ruled
+  out: the filter was not the problem, the 0×0 layout was).
+- **Chosen solution:** fix `onMeasure` to measure children via
+  `super.onMeasure(squareSpec, squareSpec)` after the square size (chrome/glyph
+  render); make `applyHudTone` the **single alpha authority** (drop the
+  competing `AlphaAnimation`), keeping the C17 "at most N%" dim rule; recenter
+  the pads as ~260dp squares in two `weight=1` gravity-centered half containers
+  (25%/75% width, vertically centered over the video), re-bringing the buttons/
+  gear/chip to front so they stay tappable above the full-screen pads overlay;
+  match the mockup visuals (dashed outer ring drawn in code — vector drawables
+  cannot express dashes; solid inner ring, full crosshair lines and edge arrows
+  in the tintable vector; a radial-gradient joystick knob with glow + center
+  dot in `onDraw`; 2dp glass border + soft outer glow); compact the robot-target
+  chip (28dp min-height, 8/4dp padding, 8dp margin) while **keeping 14sp text**.
+  Also fixed the C17-introduced `SettingsTests` back-navigation regression (the
+  tests still did two `pressBack()`s after the settings split flattened the
+  flow to one level).
+- **Why:** the pads are the primary control surface — an empty glass panel is
+  not a usable gamepad; and the chrome is what signals the connection state.
+  The compact chip keeps the HUD legible over the video.
+- **Out of scope / consequences:** the sub-48dp chip touch target is an
+  **accepted deviation** (the chip is a read-only status row opening the robot
+  settings; a full 48dp target dominated the video corner) — documented in
+  DESIGN.md "Robot-target chip"; the dash-pattern constraint (no dashes in
+  vector drawables) pushed the outer ring into `onDraw`, so the dash effect is
+  sized in `onSizeChanged` (lint `DrawAllocation` forbids per-frame allocation).
+  Verification: canonical gate green, 3-variant `test --rerun-tasks` green,
+  instrumented 9/9 on both emulators (after the SettingsTests fix), screenshots
+  verified by pixel-census (chrome/knob/ring present in sepia idle; gear + chip
+  render) and hash-matched against fresh captures.
+
+### [2026-08-14] Timeout-bound tooling: process-TREE kill + host adb shim
+
+- **Problem:** an `adb install` during an emulator offline blip hung the caller
+  ~15 h. Killing only the DIRECT process leaves children (cmd wrappers, gradle
+  daemons, adb clients) holding the inherited output pipe, so the tool
+  "times out" but the caller's pipe never sees EOF and the turn blocks forever.
+- **Alternatives:** rely on the bash-tool `timeout` alone (proved insufficient
+  — it kills the shell parent, not the tree); PATH-shim gradle (impossible —
+  repo-root `gradlew.bat` wins via cwd lookup); PATH-shim adb (works).
+- **Chosen solution:** `scripts/run_bounded.py` (cross-platform, kills the
+  process TREE: `taskkill /T /F` on Windows, `killpg(SIGKILL)` via
+  `start_new_session` on POSIX; exit 124 + TIMEOUT marker). `_gradle.call_gradle`
+  and `gate.py` non-gradle steps route through it. A host-local `adb.bat` shim
+  (`~/.local/bin`, first on PATH) forwards every adb through it. All committed
+  except the shim (machine-local per AGENTS.md).
+- **Why:** a hang must fail the gate fast with a readable marker, never block
+  the caller; adb interception is the only external force-multiplier.
+- **Out of scope:** POSIX adb shim (re-audit on the first POSIX box).
+
+### [2026-08-14] HUD error pill replaces the Material Snackbar
+
+- **Problem:** the connection-error Snackbar rendered the Material default grey
+  bar OVER the magic-button row, and Material styling + WRAP_CONTENT sizing is
+  an unsupported, version-fragile trick.
+- **Alternatives:** keep Snackbar + anchor above buttons (look still clashes);
+  Snackbar WRAP_CONTENT hack (fragile); custom glass pill (fits content by
+  construction).
+- **Chosen solution:** a `connectionError` TextView (`Hud.GlassPill`,
+  wrap_content -> always fits content), fade-in + auto-dismiss (3.5 s),
+  positioned at the pill\<->buttons vertical midpoint.
+- **Why:** XML-first HUD-native element, no library dependency, always fits.
+- **Out of scope:** animation beyond a simple alpha fade.
+
+### [2026-08-14] Drop the `material` dependency
+
+- **Problem:** `com.google.android.material` was pulled in ONLY for the
+  Snackbar. With the error pill replacing it, material had zero consumers and
+  dragged a large transitive tree (appcompat/activity/fragment/recyclerview).
+- **Chosen solution:** remove `material` from `gradle/libs.versions.toml` +
+  `app/build.gradle`; verified gone from `debugRuntimeClasspath`.
+- **Out of scope:** full AppCompat drop — androidx.preference still requires it
+  (see ROADMAP "Deferred — drop AppCompat").
+
+### [2026-08-14] RobotChipController extraction (detekt TooManyFunctions)
+
+- **Problem:** the chip feature pushed MainActivity to 36 functions vs the
+  detekt class threshold of 31.
+- **Alternatives:** raise the threshold (hides growth); extract the chip logic.
+- **Chosen solution:** new `RobotChipController` owns the host text, both status
+  glyphs and the chip contentDescription; MainActivity ~28 functions, directly
+  testable. Matches the repo pattern (MagicButtonPanel, ConnectionFeedback).
+- **Out of scope:** moving the rest of the HUD wiring.
+
+### [2026-08-14] Delete stale untracked layout-v26
+
+- **Problem:** an untracked `res/layout-v26/activity_main.xml` (an old copy)
+  overrode the canonical base layout on API 26+ — the emulator rendered the old
+  broken geometry and the new design appeared "not applied". It had no
+  API-26-specific differences.
+- **Chosen solution:** delete the directory; the base layout is the single
+  source. Confirmed identical-by-hash before deletion.
+- **Why:** a stale shadow copy is a recurring trap on every layout edit.
+
+### [2026-08-14] Video smart-fit: center-crop cover instead of letterbox
+
+- **Problem:** the MJPEG renderer letterboxed every frame ("fit within"), so a
+  robot camera feed — typically a different aspect than the phone — left black
+  bars and never filled the HUD screen like a real camera view.
+- **Alternatives considered:** keep letterboxing (whole image visible, but
+  bars); center-crop cover (fill the screen, cropping the aspect mismatch from
+  the center); fit-xy (distort).
+- **Chosen solution:** `MjpegFrameRenderer.destRect` now center-crops to cover
+  the display (`scale = max(dispW/bmw, dispH/bmh)`, overflow clipped by the
+  canvas); the returned `Rect` may sit outside the display. KDoc + docs updated;
+  `MjpegFrameRendererTest` asserts both crop axes.
+- **Why:** a camera feed should look like a camera feed — edge-to-edge, no bars.
+  The crop keeps the center of the frame (the robot's area of interest).
+- **Out of scope:** no per-frame scaling modes (e.g. a toggle back to fit) —
+  the Type 1 HUD's single smart-fit is the whole product behavior.
+
+### [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test
+
+- **Problem:** (1) the video tests generated JPEG frames in-memory (solid
+  colors), so decode coverage used synthetic data and the suite carried
+  `Bitmap.compress` code under `@GraphicsMode(NATIVE)`; (2) there was no way to
+  see how the HUD actually looks over a real camera-like frame.
+- **Alternatives considered:** keep generated frames; add a host-side MJPEG
+  server + emulator screenshot (extra moving parts, hangs on Windows pipe
+  inheritance); capture the render from inside a Robolectric test.
+- **Chosen solution:**
+  - Commit a **CC0 1.0 vintage-cat illustration** (verified via the Openverse CC
+    index; `rawpixel.com/image/9405680`), downscaled/center-cropped to three
+    test fixtures (640×480 / 320×200 / 1000×600) with a CC0 license note, in
+    `app/src/test/resources/mjpeg/`.
+  - `SyntheticMjpegServer`'s default frames are now those fixtures (no
+    in-memory generation); the suite consolidates into one `MjpegServerTest`
+    (byte-identical decode of all three sizes, cycling, drop/reconnect).
+  - New `HudThemeTest` renders the **real** activity view hierarchy over a cat
+    frame for each connection state, analyzes it in-process (structural +
+    source-pixel mapping), and writes `hud_{connected,connecting,standby,error}.png`
+    to the always-on `screenshots.dir` build-output property.
+- **Why:** real photographic frames exercise the full JPEG path; the theme test
+  doubles as a screenshot artifact with zero external infrastructure; CC0 needs
+  no attribution and permits test use.
+- **Out of scope:** glyph-text pixel fidelity under Robolectric (structural
+  assertions cover it); shipping the images in the APK (test-only resources);
+  the emulator-based screenshot workflow as the theme-test oracle.

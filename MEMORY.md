@@ -60,8 +60,9 @@ versions risk collisions with the `minSdk*10000 + ...` formula).
   `PropertyEscape` check fails the build (POSIX paths need no escaping).
 - JDK 21 is required (Robolectric needs it for SDK 36; it is also the CI JDK).
   The concrete Gradle/AGP pair is NOT restated here — toolchain versions drift
-  and live in the Gradle wrapper + `gradle/libs.versions.toml`; the migration
-  rationale is in `DECISIONS.md` "AGP 9.3.1 / Gradle 9.5.0 migration LANDED".
+  and live in the Gradle wrapper + `gradle/libs.versions.toml`; the toolchain
+  rationale (incl. the Android Studio 3-release compatibility floor) is in
+  `DECISIONS.md` "AGP 9.2.1 — Android Studio 3-release compatibility floor".
 - Local emulator acceleration (Windows): AEHD (Android Emulator Hypervisor
   Driver 2.2) is installed; verify with `emulator -accel-check`. Installer
   lives in the SDK:
@@ -105,6 +106,39 @@ locked in `uv.lock` (committed); `uv sync` (re)creates `.venv` on any platform
 `uvx`. Do NOT use `uv tool install` (global, machine-level) or system pip. The
 git pre-commit hook (`.git/hooks/pre-commit`) points at the venv Python via
 `INSTALL_PYTHON`.
+
+### Timeout-bound tooling (run_bounded + adb shim)
+
+**Problem (hit 2026-08-13):** an `adb install` during an emulator offline blip
+hung the caller for ~15 h. Killing only the DIRECT process is not enough on
+Windows: cmd wrappers / gradle daemons / adb clients inherit the output-pipe
+handle, so the tool "times out" but the caller's pipe never sees EOF and the
+turn blocks forever (the same handle-inheritance trap as the cold-Gradle-daemon
+hang).
+
+**Solution — `scripts/run_bounded.py`:** cross-platform bounded runner that
+kills the process **TREE** on timeout — Windows `taskkill /PID <pid> /T /F`,
+POSIX `os.killpg(SIGKILL)` via `start_new_session`. Exit code `124` + a
+`TIMEOUT after Ns (label)` marker in the log. Usage:
+`uv run python scripts/run_bounded.py --timeout 600 --label X --log .tmp/x.log -- cmd ...`.
+
+Wiring (all committed except the shim):
+
+- `scripts/_gradle.py::call_gradle` runs every gradle call through it
+  (`GRADLE_TIMEOUT_S = 900`), so `gate.py`'s 8 gradle steps + the pre-commit
+  `spotless_apply` hook are bounded by default.
+- `scripts/gate.py`'s non-gradle steps (jscpd, lizard, check_translations) are
+  bounded (`NON_GRADLE_TIMEOUT_S = 300`).
+- **Machine-local** (never in repo docs): the `adb.bat` shim at
+  `~/.local/bin/adb.bat` (that dir is FIRST on this host's PATH) forwards every
+  `adb` through `run_bounded --timeout 120` and the WinGet `platform-tools`
+  `adb.exe`. `where adb` → `~/.local/bin\adb.bat` first proves interception.
+  POSIX has no such shim yet — re-audit on the first POSIX box.
+
+Rule: never invoke `adb`/`gradlew` bare from the tool; adb is auto-intercepted
+by the shim, gradle goes through `call_gradle`, and ad-hoc calls route through
+`run_bounded` or get an explicit bash-tool `timeout` (which alone is
+INSUFFICIENT — it kills only the direct process).
 
 ## Testing
 
@@ -2098,3 +2132,356 @@ suppress-key guess cost 1 compile cycle (read the constant pool FIRST).
 
 Solutions institutionalized: TESTING.md "Compiler warnings as errors" + suppression
 registry; the docs-drift fix in this MEMORY section; DECISIONS.md decision record.
+
+### [2026-08-12] Campaign 17 execution run (Type 1 HUD theme + settings split)
+
+User-driven UX prototyping session (fully local, no commits/pushes). Started from
+a v0.dev mockup (`components/hud/*` in `.tmp/robot-control-interface.zip`),
+translated to Android as the **Type 1 HUD theme**, plus a **settings split** into
+App settings (appearance/controls/wheel/pads/hardware/magic/about) and
+Robot/target settings (host/port/video/network/presets). Timing: ~3.5 h
+(12:45 → 16:20 local).
+
+**Quirks discovered (each cost a cycle before it was pinned):**
+
+- **The "green bar" was the action bar.** The HUD "looked unchanged" after a big
+  restyle. Pixel-census of the screenshot showed a full-width `greendark #559540`
+  band on top = the action bar (`colorPrimary`), used to display the robot IP via
+  `setActionBarTitle`. It is NEVER hidden by `SystemUiController.setVisibility(false)`
+  (that only hides system bars; the action-bar hide is a separate `show()`/no-op).
+  Fix: `supportActionBar?.hide()` in `onCreate`; the IP moved to a glass chip.
+- **AAPT implicit-parent style lookup.** `<style name="Hud.GlassPill">` (no
+  `parent=`) makes AAPT try to inherit from a style literally named `Hud` →
+  `resource style/Hud not found`. Dotted names imply a parent chain; either add
+  `parent=""` or use an explicit parent. Same trap for `Hud.TargetChip`.
+- **`getInt` returns 0, not null, for a missing key.** `arguments?.getInt(ARG_XML) ?: R.xml.pref_app` returned 0 (key absent → 0, elvis never fires) → inflating
+  `Resource ID #0x0`. Must use `getInt(key, default)`.
+- **Duplicate ids in sibling subtrees fail lint.** Two pads each hosting
+  `@+id/padChrome`/`@+id/padGlyph` → `DuplicateIds` (21 errors across variants).
+  Fix: switch to `android:tag` + `findViewWithTag` (subtree lookup still works).
+- **`UseCompoundDrawables` lint on the status pill.** A `LinearLayout` with an
+  `ImageView` + `TextView` is flagged; a single `TextView` with
+  `setCompoundDrawablesRelativeWithIntrinsicBounds` is both lint-clean and
+  simpler — the pill icon rides as a compound drawable.
+- **`tools:ignore="SelectableText"` needs a real rationale.** An IP-looking
+  `TextView` that is an action (not copyable content) triggers `SelectableText`;
+  suppression is legitimate (tap-to-open beats long-press-select) but must carry
+  the reasoning in the comment.
+- **Lint reports ONE unused resource at a time.** Deleting a drawable/style
+  exposes the next (`button_ripple` → `hud_base` → `hud_accent_alpha_20` →
+  `connection_status_background` → `hud_button_corner`/`hud_glow_radius` →
+  `oxygen_actions_transform_move_icon.webp` → `Hud.MagicButton` →
+  `touchpad_shape` → `videoScrim` id → duplicate string). A full UI restyle
+  leaves a *cascade* of now-unused resources; grep for them BEFORE the gate
+  (each lint round-trip ~2 min).
+- **Duplicate string VALUES across keys also fail lint.** `robot_settings` and
+  `pref_open_robot_settings` with identical text → `DuplicateStrings`. Fix: one
+  key (`@string/robot_settings`) referenced from both the manifest label and the
+  preference row.
+- **`bringToFront()` on the pads overlay eats taps on later-declared siblings.**
+  `controlsOverlay.bringToFront()` moves the pads (full-screen, touch-listeners)
+  above the chip; the chip *rendered* (visible in the screenshot) but taps never
+  reached it. Fix: `targetChip.bringToFront()` after the overlay. **Lesson: when a
+  full-screen overlay is brought to front, re-bring-to-front any sibling you want
+  tappable.**
+- **Dim multiplication trap.** Connection-state dim (0.4) × the default
+  `showPads` alpha (100/255 ≈ 0.39) ≈ 0.16 → pads/chrome nearly invisible.
+  Correct semantic: dim = `min(padsAlphaBase, CONTROLS_DIM_ALPHA)` when
+  disconnected — "at most 40%, never more transparent than the user's setting".
+- **PowerShell mangles long Gradle error lines.** `e: file:///...` diagnostics
+  wrap mid-token in the console. Always `Get-Content`/grep the LOG FILE, not the
+  terminal echo.
+- **Robolectric temp-dir race is a flake, not a failure.** One RawSocketHttpStream
+  test failed with `NoSuchFileException ...robolectric-.../com.trikset.gamepad-dataDir`
+  under the parallel 3-variant JVM. Single-class rerun passed. Don't chase it.
+
+**What saved time (do again):**
+
+- **Pixel-census the screenshot, don't eyeball the diff.** `struct/zlib` PNG
+  decoder + `Counter` over sampled colors = ground truth for "did the visual
+  change" (catches the action-bar band, dim-multiplication washout, chip
+  visibility). `uiautomator dump` for the view tree; `dumpsys activity activities` for the foreground screen.
+- **`hash`-match a fresh capture against the stored screenshot** to prove the
+  stored PNG is the real screen (used for the robot-settings proof).
+- **Screenshot naming convention** `_ui_YYMMDD-HHMM-NN.png` in `.tmp/` — zero
+  thought later.
+- **The `question` tool early** — scoping (which HUD directions, settings-split
+  structure, chip content) before writing code avoided a wrong-direction rework.
+- **`@Suppress`/lint-skip only with a rationale** — each suppression carries the
+  why, so a reviewer (or future agent) can relitigate cheaply.
+- **Reusing the shared test base** (`RobolectricTestBase.dialogViews`) instead of
+  copy-pasting the dialog-tree walker — kept jscpd at 0 clones.
+- **Settings-split via two activities + one parameterized fragment** — the
+  fragment reads `ARG_PREFERENCE_XML`; nested sub-screens preserve the XML via
+  the same arg. Cross-link rows (app↔robot) keep both reachable from inside
+  Settings, so the chip/gear entry points are not the only ones.
+
+**What was bad (do differently next time):**
+
+- **Iterating lint one unused-resource at a time.** After a UI restyle, run the
+  unused-resource grep FIRST (AGENTS.md rule now). Saved ~20 min of 2-min gates.
+- **Tapping blind coordinates.** `adb input tap 95 95` missed the chip (bounds
+  from uiautomator, tap coordinate in another space). Use the *dump bounds
+  center*, and verify with `dumpsys activity activities` + screenshot hash.
+- **Reading the zip repeatedly in-memory.** Extract the mockup zip to `.tmp/`
+  once at session start instead of re-opening entries 6×.
+- **The action-bar diagnosis took 3 capture-analysis rounds.** Should have
+  sampled a horizontal strip across the FULL screen width immediately (the bar
+  spans 100%), not the pad region. Rule: for "looks unchanged", check top/bottom
+  full-width strips first.
+
+### [2026-08-12] Campaign 18 execution run (pad render + layout + compact chip)
+
+Local-only UX follow-up to C17 (no commits/pushes — user rule; auto mode).
+Goal: fix the "pads barely visible" complaint, then implement the approved pad
+visual + layout plan (~260dp centered pads, mockup chrome/knob, compact chip).
+Timing: ~3.7 h (18:40 → 22:25 local, incl. a cold-boot emulator relaunch).
+
+**Root cause (the C17 "verified" screenshot never showed the chrome):**
+
+- `SquareTouchPadLayout.onMeasure` called `setMeasuredDimension(size, size)` but
+  never measured its children → the C17 chrome/glyph child ImageViews measured
+  0×0 (`dumpsys activity top -a` bounds confirmed `0,0-0,0`). Fix: measure the
+  children with `super.onMeasure(squareSpec, squareSpec)` after the square size.
+- `animatePadsAlpha`'s `AlphaAnimation(prev, alpha)` + `setFillAfter` and
+  `applyHudTone`'s direct `view.alpha` both targeted `controlsOverlay`/`buttons`
+  → the two alpha channels multiplied (~0.392² ≈ 0.154 effective opacity — the
+  dimmed border rendered `(17,30,13)` = greenlight×0.15). Fix: `applyHudTone` is
+  the single alpha authority (the animation is dropped).
+- **The stored C17 proof screenshot was byte-identical (same MD5) to a fresh
+  cold-boot capture** — the pads were always chrome-less; the earlier "everything
+  black" live captures were the degraded-emulator symptom layered on top.
+
+**Layout/visual work (all verified by pixel-census + hash-matched screenshots):**
+
+- Pads recentered: `controlsOverlay` → full-screen `LinearLayout`, two `weight=1`
+  gravity-centered `FrameLayout` halves, each pad `@dimen/hud_pad_size` = 260dp.
+  Pad centers land at 25%/75% width, vertically centered over the video.
+- Z-order: after `controlsOverlay.bringToFront()`, the buttons row, gear and chip
+  are re-brought to front (the full-screen overlay would otherwise eat their
+  taps; C17's single-chip rule extended to the whole bottom cluster).
+- Chrome mockup match: solid inner ring, FULL crosshair lines through the center
+  and 4 edge arrows in `hud_pad_chrome`; the **dashed outer ring is drawn in
+  `onDraw`** (vector drawables have no dash pattern); the joystick **knob** is a
+  radial gradient (accent→dark edge) + glow + center dot, painted in `onDraw`,
+  rebuilt only on accent/radius change. `hud_pad_glass` got a 2dp border + soft
+  glow layer.
+- Compact chip: `Hud.TargetChip` keeps 14sp; minHeight 48→28dp, padding
+  h14→h8/v10→v4, margin 12→8dp (≈99×28dp on device). Sub-48dp touch target is an
+  accepted, documented deviation.
+- **C17 test regression fixed:** `SettingsTests` still did two `pressBack()`s
+  but C17 flattened navigation (chip → RobotSettings → back) to one level; the
+  second back killed the app. Reduced to one `pressBack()` per test.
+
+**Quirks hit this campaign:**
+
+- **Lint `UseKtx`** demands `canvas.withTranslation {}` over manual
+  save/translate/restore (core-ktx already a dependency).
+- **Lint `DrawAllocation`** forbids `DashPathEffect` allocation in `onDraw` —
+  size it in `onSizeChanged` (the dash lengths scale with pad size).
+- **detekt `ReturnCount`/`MagicNumber`** on the new knob code — split `onDraw`
+  into `drawKnob`, hoist the gradient ratios/255s to named constants.
+- **`PressBack` on a single-level settings flow kills the app** → the
+  instrumented `NoActivityResumedException` signature is the test navigating one
+  level too far, not a flake.
+- **`connectedDebugAndroidTest` uninstalls the app afterwards** — take proof
+  screenshots BEFORE the suite, or reinstall after it.
+
+**What saved time (do again):** the ring-trace + knob-grid census scripts
+(scan a row at a known ring radius; the full crosshair line sits ON the center
+row, so scan above/below it to see the dashed ring); `dumpsys activity top -a`
+to read actual view bounds (0×0 vs real) instead of guessing from pixels.
+
+**What was bad (do differently):** the first `gravity="center"` attempt on the
+half containers did not center the pads (still 0,0-715,715 in the dump) — the
+pads needed `layout_gravity="center"` too; diagnosing that cost a rebuild cycle.
+And the Snackbar ("video stream unavailable") repeatedly polluted bottom-strip
+screenshots — wait for it to dismiss before the proof capture.
+
+### [2026-08-14] Campaign 19 execution run — HUD error pill, material drop, layout two-layer, timeout tooling
+
+**Scope (user-driven):** (1) bullet-proof symbols via a bundled mono font subset;
+(2) two-layer HUD layout (pads layer + visuals layer); (3) content-fitting glass
+error pill replacing the Material Snackbar + drop the `material` dependency;
+(4) timeout-bound tooling (the ~15 h adb hang); (5) RobotChipController
+extraction; (6) docs pass. Working tree only (no commits ??" session rule).
+
+**What landed (uncommitted):**
+
+- `scripts/run_bounded.py` — process-TREE kill (taskkill /T /F / killpg),
+  exit 124 + TIMEOUT marker; `_gradle.call_gradle` + `gate.py` non-gradle steps
+  bounded. Host `adb.bat` shim (machine-local, `~/.local/bin`).
+- Two-layer `activity_main.xml`: pads (260dp, `layout_gravity="center"` in two
+  weight-1 halves) below chip/gear/buttons/pill; `hud_half_glyph` 7dp spacing;
+  no `bringToFront()` (XML order = z-order).
+- `connectionError` pill (Hud.GlassPill, wrap_content) replaces Snackbar;
+  **`material` dependency removed** (verified gone from debugRuntimeClasspath).
+- `res/font/symbols_mono.ttf` (DejaVuSansMono Nerd Font subset, ~9 KB) +
+  `scripts/build_symbol_font.py` (cmap-verified) + license texts in `res/raw`
+  - in-app "Open-source licenses" dialog.
+- `RobotChipController` (chip host/glyphs/description) — MainActivity 36 -> ~28
+  functions (detekt TooManyFunctions gate).
+
+**Quirks hit this campaign:**
+
+- **Stale untracked `res/layout-v26/activity_main.xml` shadowed the base layout
+  on API 26+** ??" the emulator rendered old broken geometry for a whole cycle
+  while the base layout "was correct". It was an old copy with no API-26
+  differences; DELETED (decision in DECISIONS.md). Check for a `layout-v26`
+  shadow whenever the on-screen layout disagrees with the base XML.
+- **PS `Add-Content` corrupts non-ASCII on write** (AGENTS.md trap, hit again):
+  the DECISIONS.md append produced lone 0x97 bytes for em-dashes. Repaired by
+  decoding the appended tail as cp1251 and re-encoding as UTF-8 (the edit tool
+  preserves bytes; the shell cmdlets do not). Verify `git diff` stayed minimal.
+- **FrameLayout `gravity="center"` does not center a custom pad view** ??" needed
+  `layout_gravity="center"` on the pad child too (diagnosed via uiautomator
+  bounds: 0,0-715,715 while expecting ~227,182).
+- **detekt `TooManyFunctions`** (36 > 31) after the chip feature ??" solved by
+  extracting `RobotChipController`, not by raising the threshold.
+- **jacoco branch 0.84 vs 0.85 gate** after the chip extraction ??" the new
+  controller needs branch tests (4 accent colors, null fallbacks);
+  `RobotChipControllerTest` added, still needs the full branch pass.
+- **Lint `DuplicateStrings` is case-insensitive** ??" chip_control_connected vs
+  connection_status_connected (en "connected"/"Connected") collide; fixed by
+  `@string/` reference (RU also: chip_video_disabled -> chip_control_disconnected).
+- **Lint `HardcodedText`** for the gear glyph ? in XML ??" moved to a string
+  resource `settings_gear_glyph`.
+
+**What saved time (do again):** `dumpsys package lastUpdateTime` to confirm an
+APK actually installed (vs the 17:30 offline-blip ghost); the bounded runner
+self-test (`sleep` + short timeout -> 124 + no orphan); byte-preserving Python
+repairs over shell cmdlets for any non-ASCII file edit.
+
+**What was bad (do differently):** the ~15 h adb hang itself ??" always route
+adb through the bounded shim (now automatic) and never inline a reconnecting-
+device install without a watchdog; and writing the DECISIONS append with
+`Add-Content` instead of the edit tool (encoding repair cost a cycle).
+
+### [2026-08-14] Campaign 19 addendum - video smart-fit, CC0 fixtures, theme screenshots
+
+Continuation of the same working-tree session. All gate-green.
+
+**What landed:**
+
+- **Video renderer center-crop cover** (`MjpegFrameRenderer.destRect`): the
+  MJPEG feed now fills the screen edge-to-edge, cropping the aspect mismatch
+  from the center (was letterbox). User-visible behavior change for real robots.
+- **CC0 test images replace in-memory JPEGs**: committed a CC0 1.0 vintage-cat
+  illustration (verified via the Openverse CC API - record id `187aa956-...`,
+  `rawpixel.com/image/9405680`) as three fixtures (640x480 / 320x200 /
+  1000x600, low-quality ~5-44 KB) + `vintage_cat_9405680.CC0.txt` license note,
+  in `app/src/test/resources/mjpeg/`. `SyntheticMjpegServer` drops
+  `encodeJpeg`/`defaultFrameImages` (default frames = the cat fixtures).
+- **Test consolidation**: `mjpeg/SyntheticMjpegServerTest` +
+  `VintageCatVideoStreamTest` deleted; one `mjpeg/MjpegServerTest` covers
+  byte-identical decode of all three sizes + multi-frame cycling + drop/
+  reconnect. `RawSocketHttpStreamTest` seeds the cat frames.
+- **`HudThemeTest`**: renders the real `MainActivity` view hierarchy over a cat
+  frame for each connection state (Connected green / Connecting amber / standby
+  sepia / error red), analyzes in-process (structural asserts + a
+  source-pixel-mapping check that the video fills the screen), and writes
+  `hud_*.png` to the always-on `screenshots.dir` build output
+  (`app/build/outputs/screenshots/`, wired in `app/build.gradle` testOptions).
+- **Isolated commit**: the video-test refactor was committed on its own
+  (`test: refactor video/streaming tests to static CC0 cat fixtures`, 9803bb5)
+  via stash -> restore-only-test-files -> gate -> commit -> unstash; the huge
+  working-tree changes were popped back with a trivial
+  `SyntheticMjpegServer.kt` conflict resolved to HEAD.
+
+**Quirks:**
+
+- **Robolectric renders at mdpi** - emulator 440dpi uiautomator bounds do NOT
+  match the in-test render; use dp-derived bounds (260dp = 260px at mdpi).
+- **The cat fixture has black vignette borders** - "left/right edge bright"
+  assertions are wrong; assert the rendered edge pixel maps to the cat's own
+  source pixel through the center-crop rect (proves no letterbox bar).
+- **Pads-alpha default is 100/255 ~ 0.39** - "full alpha while connected"
+  assertions must set `SK_SHOW_PADS=255` in the fixture or the connected vs
+  dimmed states are indistinguishable.
+- **The 2x-gate drop is per-frame, not per-size** (`available() < 2*CL`): only
+  fast pacing + wildly different fixture sizes drop frames; consumers loop with
+  `?: continue`. Keep ~50 ms pacing when cycling.
+- **Robolectric NATIVE glyph/text fidelity is imperfect** - theme assertions are
+  structural (visibility/text/bounds/alpha), never glyph pixels.
+
+**Verification:** full `./gradlew test` + `uv run python scripts/gate.py` GREEN;
+4 screenshots pixel-censused (pads/buttons/gear/pill present; per-state accent
+colors on the gear border: green / red sampled). The host-side `serve_cat_video.py`
+emulator approach was abandoned - the in-test render is the screenshot source.
+
+### [2026-08-14] Campaign 19 retrospective (pre-commit) - what we learned
+
+**Windows/tooling - the biggest wins, save these:**
+
+- **`start /b` hangs the caller for long-lived children - even with a `>`
+  redirect.** Hit twice this session: \`cmd /c "start /b uv run python server.py
+  > log 2>&1"`spins forever because the child inherits the tool's stdout/stderr   pipe and EOF never comes. The AGENTS.md rule "don't pipe long-lived children   through Tee/Select" does NOT cover`start /b`+ redirect. **Correct pattern:  `Start-Process -FilePath uv -ArgumentList ... -WindowStyle Hidden -PassThru
+  > -RedirectStandardOutput log -RedirectStandardError err`** (fully detached, no   shared pipe) -> verify liveness immediately (`HasExited == false`) -> one   bounded readiness poll (`netstat -ano | findstr :port\`) in the same turn.
+  > This is what finally worked.
+- **Process-tree vs direct kill, confirmed twice:** `taskkill /PID` on a wrapper
+  leaves children; `run_bounded.py`'s `taskkill /T /F` is the reliable way. The
+  detached `Start-Process` server dies with its own PID (no wrapper).
+- **Nested quoting is the #1 Windows time-sink:** `cmd /c "powershell -Command "... $x ... python -c "..." ""` mangles `$`, quotes, and `^` (git
+  `stash@{0}^3` became `stash@{0}3`). Always route through a `.tmp/*.ps1` or
+  `.tmp/*.py` file (byte-preserving), never inline. Confirmed ~6 times.
+- **`uv run pip list` showing a package =/= usable:** Pillow appeared in the
+  listing but `uv run python` could not import it. Use `uv run --with pillow`
+  for one-off image work (keeps pyproject untouched).
+- **Binary inspection:** `certutil -encodehex file out 0x4` then read the hex
+  dump (JPEG SOI/EOI/width/height); inline `python -c` keeps breaking.
+
+**Robolectric rendering facts (new):**
+
+- **Robolectric renders at mdpi (160dpi) by default** - emulator 440dpi
+  uiautomator bounds do NOT match an in-test render. Use dp-derived bounds
+  (260dp = 260px at mdpi) for pixel assertions, or set `@Config(qualifiers=...)`.
+- **Robolectric NATIVE glyph/text fidelity is imperfect** (esp. the bundled
+  symbol font) - theme/pixel assertions must be **structural** (visibility /
+  text / bounds / alpha), never glyph pixels.
+- **`Bitmap.compress(PNG)` + `Canvas` under `@GraphicsMode(NATIVE)` produces
+  real, analyzable screenshots in-process** - this replaced the host-MJPEG-server
+  - emulator screenshot approach entirely (abandoned: `serve_cat_video.py`).
+- **Always-on screenshot artifacts:** `systemProperty 'screenshots.dir', "$buildDir/outputs/screenshots"` in `testOptions.unitTests.all` -> PNGs land
+  beside existing test outputs. Read `System.getProperty("screenshots.dir")` in
+  the test; skip write if null.
+
+**Test-design lessons:**
+
+- **Pixel assertions must survive dark source content:** the cat fixture has
+  black vignette borders, so "edge pixel bright" is wrong. Assert the rendered
+  edge pixel **maps to the source pixel** through the renderer's destRect
+  (proves no letterbox bar, robust to dark edges).
+- **Defaults defeat state assertions:** pads-alpha default = 100/255 ~ 0.39
+  makes connected-vs-dimmed indistinguishable; set `SK_SHOW_PADS=255` in the
+  fixture.
+- **jscpd (0.0% threshold) flags in-file clones:** two 11-line
+  `ConnectionFeedback` constructor blocks failed the gate -> extract a shared
+  `activityFeedback(activity)` helper. When a new test mirrors an existing setup
+  block, extract/reuse the helper immediately.
+- **Translation sync only REPORTS, it doesn't add keys:** new `en` strings
+  (glyphs) failed `check_translations --sync`; glyphs are locale-independent, so
+  copy the identical value into all 4 locale files manually, then re-sync.
+
+**The stash-based isolated-subset commit (this session's key process win):**
+
+To commit only a subset of a huge working tree while keeping the rest
+uncommitted:
+
+1. `git stash push -u -m "wip"` (all tracked + untracked).
+1. Restore **only** the target files: `git restore --source=stash@{0} -- <paths>`;
+   untracked files live in the stash's **3rd parent commit** (`git cat-file -p <stash> | findstr parent` -> third hash), restore via `git checkout <hash> -- <paths>`.
+1. Gate on the clean tree -> `git commit`.
+1. `git stash pop` -> resolve the trivial conflict (`SyntheticMjpegServer.kt`:
+   only spotless-reflow differences; resolve to HEAD with `git checkout HEAD -- <file>`), drop the stash.
+1. **After pop, `git reset`** to restore the original unstaged state (stash pop
+   stages everything).
+
+**Committability constraint (why the commit plan is shaped as it is):**
+
+A commit must compile/test-green **at its own point in history** (bisect-safety).
+`HudThemeTest` references `R.id.connectionError`, `R.id.targetChip`, and glyph
+strings that **don't exist at HEAD** - it can't be committed to the old design.
+The HUD redesign + its test updates + new tests are one entangled unit.
+**Before splitting commits, diff HEAD's versions of every file the new test
+touches** - "will this compile against the previous design?" is the deciding
+question, and the answer can force consolidation.

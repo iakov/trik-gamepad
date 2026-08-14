@@ -54,7 +54,7 @@ constants in `SettingsFragment`.
 - `com.trikset.gamepad.mjpeg` — the MJPEG player (vendored origin, renamed
   from `com.demo.mjpeg` in Phase 5): `MjpegView` (SurfaceView + render
   thread), `MjpegInputStream` (frame parser), `MjpegFrameRenderer` (decoding
-  - letterbox + FPS overlay).
+  - center-crop cover + FPS overlay).
 - `com.trikset.gamepad.diagnostics` — user-facing diagnostics (Campaign 14):
   `AppLog` (logcat + ring buffer) + `LogRingBuffer`, `DiagLevel`, `DiagnosticsReport`,
   `ReportDiagnosticsWriter`/`ReportSharer`, `CrashLogStore`, `CrashHandler`,
@@ -115,7 +115,7 @@ timer. The timeout is configurable via `SK_KEEPALIVE`.
 RawSocketHttpStream (http; bypasses NSC) / HttpURLConnection (https fallback)
   5 s connect/read timeouts
   -> MjpegInputStream   parses the multipart stream into JPEG frames
-  -> MjpegFrameRenderer decodes a frame, computes the letterboxed Rect, draws
+  -> MjpegFrameRenderer decodes a frame, computes the center-crop Rect, draws
   -> MjpegView          SurfaceView; its render thread owns the loop + lockCanvas
 ```
 
@@ -147,7 +147,7 @@ RawSocketHttpStream (http; bypasses NSC) / HttpURLConnection (https fallback)
   path); see `res/xml/network_security_config.xml`.
 
 `MjpegFrameRenderer` is deliberately separate from the view so the decode /
-letterbox / FPS logic is testable under Robolectric (inject a decoder + plain
+center-crop / FPS logic is testable under Robolectric (inject a decoder + plain
 `Canvas`); the SurfaceView render-thread plumbing itself stays ~0 % covered
 and is excluded from the coverage gates.
 

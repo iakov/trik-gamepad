@@ -24,6 +24,8 @@ Rationale for the decisions themselves (problem → alternatives → why) lives 
 | Magic button symbols (advanced) | Advanced > Magic buttons |
 | About system vs Copy report | About category |
 | System theme | day/night, gamepad vs Settings |
+| HUD themes (Type 1) | the gamepad chrome: pads, buttons, gear, pill, chip |
+| Robot-target chip | top-left chip + connection-tone semantics |
 | Localization | strings, locales, translations |
 | WCAG | contrast + touch-target regression tests |
 | Connection & video state UX | status pill, reconnect badge |
@@ -106,6 +108,68 @@ stay visible over bright frames — via an explicit black window background and
 system chrome. Verified by pixel-sampled screenshots in light (250,250,250)
 and dark (48,48,48) mode.
 
+## HUD themes (Type 1)
+
+The gamepad chrome ships as **"Type 1"** — a glass/arcade look (translucent dark
+fake-glass fills, brand-green glow strokes, rounded capsule buttons, one tintable
+pad-chrome vector). Two principles:
+
+- **XML-first, code-only-where-runtime.** Shapes, gradients, ripples, corners,
+  padding, glass fills and styles live in `hud_*` resources and `Hud.*` styles;
+  Kotlin holds *only* the connection-state accent tint (`Drawable.setTint` /
+  `setTextColor` / `GradientDrawable.setStroke`). Rationale: Android resources
+  resolve at inflation and `ColorStateList` selectors key on a fixed framework
+  state set, so a four-value app-defined connection state has no XML hook
+  (see DECISIONS.md "[2026-08-12] Type 1 HUD theme").
+- **A future theme = a parallel resource set.** Type 2/3 swaps the `hud_*`
+  drawables/styles/colors and the `ConnectionIndicator` palette — no layout or
+  logic changes. Settings exposes one greyed-out "HUD theme" row (current value
+  "Type 1"); it lights up when more than one theme exists.
+
+### Pads (layout + visuals)
+
+- **Placement:** the two pads are centered in their screen halves (`controlsOverlay`
+  = a full-screen `LinearLayout` of two `weight=1` gravity-centered `FrameLayout`s;
+  each pad is `@dimen/hud_pad_size = 260dp` square). Pad centers land at 25%/75%
+  screen width, vertically centered over the video.
+- **Chrome:** a single tintable vector (`hud_pad_chrome`) with a solid inner
+  ring, full crosshair lines through the center and four edge arrows, plus a
+  **dashed outer ring drawn in code** (`SquareTouchPadLayout.onDraw`; vector
+  drawables cannot express dash patterns). The joystick **knob** is a radial
+  gradient (accent → darkened edge) with a translucent glow halo and a bright
+  center dot, drawn in `onDraw`, following the touch point.
+- **Glass panel:** `hud_pad_glass` (translucent fill, 2dp brand-green border, soft
+  outer glow layer). The pad chrome + glyph are child `ImageView`s tagged
+  `padChrome`/`padGlyph` and recolored via one `SRC_IN` filter in
+  `SquareTouchPadLayout.setAccent` — same connection-state tone as the gear/pill.
+- **Measurement trap (fixed C18):** `SquareTouchPadLayout.onMeasure` must measure
+  its children (`super.onMeasure(squareSpec, squareSpec)` after the square
+  `setMeasuredDimension`), or the chrome/glyph collapse to 0×0 and the pad renders
+  as an empty glass panel (see DECISIONS.md "[2026-08-12] Pad render + layout").
+
+## Robot-target chip
+
+The top-left glass chip shows the robot target and reflects **robot control
+status** (not the app's UI state):
+
+- Text: the configured host → else the video stream's host (video-only mode) →
+  else a `---.---.---.---` filler (never blank; DESIGN.md "Defaults are as useful
+  as possible").
+- Tone = the connection-state accent (green Connected / amber Connecting / sepia
+  idle-standby / red error) via the pure `ConnectionIndicator` — same signal the
+  gear border, pads and pill use, so the whole HUD reads one state.
+- Tap opens the **robot/target settings** screen (host/port/video/network/
+  presets); the gear opens the **app settings** screen. The chip text is
+  deliberately not selectable (it is an action, not copyable content); the host
+  is copied from Settings.
+- **Compact chrome, fixed 14sp text:** the chip keeps the pill background but is
+  deliberately smaller than the status pill (28dp min-height, tight 8/4dp
+  padding, 8dp margin) so it stays out of the video view. The sub-48dp touch
+  target is an **accepted deviation** (recorded in DECISIONS.md "[2026-08-12]
+  Pad render + layout"): the chip is a read-only status row whose primary
+  interaction surface is the settings screen it opens, and a full 48dp target
+  made the chip dominate the top-left of the video.
+
 ## Localization
 
 - The app ships `en` + `ru` + `fr` + `de` + `vi` (`resourceConfigurations` +
@@ -143,3 +207,24 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
   badge, so the user can tell a reconnect apart from the first load. Stall
   detection ("no video signal") was deliberately **not** added: a robot with
   video disabled legitimately keeps the spinner cycling (see DECISIONS.md).
+
+## Two-layer HUD layout & the error pill
+
+- **Two layers in `activity_main.xml`** (child order = z-order, no
+  `bringToFront()`): the pads layer (`controlsOverlay`, full-screen, two
+  `weight=1` gravity-centered halves holding 260dp pads with
+  `layout_gravity="center"`) is declared FIRST, then the visuals (chip, gear,
+  buttons, status pill). The visuals always draw and receive touches above the
+  pads. Edge insets share one dimen `hud_half_glyph` (~7dp = half a caption
+  glyph): chip top, gear left/bottom, buttons bottom.
+- **Error feedback is a content-sized glass pill** (`connectionError`,
+  `Hud.GlassPill`, wrap_content → always fits its message), shown by
+  `ConnectionFeedback.error()` for real connection errors: fade-in, auto-dismiss
+  (~3.5 s), positioned at the vertical midpoint between the status pill and the
+  magic-button row so it never covers either. It replaced the Material Snackbar
+  (and let us drop the `material` dependency); the persistent state colors stay
+  on the gear border and the chip glyphs.
+- **Fixed symbols are bundled glyphs, not system-font text**: the pill ⏻/↺,
+  gear ⚙ and magic-button defaults render from `res/font/symbols_mono.ttf`
+  (a cmap-verified DejaVuSansMono Nerd Font subset) so they render identically
+  on every device; anything else a user types falls back to the system font.

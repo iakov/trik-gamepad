@@ -117,6 +117,18 @@ Local instrumented run (per-platform acceleration prerequisites):
   `app/build/outputs/androidTest-results/<avd>/logcat-*.txt`. The root cause
   of a repeated instrumented failure is often in the test harness/injection,
   not the app.
+- **`NoActivityResumedException: Pressed back and killed the app` = the test
+  navigated one level too far**, not a flake. A navigation-flow change (e.g.
+  flattening a two-level settings screen to one) leaves tests doing one extra
+  `pressBack()`, which then pops the root activity and kills the app (C18:
+  C17's settings split flattened `Settings → Advanced → back → back` to
+  `chip → RobotSettings → back`, but the tests still pressed back twice).
+  When this signature appears, re-count the navigation depth the test drives
+  and update the test, don't re-run it.
+- **`connectedDebugAndroidTest` uninstalls the app after the suite**: UI-proof
+  screenshots taken after an instrumented run show the launcher, not the app.
+  Capture `.tmp` proofs BEFORE the suite, or `adb install -r` the debug APK
+  again afterwards (hit C18).
 - **Full output while debugging**, quiet mode only for the final green check.
 
 ## Patterns
@@ -143,17 +155,36 @@ Local instrumented run (per-platform acceleration prerequisites):
 `multipart/x-mixed-replace` MJPEG server (ephemeral port) that streams seeded
 JPEG frames to the app's real `VideoStreamLoader`/`MjpegInputStream` decode path
 and can **drop the connection after N frames** to exercise the reconnect.
-Companion `SyntheticMjpegServerTest.kt`:
+Companion `mjpeg/MjpegServerTest.kt` (the single consolidated video/streaming
+test — it replaced the old `SyntheticMjpegServerTest` + `VintageCatVideoStreamTest`):
 
 - **Must run under `@GraphicsMode(GraphicsMode.Mode.NATIVE)`** — default
   Robolectric graphics return fake bitmaps, making decode correctness/perf
   assertions meaningless.
-- **Color-asserting tests must pin `@Config(sdk=[Config.TARGET_SDK])`**: on
-  API 23, native `BitmapFactory` decodes pixels near-black (red → r=1,g=0,b=0) —
-  byte-equality checks still prove correctness on the full SDK triple.
-- **Pace the server (~50 ms) and keep seeded JPEGs comparable in size**: the
-  parser's `available() < 2*contentLength` gate drops small frames first when
-  the client lags.
+- **Frames are committed CC0 test fixtures** (`src/test/resources/mjpeg/`, a
+  vintage cat illustration at 640×480 / 320×200 / 1000×600 + the CC0 license
+  text) — no in-memory JPEG generation anymore.
+- **Pace the server (~50 ms) and keep seeded JPEGs comparable in size** when
+  cycling multiple frames: the parser's `available() < 2*contentLength` gate
+  drops small frames first when the client lags.
+
+### HUD theme screenshots (`HudThemeTest`)
+
+`HudThemeTest` renders the **real** `MainActivity` view hierarchy over a real
+cat-video frame for each connection state, analyzes the frame in-process for the
+theme's main features, and saves one PNG per state to the always-on
+`screenshots.dir` build-output property (`app/build/outputs/screenshots/`, wired
+in `app/build.gradle` `testOptions`). `hud_connected.png` /
+`hud_connecting.png` / `hud_standby.png` / `hud_error.png`. Rendering is
+`@GraphicsMode(NATIVE)` + `@Config(sdk=[TARGET_SDK])` so Skia rasterization is
+real and deterministic; glyph-text fidelity under Robolectric can be imperfect,
+so the in-process assertions are structural (visibility/text/bounds/alpha) plus
+a source-pixel-mapping check that the video fills the screen edge-to-edge.
+Pixel bounds are computed at **mdpi** (Robolectric's default — emulator 440dpi
+bounds do NOT match the in-test render), and the cat fixture has black vignette
+borders, so edge assertions must map pixels to the source, never expect
+"bright". Set `SK_SHOW_PADS=255` to make the connected-vs-dimmed alpha contrast
+visible (the default 100/255 ≈ 0.39 hides it).
 
 ### Why awaits are required
 
@@ -421,7 +452,7 @@ A0 baseline (2026-08-09; `main` sources excluded) — the fixed trend anchor:
 
 - `app/build.gradle` sets `extraWarnings` **and** `allWarningsAsErrors` on the
   `kotlin { compilerOptions {} }` extension (AGP 9 built-in Kotlin wires the real
-  KGP `KotlinAndroidProjectExtension`; AGP 9.3.1 bundles KGP 2.2.10). This covers
+  KGP `KotlinAndroidProjectExtension`; AGP 9.2.1 bundles KGP 2.2.10). This covers
   **every** Kotlin compilation in the module — main, unit test, androidTest — so
   a new warning (deprecation, redundant code, unreachable code, `-Wextra` extra
   checks) fails the build. Enablement history: DECISIONS.md "K2 -Wextra

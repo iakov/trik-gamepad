@@ -630,3 +630,160 @@ run".
   canonical gate green twice (LINE **0.9753** / BRANCH **0.8661**, jscpd 0 in
   gate scope); lint/detekt/spotbugs clean. Commit `3855815`, pushed; CI run
   31567580412 green. **CAMPAIGN 16 COMPLETE.**
+
+## Campaign 17 — Type 1 HUD theme + app/robot settings split (UX prototyping)
+
+Scope (user-driven, 2026-08-12): translate a v0.dev gamepad mockup into the
+Android HUD as the **Type 1 theme** (glass/arcade), remove the legacy green
+action bar, and split Settings into **App** (appearance/controls/wheel/pads/
+hardware/magic/about) and **Robot/target** (host/port/video/network/presets)
+screens. **Fully local — no commits, no pushes** (working-tree changes only).
+Decision + rationale: DECISIONS.md "[2026-08-12] Type 1 HUD theme + app/robot
+settings split". Retrospective + quirks: MEMORY.md "Campaign 17 execution run".
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ≈3.5 h (12:45 → 16:20 local; impl + gate ×20 + emulator screenshots) |
+
+- **Type 1 HUD** — glass pads (one tintable chrome vector: crosshair rings,
+  arrows, mode glyph), round glass magic buttons in a capsule, circular glass
+  gear, glass status pill (state icon as a compound drawable), readability scrim,
+  green spinner. All static chrome in `hud_*` XML/styles; Kotlin only tints the
+  runtime connection-state accent.
+- **Connection-tone semantics** — pure `ConnectionIndicator` maps green
+  (Connected) / amber (Connecting) / **sepia #C9A97A** (idle + clean pause) / red
+  (real error); pads/buttons/pill/chip all read the same accent. Controls dim to
+  "at most 40%" while disconnected (never below the user's `showPads` base).
+- **Action bar removed** — `supportActionBar?.hide()`; the robot IP moved to the
+  tappable top-left glass chip (host → video host → `---.---.---.---` filler),
+  tinted to the robot control status. Gear opens App settings; chip opens Robot
+  settings.
+- **Settings split** — two activities (`SettingsActivity`/`RobotSettingsActivity`)
+  sharing one parameterized `SettingsFragment` (`ARG_PREFERENCE_XML`), nested
+  sub-screens preserve the XML choice; cross-link rows both ways. App keeps the
+  Basic/Advanced structure; robot screen is flat.
+- **Verification** — canonical gate green (test ×3-variant `--rerun-tasks`,
+  lint, detekt, spotbugs, jacoco, spotless, jscpd 0 clones, translations sync
+  118 keys); screenshots pixel-census + hash-verified on the Swiftshader
+  emulator: `_ui_260812-1840-01_gamepad.png`,
+  `_ui_260812-1840-02_app-settings.png`, `_ui_260812-1840-03_robot-settings.png`.
+  **CAMPAIGN 17 COMPLETE** (uncommitted; session rules forbid commits/pushes).
+
+### Deferred (recorded this session)
+
+- **Left-pad spring-back joystick** — a configurable option making the left pad
+  clamp the knob to a circle and spring back on release (real-stick feel).
+- **Left-handed mode** — swap the on-screen pads for left-handed users.
+- **Dual-network socket binding** — fix "connection lost" when cellular data is
+  on alongside the robot Wi-Fi (bare `Socket()` routes over the default network;
+  bind to `TRANSPORT_WIFI`). User-reported 2026-08-12; tracked in `.PLAN.md`.
+
+## Campaign 18 — pad render + layout + compact chip (UX follow-up)
+
+Scope (user-driven, 2026-08-12): fix the C17 "pads barely visible" rendering
+regression, then land the approved pad visuals + layout (~260dp pads centered in
+their halves, mockup chrome/knob, compact robot-IP chip). **Fully local — no
+commits, no pushes** (working-tree changes only; user rule). Decision +
+rationale: DECISIONS.md "[2026-08-12] Pad render + layout (C18)". Retrospective +
+quirks: MEMORY.md "Campaign 18 execution run".
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ≈3.7 h (18:40 → 22:25 local; incl. cold-boot emulator relaunch + gate/9-test iterations + docs) |
+
+- **Render root cause fixed (2 bugs)** — `SquareTouchPadLayout.onMeasure` never
+  measured its children (chrome/glyph were 0×0 — the C17 "verified" screenshot
+  was byte-identical to a fresh capture, proving the chrome never rendered), and
+  `animatePadsAlpha`'s `AlphaAnimation` (fillAfter) multiplied with
+  `applyHudTone`'s direct `.alpha` (≈0.392² ≈ 0.154 effective opacity).
+- **Pad layout** — full-screen `controlsOverlay` with two `weight=1`
+  gravity-centered halves; pads are 260dp squares centered at 25%/75% width,
+  vertically centered over the video. Buttons/gear/chip re-brought to front so
+  they stay tappable above the pads.
+- **Pad visuals** — dashed outer ring (drawn in code; vectors have no dashes),
+  solid inner ring, full crosshair lines + edge arrows (tintable vector),
+  radial-gradient joystick knob with glow + center dot (`onDraw`), 2dp glass
+  border + soft glow.
+- **Compact chip** — 28dp min-height, tight padding/margins, **14sp kept**;
+  sub-48dp touch target accepted + documented.
+- **C17 test regression** — `SettingsTests` double-`pressBack` reduced to one
+  (navigation flattened to a single level by the settings split).
+- **Verification** — canonical gate green; 3-variant `test --rerun-tasks` green;
+  instrumented **9/9 on both emulators**; proof screenshots pixel-census +
+  hash-matched: `_ui_260812-2205-01.png`. **CAMPAIGN 18 COMPLETE** (uncommitted;
+  session rules forbid commits/pushes).
+
+## Deferred — drop AppCompat (re-evaluate later)
+
+**Status: deferred (2026-08-14).** No work scheduled; revisit when the
+settings UI is next touched or before a release size pass.
+
+**Why now-deferred:** the direct AppCompat surface is small (two
+`AppCompatActivity` bases, appcompat `AlertDialog`, `ActionBar`, the
+`Theme.AppCompat.*` parents), but **androidx.preference requires appcompat
+transitively**, so removing the direct dependency would not remove AppCompat
+from the APK. A real drop needs the settings screens rewritten off
+`PreferenceFragmentCompat` — a large, risky churn for little gain.
+
+**What changed in the meantime (2026-08-14):** `material` was removed entirely
+(the HUD error pill replaced its only consumer, the Snackbar). `material` also
+pulled in appcompat transitively, so the transitive AppCompat surface shrank to
+just androidx.preference. Re-evaluating is cheaper than before.
+
+**When to re-evaluate:**
+
+- If the settings screens are rewritten anyway (custom RecyclerView/preferences
+  UI), the appcompat dependency can likely go with them.
+- A release size pass that shows appcompat's dex/resource weight as
+  unacceptable (measure `app-debug.apk` size before/after; material removal
+  already trimmed the tree).
+
+**Work needed if approved:** replace `AppCompatActivity` (→ plain
+`android.app.Activity`/`ComponentActivity`), appcompat `AlertDialog` →
+framework `AlertDialog`, `ActionBar` handling → framework equivalent,
+`Theme.AppCompat.*` → framework `Theme.Material`/`DeviceDefault` day-night
+parents. Keep `androidx.core`/`lifecycle`/`activity` (not appcompat).
+
+## Campaign 19 — HUD error pill, two-layer layout, timeout tooling (in progress 2026-08-14)
+
+Scope (user-driven, 2026-08-14): bullet-proof symbol glyphs via a bundled mono
+font subset; two-layer HUD layout (pads layer + visuals layer); a
+content-fitting glass error pill replacing the Material Snackbar + the
+`material` dependency drop; timeout-bound tooling (process-tree kill) after a
+~15 h `adb install` hang; `RobotChipController` extraction. **Fully local — no
+commits** (session rules). Decisions + rationale: DECISIONS.md "[2026-08-14]
+HUD error pill …", "Timeout-bound tooling", "Drop the material dependency",
+"RobotChipController extraction", "Delete stale untracked layout-v26".
+Retrospective + quirks: MEMORY.md "Campaign 19 execution run".
+
+| Estimated | Actual |
+|-----------|--------|
+| — | *(to record at campaign close)* |
+
+- **Symbol font** — `res/font/symbols_mono.ttf` (DejaVuSansMono Nerd Font
+  subset, ~9 KB) via `scripts/build_symbol_font.py` (cmap-verified); pill ⏻/↺,
+  gear ⚙, magic buttons all use it; license texts in `res/raw` + in-app
+  "Open-source licenses" dialog (About).
+- **Two-layer layout** — pads (260dp, `layout_gravity="center"` in two weight-1
+  halves) below chip/gear/buttons/pill; `hud_half_glyph` 7dp spacing; no
+  `bringToFront()` (XML order = z-order). Deleted the stale untracked
+  `layout-v26` shadow that broke the emulator render.
+- **Error pill** — `connectionError` TextView (Hud.GlassPill, wrap_content)
+  replaces the Snackbar; fade-in + auto-dismiss at the pill↔buttons midpoint;
+  **`material` dependency removed** (verified gone from debugRuntimeClasspath).
+- **Timeout tooling** — `scripts/run_bounded.py` (process-TREE kill), bounded
+  `_gradle.call_gradle` (900 s) + `gate.py` non-gradle steps (300 s); host
+  `adb.bat` shim (machine-local).
+- **Chip extraction** — `RobotChipController`; MainActivity 36 → ~28 functions
+  (detekt gate).
+- **Video smart-fit** — `MjpegFrameRenderer.destRect` center-crops to cover the
+  screen (was letterbox); any-size robot feeds now fill edge-to-edge.
+- **CC0 test fixtures + theme test** — three committed cat JPEGs
+  (`app/src/test/resources/mjpeg/`) replace in-memory frame generation;
+  consolidated `mjpeg/MjpegServerTest`; new `HudThemeTest` renders the real HUD
+  over the cat frame for each connection state and writes `hud_*.png` to the
+  always-on `screenshots.dir` build output. Video-test refactor committed on its
+  own (9803bb5) during an otherwise working-tree-only session.
+- **Open:** material-drop + layout + smart-fit still need an instrumented
+  re-verify (`connectedDebugAndroidTest --no-configuration-cache`); the 4 theme
+  screenshots are the layout/video proof for now; `.PLAN.md` "Campaign 19".
