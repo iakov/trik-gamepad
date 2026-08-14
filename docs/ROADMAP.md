@@ -758,7 +758,7 @@ Retrospective + quirks: MEMORY.md "Campaign 19 execution run".
 
 | Estimated | Actual |
 |-----------|--------|
-| — | *(to record at campaign close)* |
+| — | 9 h 17 m (committed span 2026-08-14 17:37 → 2026-08-15 02:44 +03:00; CI green) |
 
 - **Symbol font** — `res/font/symbols_mono.ttf` (DejaVuSansMono Nerd Font
   subset, ~9 KB) via `scripts/build_symbol_font.py` (cmap-verified); pill ⏻/↺,
