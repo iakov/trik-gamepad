@@ -18,7 +18,7 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RawSocketHttpStreamTest : RobolectricTestBase() {
 
-  private val seededFrames = SyntheticMjpegServer.defaultFrameImages()
+  private val seededFrames = SyntheticMjpegServer.catFrameImages()
 
   @Test
   fun opensStreamFromNonDefaultHostAndReadsFrames() {

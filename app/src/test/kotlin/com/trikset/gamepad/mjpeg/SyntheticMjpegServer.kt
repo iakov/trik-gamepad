@@ -1,12 +1,5 @@
 package com.trikset.gamepad.mjpeg
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.LinearGradient
-import android.graphics.Paint
-import android.graphics.Shader
 import java.io.BufferedOutputStream
 import java.io.Closeable
 import java.io.IOException
@@ -16,19 +9,20 @@ import java.net.Socket
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Synthetic MJPEG-over-HTTP server for the unit suite. Binds an **ephemeral** port (each of the 3
+ * MJPEG-over-HTTP test server for the unit suite. Binds an **ephemeral** port (each of the 3
  * parallel unit-test JVMs gets its own; or a caller-chosen port via [port], used by the "robot
  * offline on a known address, then back" simulation), serves `multipart/x-mixed-replace` frames
- * generated from a small cycling set of JPEG images (solid color → gradient → second color), and
- * can **drop the connection after N frames** before resuming the accept loop — emulating a real
- * robot stream dying and coming back (reconnect-on-error).
+ * from a cycling set of JPEG images, and can **drop the connection after N frames** before resuming
+ * the accept loop — emulating a real robot stream dying and coming back (reconnect-on-error).
  *
- * The test MUST run under `@GraphicsMode(NATIVE)` so [Bitmap.compress] here and
- * [BitmapFactory.decodeStream] on the client side do real JPEG work instead of fake bitmaps.
+ * Frames come from the committed CC0 test fixtures (`src/test/resources/mjpeg/`, see
+ * [catFrameImages]) — a real vintage-cat photo at three resolutions — not from in-memory generated
+ * bitmaps. Decoding them exercises the full JPEG path on the client, so the tests must run under
+ * `@GraphicsMode(NATIVE)` for real `BitmapFactory` work.
  */
 class SyntheticMjpegServer(
-    /** JPEG-encoded frames to cycle; default: solid red, vertical gradient, solid blue. */
-    private val frameImages: List<ByteArray> = defaultFrameImages(),
+    /** JPEG-encoded frames to cycle; default: the three CC0 cat fixtures. */
+    private val frameImages: List<ByteArray> = catFrameImages(),
     /** Frames served per connection before an abrupt close. */
     private val framesPerConnection: Int = 4,
     /** Pause between frames so the client's available()-based parser keeps up. */
@@ -130,69 +124,23 @@ class SyntheticMjpegServer(
   }
 
   companion object {
-    /** Encodes [width]x[height] solid/gradient test images once at startup. */
-    fun encodeJpeg(
-        painter: (Canvas, Paint) -> Unit,
-        width: Int,
-        height: Int,
-        quality: Int = 85,
-    ): ByteArray {
-      val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-      val canvas = Canvas(bitmap)
-      val paint = Paint()
-      painter(canvas, paint)
-      val out = java.io.ByteArrayOutputStream()
-      bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
-      bitmap.recycle()
-      return out.toByteArray()
+    /** Loads one committed CC0 cat fixture (a "640x480"-style size token) from the classpath. */
+    fun catFrameImage(size: String): ByteArray {
+      val path = "/mjpeg/vintage_cat_9405680_${size}.jpg"
+      val stream =
+          requireNotNull(SyntheticMjpegServer::class.java.getResourceAsStream(path)) {
+            "missing test fixture $path"
+          }
+      return stream.use { it.readBytes() }
     }
 
     /**
-     * Solid red / vertical gradient / solid blue — comparable JPEG sizes so the parser's 2x gate
-     * does not systematically drop the small solid frames on slower SDKs.
+     * The three committed CC0 cat fixtures (640x480 / 320x200 / 1000x600, license in the same
+     * resources dir): real photographic frames at three aspect ratios, so a stream can be any
+     * size/proportion. The 640x480 and 1000x600 sizes are comparable enough for the parser's
+     * available() 2x gate to keep the smaller frames; tests that cycle must use comparable sizes.
      */
-    fun defaultFrameImages(
-        width: Int = 64,
-        height: Int = 48,
-        quality: Int = 95,
-    ): List<ByteArray> {
-      fun diagonalStripe(color: Int) =
-          encodeJpeg(
-              { canvas, paint ->
-                paint.color = color
-                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-                // A thin lighter diagonal adds comparable JPEG entropy to the gradient
-                // frame, keeping the three seeded images close in encoded size.
-                paint.color = Color.WHITE
-                paint.strokeWidth = 4f
-                canvas.drawLine(0f, height.toFloat(), width.toFloat(), 0f, paint)
-              },
-              width,
-              height,
-              quality,
-          )
-      return listOf(
-          diagonalStripe(Color.RED),
-          encodeJpeg(
-              { canvas, paint ->
-                paint.shader =
-                    LinearGradient(
-                        0f,
-                        0f,
-                        0f,
-                        height.toFloat(),
-                        Color.WHITE,
-                        Color.BLACK,
-                        Shader.TileMode.CLAMP,
-                    )
-                canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-              },
-              width,
-              height,
-              quality,
-          ),
-          diagonalStripe(Color.BLUE),
-      )
-    }
+    fun catFrameImages(): List<ByteArray> =
+        listOf(catFrameImage("640x480"), catFrameImage("320x200"), catFrameImage("1000x600"))
   }
 }
