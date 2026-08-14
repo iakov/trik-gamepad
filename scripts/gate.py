@@ -25,10 +25,16 @@ import subprocess
 import sys
 
 from _gradle import call_gradle
+from run_bounded import run
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(ROOT, ".tmp")
 LOG = os.path.join(LOG_DIR, "gate.log")
+
+# Generous bound for the non-gradle gate steps (jscpd/lizard/translations) so a
+# hang fails the gate instead of blocking the caller (see AGENTS.md
+# "Operational rules" + MEMORY.md; gradle uses _gradle.GRADLE_TIMEOUT_S).
+NON_GRADLE_TIMEOUT_S = 300
 
 # A0 baseline for the logical-SLOC token trend (see TESTING.md
 # "Test quality discipline"). Reported as a trend, not a gate.
@@ -58,11 +64,10 @@ def run_jscpd() -> None:
         print("FAILED: npx not found on PATH (jscpd gate requires Node.js/npx)")
         sys.exit(1)
     cmd = [npx, "-y", "jscpd", "app/src/test", "app/src/androidTest", "--config", ".jscpd.json"]
-    with open(LOG, "a", encoding="utf-8") as f:
-        result = subprocess.run(cmd, cwd=ROOT, stdout=f, stderr=subprocess.STDOUT)
-    if result.returncode != 0:
+    rc = run(NON_GRADLE_TIMEOUT_S, "jscpd", cmd, LOG)
+    if rc != 0:
         print(f"FAILED: jscpd test duplication gate (see {LOG})")
-        sys.exit(result.returncode)
+        sys.exit(rc)
 
 
 def lizard_executable() -> str | None:
@@ -88,6 +93,7 @@ def run_lizard_trend() -> None:
         cwd=ROOT,
         capture_output=True,
         text=True,
+        timeout=NON_GRADLE_TIMEOUT_S,
     )
     if result.returncode != 0:
         print(f"FAILED: lizard (see {LOG})")
@@ -111,6 +117,7 @@ def run_check_translations() -> None:
         cwd=ROOT,
         capture_output=True,
         text=True,
+        timeout=NON_GRADLE_TIMEOUT_S,
     )
     if result.stdout:
         print(result.stdout.rstrip())
