@@ -213,10 +213,20 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
 - **Two layers in `activity_main.xml`** (child order = z-order, no
   `bringToFront()`): the pads layer (`controlsOverlay`, full-screen, two
   `weight=1` gravity-centered halves holding 260dp pads with
-  `layout_gravity="center"`) is declared FIRST, then the visuals (chip, gear,
-  buttons, status pill). The visuals always draw and receive touches above the
-  pads. Edge insets share one dimen `hud_half_glyph` (~7dp = half a caption
-  glyph): chip top, gear left/bottom, buttons bottom.
+  `layout_gravity="center"`) is declared FIRST, then the visuals. The visuals
+  always draw and receive touches above the pads. Edge insets share one dimen
+  `hud_half_glyph` (~7dp = half a caption glyph): chip top, gear left/bottom,
+  buttons bottom.
+- **Edge-pinned controls live in an inset-aware container** (`@+id/hudControls`,
+  a full-screen RelativeLayout wrapping the chip, gear and magic buttons).
+  `MainActivity` pads it per edge from the window insets (`systemBars` |
+  `displayCutout` | `systemGestures` | `mandatorySystemGestures`), so the
+  controls clear the status-bar/shade strip, the display cutout and the
+  gesture-nav zones — a bare-edge chip/gear would sit inside those OS strips
+  and the system swallows their touches on physical devices (the top-left
+  chip's taps were eaten by a Samsung shade strip; see DECISIONS.md
+  "Inset-aware HUD container"). The video stays full-bleed as a sibling below
+  the container; the center pills stay in `main`.
 - **Error feedback is a content-sized glass pill** (`connectionError`,
   `Hud.GlassPill`, wrap_content → always fits its message), shown by
   `ConnectionFeedback.error()` for real connection errors: fade-in, auto-dismiss

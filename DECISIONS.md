@@ -30,7 +30,8 @@ Each note follows the same shape:
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-14] Video smart-fit: center-crop cover instead of letterbox |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
-| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill | [2026-08-14] HUD error pill replaces the Material Snackbar |
+| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD | [2026-08-15] Inset-aware HUD container |
+| Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-15] Device identifiers never enter repo content |
 | Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction | [2026-08-14] Timeout-bound tooling: process-TREE kill + host adb shim |
 
 ______________________________________________________________________
@@ -1263,6 +1264,56 @@ ______________________________________________________________________
 - **Why:** a hang must fail the gate fast with a readable marker, never block
   the caller; adb interception is the only external force-multiplier.
 - **Out of scope:** POSIX adb shim (re-audit on the first POSIX box).
+
+### [2026-08-15] Inset-aware HUD container
+
+- **Problem:** on a physical phone (Samsung, landscape), `SettingsTests` failed
+  with the Settings screen never opening: the tap on `targetChip` (top-left,
+  7dp margin) was delivered to systemui's notification SHADE, not the app —
+  the chip sat inside the phone's top `mandatorySystemGestures` strip
+  (~26dp), which owns touches for the status-bar/shade swipe. The emulator
+  has no such overlay, so it passed there; the same flake would hit a real
+  user tapping the chip. The HUD's edge-pinned controls (chip top-left, gear
+  bottom-left, magic buttons bottom-center) sat inside the OS chrome.
+- **Alternatives:** change the test to direct `performClick()` (rejected — the
+  test caught a real UI defect and should stay as the pass criterion); a
+  full "show the system bars" redesign (rejected — loses full-bleed video +
+  gamepad feel); inset-aware HUD container (chosen).
+- **Chosen solution:** wrap the three edge-pinned controls in a full-screen
+  `@+id/hudControls` RelativeLayout and pad it per edge from
+  `WindowInsetsCompat` (`systemBars` | `displayCutout` | `systemGestures` |
+  `mandatorySystemGestures`) in `MainActivity.onCreate`. RelativeLayout
+  applies parent padding before `alignParent*`, so the child relations
+  (buttons→btnSettings→targetChip) survive. The video stays full-bleed (a
+  sibling below the container); center pills stay in `main`.
+- **Why:** the standard edge-to-edge + gesture-nav recipe; clears the
+  shade/status strip, cutout and nav zones on every device in both immersive
+  and transient-bars states. Robolectric dispatches no insets → padding 0 →
+  layout unchanged for unit tests.
+- **Out of scope / consequences:** a Robolectric structural test
+  (`hudControlsPaddingShouldFollowWindowInsets`) dispatches a known compat
+  insets frame and asserts the container adopts it per edge. The unchanged
+  `SettingsTests` becomes the on-device verification (deferred — the phone
+  dropped off adb after the change; recorded in `.PLAN.md`).
+
+### [2026-08-15] Device identifiers never enter repo content
+
+- **Problem:** a physical phone connected for local instrumented verification
+  has an adb serial, model name and IMEI that can identify the exact person
+  or device. Committing any of them (or derived values like the
+  "<model> - 16" test-result filenames) leaks a private identifier into
+  history/CI.
+- **Alternatives:** scrub at push time only (error-prone — the leak is already
+  in history); a committed rule + pre-commit sweep (chosen).
+- **Chosen solution:** AGENTS.md "Repo hygiene" guardrail — serial/model/IMEI
+  are session-only (scoped via `ANDROID_SERIAL` on the command line), never
+  in committed docs/config/tests; sweep `git diff`/`git add` output before
+  committing (instrumented-test artifacts live under gitignored `app/build/`
+  but still get swept). Serial stays out of `.PLAN.md` pushes too (it is
+  gitignored but the rule is universal).
+- **Why:** an exact-person/device identifier is private data; a leak is
+  irreversible once pushed (this repo verified: 521 commits contain none).
+- **Out of scope:** sanitizing vendor device logs or upstream data.
 
 ### [2026-08-14] HUD error pill replaces the Material Snackbar
 

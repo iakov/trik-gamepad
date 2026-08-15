@@ -2756,3 +2756,42 @@ keeps the insight while making the question productive every run.
 *Checklist revision: #3 rephrased from "What nearly got lost (uncommitted
 work, crash-safety near-miss)?" to "What could have been lost, and what kept
 it safe?" — see checklist *Last revised* stamp.*
+
+### [2026-08-15] Campaign 21 execution run - inset-aware HUD container
+
+A user-reported device item (A.1 phone re-verify) surfaced a real UI defect:
+on the physical phone, the top-left chip's taps were eaten by systemui's
+notification shade. Root-caused from the instrumented failure logcat: the app
+is landscape, and the phone reports a top `mandatorySystemGestures` strip
+(~26dp) that owns touches for the status-bar/shade swipe; the chip (7dp
+margin) sat inside it. The emulator has no such overlay, so it passed there —
+the test caught a genuine on-device UX bug, not an injection artifact.
+
+**Fix (the UI, not the test):** wrapped the three edge-pinned controls (chip,
+gear, magic buttons) in a full-screen `@+id/hudControls` RelativeLayout and
+pad it per edge from the window insets in `MainActivity.onCreate`
+(`systemBars | displayCutout | systemGestures | mandatorySystemGestures`).
+The video stays full-bleed; the center pills stay in `main`. Rationale +
+alternatives: DECISIONS.md "Inset-aware HUD container".
+
+**Guardrail added (user instruction, 2026-08-15):** device identifiers
+(adb serial, model name, IMEI) never enter commits/docs/CI — session-only,
+swept before `git add`. AGENTS.md "Repo hygiene" + DECISIONS.md "Device
+identifiers never enter repo content". Verified: 521 commits contain neither
+the serial nor the model.
+
+**Verification:** new Robolectric structural test
+`hudControlsPaddingShouldFollowWindowInsets` (dispatches a compat insets
+frame, asserts the container adopts it per edge); gate green; full 3-variant
+`test` green twice. Two test-authoring traps hit: (1) the "initial padding is
+0" assert is environment-dependent — Robolectric dispatches a simulated
+status-bar inset during activity setup on the minSdk qualifier, so assert the
+effect of the dispatched frame, not an initial zero; (2) the raw platform
+`WindowInsets.Type` is **not** mocked on the API-23 qualifier
+(`Method systemBars not mocked`) — use the compat `WindowInsetsCompat.Builder`
+in tests.
+
+**Deferred (recorded in `.PLAN.md`):** the on-device confirmation (unchanged
+`SettingsTests` passing on the phone + real `input tap` + screenshot) — the
+phone dropped off adb mid-campaign (USB status Unknown) and was unavailable;
+the fix's CI gate (green on push) stands in for it until the phone returns.

@@ -837,3 +837,38 @@ protocol): MEMORY.md "Campaign 20 retrospective".
 - **CAMPAIGN 20 COMPLETE** — one commit for code + tests + detekt config
   (`212791b`), gate green, 3-variant `test` twice, CI build+gate suite and
   instrumented API 36 green on the first push.
+
+## Campaign 21 — inset-aware HUD container (on-device defect from A.1) (2026-08-15)
+
+Scope (user-driven, 2026-08-15): the physical-phone instrumented re-verify
+(A.1) FAILED — both `SettingsTests` showed the Settings screen never opening.
+Root cause: on the phone (landscape) the top-left chip sits inside the top
+`mandatorySystemGestures`/shade strip and its taps were delivered to systemui,
+not the app — a real on-device UX defect the emulator cannot reproduce. Fix the
+UI, keep the discovered test as the pass criterion. Decision + rationale:
+DECISIONS.md "Inset-aware HUD container"; findings: MEMORY.md "Campaign 21
+execution run". **Committed + pushed 2026-08-15** (CI green).
+
+| Estimated | Actual |
+|-----------|--------|
+| — | (fill in elapsed at push) |
+
+- **Inset-aware HUD container** — the three edge-pinned controls (chip, gear,
+  magic buttons) moved into a full-screen `@+id/hudControls` RelativeLayout,
+  padded per edge from the window insets (`systemBars` | `displayCutout` |
+  `systemGestures` | `mandatorySystemGestures`) in `MainActivity.onCreate`.
+  The video stays full-bleed; center pills stay in `main`. Standard
+  edge-to-edge + gesture-nav recipe: clears the shade/status strip, cutout
+  and nav zones on every device.
+- **New Robolectric structural test** — `hudControlsPaddingShouldFollowWindowInsets`
+  dispatches a compat insets frame and asserts the container adopts it per
+  edge. Test-authoring traps hit (minSdk qualifier): Robolectric simulates a
+  status-bar inset at activity setup (assert the effect of the dispatched
+  frame, not an initial zero), and raw `WindowInsets.Type` is not mocked on
+  API 23 (use the compat builder).
+- **Device-identifier guardrail (user instruction)** — adb serial/model/IMEI
+  are session-only, never committed (AGENTS.md "Repo hygiene" + DECISIONS.md
+  "Device identifiers never enter repo content"; 521 commits verified clean).
+- **Deferred** — the on-device confirmation (unchanged `SettingsTests` on the
+  phone + real `input tap` + screenshot): the phone dropped off adb mid-campaign.
+  Recorded in `.PLAN.md` (A.1); re-run when the phone returns.
