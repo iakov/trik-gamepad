@@ -24,7 +24,7 @@ Each note follows the same shape:
 
 | Area | Covers | Newest decision |
 |------|--------|-----------------|
-| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-13] AGP 9.2.1 — Android Studio 3-release compatibility floor |
+| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-15] Idiomatic Kotlin pass (Java→Kotlin leftovers) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-14] Video smart-fit: center-crop cover instead of letterbox |
@@ -1325,3 +1325,38 @@ ______________________________________________________________________
 - **Out of scope:** glyph-text pixel fidelity under Robolectric (structural
   assertions cover it); shipping the images in the APK (test-only resources);
   the emulator-based screenshot workflow as the theme-test oracle.
+
+### [2026-08-15] Idiomatic Kotlin pass (Java→Kotlin leftovers) — Campaign 20
+
+- **Problem:** the post-migration code still carried Java-isms: `!!` on SDK
+  `getString` results, AOSP `m`-prefixed fields, JavaBeans `getX()/setX()`
+  accessors on our own classes, and no detekt rule to catch any of it going
+  forward.
+- **Alternatives considered:** leave the code as-is; run Android Studio
+  Inspect Code and fix everything it flags (IDE-strength, not repeatable in
+  CI); convert only own-code accessors (framework Java API calls are correct
+  Kotlin interop and untouched).
+- **Chosen solution:**
+  - `!!` → elvis: `getString(key, default) ?: default` (the 2-arg SDK
+    `getString` is nullable).
+  - Drop `m` prefixes; convert our own accessors to Kotlin properties
+    (`SenderService.hostAddr`/`hostPort`/`keepaliveTimeout` with a custom
+    setter, `SquareTouchPadLayout.padName`/`sender`, `MjpegView.isPlaying`,
+    `MainActivity.senderService`/`settingsController`, `SettingsUi` interface
+    → `var wheelStep`/`var wheelEnabled`).
+  - Listener-registration setters stay methods (Kotlin does not SAM-convert a
+    lambda into a fun-interface property); `setSenderService` stays a method
+    for its null-guard.
+  - Enable syntax-only detekt idiom rules (`ExpressionBodySyntax`,
+    `UseIfInsteadOfWhen`, `UseLet`) in `detekt.yml`; type-resolution rules
+    (`CanBeNonNullable`, `UseDataClass`, `ObjectLiteralToLambda`) are gated on
+    the detekt 2.0.0 bump (detekt 1.23.8 under AGP 9's built-in Kotlin
+    generates no type-resolution tasks).
+- **Why:** properties are the canonical Kotlin idiom for accessors; the rules
+  make the canonicality check repeatable in the existing gate; deferring the
+  type-resolution rules avoids wiring a half-broken toolchain combination that
+  the planned detekt 2.0 bump would throw away.
+- **Out of scope:** Android/JDK API call sites (correct interop, not
+  Java-isms); the AS Inspect Code report (one-off, not gateable — the detekt
+  rules are the CI mirror); rewriting parser/network port-fidelity relaxations
+  already documented in `detekt.yml`.

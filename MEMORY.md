@@ -2493,3 +2493,58 @@ The HUD redesign + its test updates + new tests are one entangled unit.
 **Before splitting commits, diff HEAD's versions of every file the new test
 touches** - "will this compile against the previous design?" is the deciding
 question, and the answer can force consolidation.
+
+### [2026-08-15] Campaign 20 execution run - idiomatic Kotlin pass
+
+User-driven (2026-08-15): make the post-Java→Kotlin code canonical — own-code
+Java-isms only, framework API calls untouched. Single commit `212791b`, pushed,
+CI green (build + gate suite 3m47s, instrumented API 36 2m59s) on the **first**
+push (no amend needed). Gate + 3-variant `test` twice green locally first.
+
+**Findings (grep + compiler-driven):**
+
+- Redundant `!!` on `SharedPreferences.getString(key, default)` (4 sites in
+  `MainActivitySettingsController`). The 2-arg `getString` IS nullable in the
+  SDK, so the fix is `?: default`, not dropping the `!!` outright — the
+  compiler caught that (the plan's "already non-null" assumption was wrong; the
+  elvis is the idiom either way).
+- `m`-prefix fields (AOSP Java convention): 7 in `MainActivity`, 4 in
+  `SenderService`.
+- JavaBeans accessors → properties: `SenderService.hostAddr`/`hostPort`/
+  `keepaliveTimeout` (custom setter preserves the keepalive-timer restart),
+  `SquareTouchPadLayout.padName`/`sender`, `MjpegView.isPlaying`,
+  `MainActivity.senderService`/`settingsController`, and the `SettingsUi`
+  interface accessors → `var wheelStep`/`var wheelEnabled` (MainActivity + the
+  `MainActivitySettingsControllerTest` FakeUi).
+- Reflection-based tests: `MainActivityTest` reaches the renamed fields by
+  string (`field(activity, "video")` etc.) — the rename had to update those
+  strings too, plus their comments.
+
+**Traps hit / confirmed (all pre-existing rules, re-confirmed here):**
+
+- **Kotlin does NOT SAM-convert a lambda into a Kotlin fun-interface
+  *property***: `client.onDisconnectedListener = { ... }` fails to compile
+  ("Assignment type mismatch: actual type is '() -> Unit'"). Listener-registration
+  setters must stay methods (`setShowTextCallback`/`setOnDisconnectedListener`,
+  Android `setOnClickListener` style). The LSP flagged this first; the compiler
+  confirmed.
+- **detekt 1.23.8 under AGP 9's built-in Kotlin generates NO type-resolution
+  tasks**: `detektMain`/`detektVariant` don't exist (`tasks --all` shows only
+  `detekt`/`detektBaseline`/`detektGenerateConfig`). The type-resolution idiom
+  rules (`CanBeNonNullable`, `UseDataClass`, `ObjectLiteralToLambda`) are gated
+  on the detekt 2.0.0 bump (recorded in `.PLAN.md`); the syntax-only set
+  (`ExpressionBodySyntax`, `UseIfInsteadOfWhen`, `UseLet`) was enabled now and
+  surfaced exactly one real finding (`ConnectionAnnouncer` if/else-null →
+  `?.let`), fixed.
+- **Mechanical setter→property replacement leaves dangling `)`**: `setX(y)`
+  → `x = y` via naive string replace produced `x = y)`; a follow-up cleanup
+  pass stripped them. Batch edits of this shape need a syntax-aware check
+  (compile) before trusting them.
+- **`cmd`/PowerShell quoting** re-mangled inline `python -c` (no output at
+  all) — routed the mechanical replacements through `.tmp/*.py` files
+  (byte-preserving), per the standing rule.
+
+**Design choice documented:** `setSenderService(sender: SenderService?)` stays a
+method (not a property setter) because a null sender must be a safe no-op that
+keeps the existing sender (asserted by `setSenderServiceWithNullShouldBeSafe`).
+`hostAddr`/`hostPort` gained `private set` (mutated only via `setTarget`).

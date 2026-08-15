@@ -794,3 +794,46 @@ test". Retrospective + quirks: MEMORY.md "Campaign 19 execution run" +
 - **CAMPAIGN 19 COMPLETE** — instrumented re-verify covered by the CI emulator
   job (API 36, green); the 4 theme screenshots are the layout/video proof;
   `.PLAN.md` trimmed to the remaining deferred items.
+
+## Campaign 20 — idiomatic Kotlin pass (Java→Kotlin leftovers) (2026-08-15)
+
+Scope (user-driven, 2026-08-15): make the Kotlin canonical after the Java→Kotlin
+migration — own-code Java-isms only (framework Java API calls untouched):
+redundant `!!` on nullable `getString` (elvis instead), `m`-prefixed fields
+(AOSP Java convention), JavaBeans `getX()/setX()` accessors → Kotlin properties
+(including the `SettingsUi` interface `getWheelStep`/`setWheelStep`/
+`isWheelEnabled`/`setWheelEnabled` → `var wheelStep`/`var wheelEnabled`), plus
+syntax-only detekt idiom rules (`ExpressionBodySyntax`, `UseIfInsteadOfWhen`,
+`UseLet`). Decision + rationale: DECISIONS.md "[2026-08-15] Idiomatic Kotlin
+pass"; discovery + findings: MEMORY.md "Campaign 20 execution run". \*\*Committed
+
+- pushed 2026-08-15\*\* (single commit, `212791b`), CI green.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | 1 h 9 m (committed span 2026-08-15 07:18 → 08:27 +03:00; CI green) |
+
+- **`!!` removal** — the 2-arg `SharedPreferences.getString(key, default)` is
+  nullable in the SDK; `getString(...)!!` → `getString(...) ?: default`
+  (`MainActivitySettingsController`).
+- **`m`-prefixes dropped** — `mSensorManager`/`mAngle`/`mWheelStep`/
+  `mWheelEnabled`/`mVideo`/`mVideoURL`/`mSettingsController` (MainActivity),
+  `mConnectTask`/`mOut`/`mHostAddr`/`mHostPort` (SenderService).
+- **Accessors → properties** — `SenderService.hostAddr`/`hostPort`/
+  `keepaliveTimeout` (custom setter keeps the keepalive-timer restart),
+  `SquareTouchPadLayout.padName`/`sender`, `MjpegView.isPlaying`,
+  `MainActivity.senderService`/`settingsController`; the `SettingsUi`
+  interface gained `var wheelStep`/`var wheelEnabled`.
+- **Kept as methods** — listener-registration setters
+  (`setShowTextCallback`/`setOnDisconnectedListener`, Android `setOnClickListener`
+  style: Kotlin does not SAM-convert a lambda into a fun-interface *property*),
+  and the null-guard `setSenderService` (a null sender must keep the existing
+  one).
+- **detekt rules** — `ExpressionBodySyntax`, `UseIfInsteadOfWhen`, `UseLet`
+  (syntax-only; the type-resolution idiom rules `CanBeNonNullable`/
+  `UseDataClass`/`ObjectLiteralToLambda` are gated on the detekt 2.0.0 bump —
+  detekt 1.23.8 under AGP 9's built-in Kotlin generates no type-resolution
+  tasks; see `.PLAN.md`).
+- **CAMPAIGN 20 COMPLETE** — one commit for code + tests + detekt config
+  (`212791b`), gate green, 3-variant `test` twice, CI build+gate suite and
+  instrumented API 36 green on the first push.
