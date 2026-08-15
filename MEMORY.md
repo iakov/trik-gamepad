@@ -223,7 +223,7 @@ launcher too — avg brightness 0.0) — a capture-path artifact, not an app def
 - Commands are newline-terminated plain text: `pad1 x y`, `pad2 x y`,
   `btn N down`, `wheel <angle>`, `keepalive <ms>`.
 - `send()` lazily connects (`connectAsync()` guarded by `syncFlag`); a failed
-  send is detected via `mOut.checkError()` posted back to the main thread
+  send is detected via `out.checkError()` posted back to the main thread
   → `disconnect("Send failed.")`.
 - `setTarget()` disconnects when host/port changes.
 
@@ -354,6 +354,65 @@ vs tests before touching code.
 records, and reference quirks** that record *what happened and what was
 learned*, not what was decided.
 
+### Campaign retrospective checklist
+
+Run after every push/campaign (AGENTS.md "After push (retrospective)" — that
+hook points here). This checklist is a **living artifact**: its final step
+revises the checklist itself every time it runs — a retrospective is also a
+review of the checklist. The dated campaign records below are worked examples;
+restate their findings here only when a checklist entry needs an anchor.
+
+**Process**
+
+1. What was the biggest process win this campaign (worth repeating)?
+1. What was the committability constraint — would each commit compile against
+   HEAD's design?
+1. What nearly got lost (uncommitted work, crash-safety near-miss)?
+1. Elapsed vs Estimated — recorded in the ROADMAP header table?
+
+**Learning**
+
+1. What new facts are worth saving (tooling / Robolectric / test-design)?
+1. What wrong assumption did the compiler / CI / gate catch?
+1. What looks similar to a previous lesson → generalize into one rule?
+
+**Signal**
+
+1. Frequency-scan the session logs — what is the top repeated diagnostic, and
+   is it root-caused? Known warnings re-confirmed vs wrongly re-marked
+   resolved?
+1. What rule deviations / missing rules surfaced → capture NOW or make an
+   explicit decision not to?
+
+**Drift**
+
+1. Per-doc scope audit (incl. AGENTS.md) — anything stale, misplaced, or
+   missing in each doc?
+1. Stale code comments / docs API references?
+1. Was every lesson stored in the best-scoped doc?
+
+**Value**
+
+1. What is the measurable profit / worth-it verdict?
+1. What was deferred and why (→ `.PLAN.md`)?
+1. What is the next automation candidate (gaps escalate)?
+1. What should I have asked the user earlier?
+
+**Checklist review (final step — do NOT skip)**
+
+1. Add any new questions this campaign produced (capture them while fresh).
+1. Identify the **single most useless question** this campaign (produced
+   nothing, added no insight). **One unproductive campaign is NOT grounds for
+   removal on its own** — a question may only pay off occasionally; document
+   it first. In this campaign's retrospective history note, answer: *why was
+   it useful when added? why did it become useless now? how can it be
+   improved, or which other question(s) should be rephrased to envelop its
+   useful part (so the insight survives)?* Then act: rephrase it (or merge the
+   useful part into another question) if a useful part remains, otherwise
+   **drop it from this checklist**. Update the *last revised* stamp.
+
+*Last revised: 2026-08-15*
+
 ### [2026-08-06] Quality-gate implementation quirks (checkstyle/SpotBugs/JaCoCo)
 
 **Context:** wiring the R5 gates onto an Android module surfaced several
@@ -441,7 +500,7 @@ and Android-lint behaviors; each cost a build cycle to pin down.
 - **`NullAssignment` and `CloseResource` are noise for Android.** The former
   fires on every lifecycle field-null (release-memory) idiom; the latter cannot
   see ownership transfer to a long-lived field (`SenderService` hands the
-  `Socket` to a `PrintWriter` stored in `mOut`, closed in `disconnect()`).
+  `Socket` to a `PrintWriter` stored in `out`, closed in `disconnect()`).
   Both are excluded from the curated ruleset with the rationale recorded in
   `app/config/pmd/ruleset.xml`.
 - **Strict-lint baseline is variant- and environment-sensitive.** The baseline
@@ -985,9 +1044,11 @@ BRANCH ~73% at campaign start).
 
 **Kotlin accessor clash.** Implementing an interface method whose name
 collides with a property's accessors breaks compilation with "Platform
-declaration clash" (e.g. a fake `SettingsUi` with `var videoUrl` + an override
-`setVideoUrl(url)`, or `var wheelStep` + `getWheelStep()`). Name the backing
-property differently (`var url`, `var step`).
+declaration clash" (e.g. a fake `SettingsUi` with `var url` + an override
+`setVideoUrl(url)` — `url`'s accessor collides with the `setVideoUrl` method).
+Name the backing property differently (`var url`, `var step`). Since Campaign
+20, the interface itself declares properties (`var wheelStep`, `var wheelEnabled`), so the clash shape now lives only in fakes that mix a property
+and a differently-prefixed setter.
 
 **MainActivitySettingsController test traps.** (1) `onPreferenceChanged`
 auto-rewrites `SK_VIDEO_URI` whenever the host address changes — a test that
@@ -2548,3 +2609,36 @@ push (no amend needed). Gate + 3-variant `test` twice green locally first.
 method (not a property setter) because a null sender must be a safe no-op that
 keeps the existing sender (asserted by `setSenderServiceWithNullShouldBeSafe`).
 `hostAddr`/`hostPort` gained `private set` (mutated only via `setTarget`).
+
+**Retrospective (asked the C19 retrospective questions):**
+
+- **What was the biggest process win?** The single-commit discipline: one
+  `refactor:` commit for code+tests+detekt config, gate + 3-variant `test`
+  twice before push, CI green on the **first** push — no amend cycle at all.
+  The plan's "assumption" (2-arg `getString` is non-null) was wrong; the
+  compiler caught it before push, proving the compile-before-trust rule pays.
+- **Generalization 1 (SAM)**: "Kotlin doesn't SAM-convert a lambda into a
+  fun-interface *property*" generalizes to a rule about *listener-registration
+  setters*: any `setX(listener)` that is a registration (not a JavaBeans
+  accessor) stays a method — the same shape that keeps `setOnClickListener`
+  working in Android. Folded into the DECISIONS entry + detekt.yml rationale,
+  not re-recorded per occurrence.
+- **Generalization 2 (toolchain gating)**: "detekt 1.23.8 + AGP 9 has no
+  type-resolution tasks" is one instance of a broader pattern — *type-resolution
+  dependent detekt rules are gated on the detekt 2.0 bump* (recorded once in
+  `.PLAN.md` + detekt.yml comment). Also: the "exit 0 ≠ tool ran" rule was
+  re-confirmed (`detektMain` vanished silently; only `tasks --all` revealed the
+  gap).
+- **Generalization 3 (batch rewrites)**: "naive setter→property replace leaves
+  dangling `)`" generalizes to *mechanical multi-file rewrites need a
+  syntax-aware compile check before trusting them* (same shape as the standing
+  "compile against HEAD's design" test rule).
+- **Frequency scan** (per AGENTS.md): every C20 build log repeats the
+  "incompatible with Gradle 10" deprecation warning (known, pending in
+  `.PLAN.md` "Gradle-10-era bump" — NOT re-marked resolved); no config-cache
+  invalidation, no spotlessKotlinCheck failures. No new systemic signals.
+- **Docs-drift discipline applied** (new rules from this session): store
+  knowledge in the best-scoped doc; audit each doc including AGENTS.md against
+  its scope; generalize similar findings; `.PLAN.md` holds only unfinished
+  tasks (the C19 COMPLETE history section was trimmed as published work). See
+  DECISIONS.md "[2026-08-15] Docs-discipline rules".

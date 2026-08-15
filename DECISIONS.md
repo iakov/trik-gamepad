@@ -29,7 +29,7 @@ Each note follows the same shape:
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-14] Video smart-fit: center-crop cover instead of letterbox |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
-| Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-09] Why .PLAN.md exists |
+| Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
 | UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill | [2026-08-14] HUD error pill replaces the Material Snackbar |
 | Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction | [2026-08-14] Timeout-bound tooling: process-TREE kill + host adb shim |
 
@@ -1089,6 +1089,33 @@ ______________________________________________________________________
 - **Out of scope / consequences:** `.PLAN.md` is referenced only here (why/what
   it is for) and in AGENTS.md "Current work" (what is in it / when to read it);
   all other docs deliberately carry no `.PLAN.md` references.
+
+### [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push)
+
+- **Problem:** session instructions and drift fixes repeatedly landed in the
+  first doc at hand, and completed campaign entries lingered in `.PLAN.md` even
+  after push (the "Campaign 19 — COMPLETE" history section). Each is drift:
+  knowledge in the wrong scope, or a local plan holding published work.
+- **Alternatives considered:** keep the rules only in chat memory (ephemeral —
+  rejected); add them all to AGENTS.md verbatim (bloats the agent-centric file);
+  leave `.PLAN.md` history sections as-is (contradicts its "only unfinished
+  tasks" design, see "Why .PLAN.md exists").
+- **Chosen solution:** four compact AGENTS.md guardrails (light, agent-centric,
+  no rationale) + one retrospective-hook line: (1) store knowledge in the doc
+  whose scope matches it; (2) docs-drift audit checks each doc against its own
+  scope; (3) missed knowledge is proposed at the next review, escalating to a
+  better home if it doesn't stick; (4) `.PLAN.md` holds only unfinished tasks —
+  completed/published work leaves it after push; plus "when something looks
+  similar, generalize" for retrospectives. Rationale lives here and in
+  DECISIONS/MEMORY, not AGENTS.
+- **Why:** AGENTS.md stays a small agent rules/triggers surface; the per-doc
+  scope check catches both stale claims and misplaced detail; trimming the plan
+  after push keeps a crash-recovery file short and accurate (its original
+  purpose); generalizing avoids re-recording each similar finding.
+- **Out of scope:** moving existing campaign history out of MEMORY/ROADMAP
+  (those are the durable homes); rewriting dated campaign records that quote
+  then-current code names (history is kept as-is per "Docs store experience,
+  not state").
 
 ## UX & accessibility & i18n
 

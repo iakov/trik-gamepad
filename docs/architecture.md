@@ -133,7 +133,7 @@ RawSocketHttpStream (http; bypasses NSC) / HttpURLConnection (https fallback)
   "MJPEG: reconnect-on-error" for the rationale.
 - **Bounded retry (Campaign 8)** — `VideoRetryController`: while the activity is
   resumed ∧ control `connectionState is Connected` (the keepalive proxy) ∧ a
-  video is configured ∧ `!view.isPlaying()`, reloads the stream on a 5 s tick,
+  video is configured ∧ `!view.isPlaying`, reloads the stream on a 5 s tick,
   and immediately on the control-`Connected` edge. Gated on the control
   connection so a dead robot is never hammered; idle recovery is bounded by user
   interaction. Decision + rationale: `DECISIONS.md` "Campaign 8 — bounded,

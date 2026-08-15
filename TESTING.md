@@ -261,11 +261,11 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
   passing test that used the wrong sensor type). Diff the JaCoCo per-class
   branch numbers for the target class after adding the test.
 - **Covering null-guard branches on layout-populated fields needs explicit
-  nulling.** `MainActivity.onPause`/`onResume` guard `mVideo`/`mSensorManager`
+  nulling.** `MainActivity.onPause`/`onResume` guard `video`/`sensorManager`
   with null checks, but the activity layout always provides those views in
   Robolectric — so a "no-op" test that just calls `onPause()` covers nothing
   (the JaCoCo needle did not move). To cover the null branch, explicitly
-  `setField(activity, "mVideo", null)` (and `mSensorManager`) via reflection
+  `setField(activity, "video", null)` (and `sensorManager`) via reflection
   **before** invoking the method.
 - **3 identical failures → stop and read the shadow source.** If the *same*
   test fails identically N≥3 consecutive runs (same exception, same line, log
@@ -376,7 +376,7 @@ times — green on every emulator until a bounded await exposed the missing
   `lateinit` (SquareTouchPadLayoutTest) are always true. An assertion must have
   a value that can go wrong.
 - **Asserting setup, not the effect** — `onSensorChangedAccelerometerShouldProcessWheel`
-  asserted `getHostAddr() != null` (a value set in `setUp`) while the comment
+  asserted `hostAddr != null` (a value set in `setUp`) while the comment
   claimed "a wheel command was sent". Assert the code-under-test's output, not
   a value the fixture already set.
 - **Empty-list iteration** — an assertion nested in `while (hasNext())` passes

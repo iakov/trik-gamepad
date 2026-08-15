@@ -130,8 +130,13 @@ configurations, update this section and the referenced config files.
 
 ### After push (retrospective)
 
+- **Run the campaign retrospective checklist** (`MEMORY.md` "Campaign retrospective checklist") — it covers frequency-scan, generalization, rule-deviation capture, per-doc drift audit, and the value questions; its **final step revises the checklist itself** (add new questions, analyze the single most useless one — why useful when added / why useless now / how to envelop its useful part — then rephrase or drop it and stamp the revision). A retrospective is also a review of the checklist.
 - Analyze decisions; suggest comments for unclear code and docs for non-obvious
   patterns.
+- **When something looks similar, generalize**: merge repeated instances of a
+  lesson into one rule/finding instead of re-recording each occurrence — if the
+  same shape shows up twice, look for the single underlying cause (see MEMORY.md
+  C19/C20 retrospectives).
 - Capture every rule deviation/missing rule NOW — end with `AGENTS.md`/
   `MEMORY.md` updated or an explicit decision not to.
 - **Frequency-scan the session logs, not just failures**: `grep -c` the session
@@ -214,6 +219,10 @@ configurations, update this section and the referenced config files.
 - **Documenting decisions**: `AGENTS.md` stores rules/constraints only — never rationale. A *decision* (problem → alternatives → why → out-of-scope) belongs in `DECISIONS.md`; a fact/quirk/retrospective belongs in `MEMORY.md`. Removing a documented rule changes agent behavior — only delete if provably wrong; relocate rationale, never drop it. Would removing this change agent behavior? → keep it. Is the claim provably wrong (verified against executable sources — config, workflow, code)? → only then delete/correct. Does it enforce a docs/structure contract? → keep structural-convention rules even when the wording looks generic.
 - **AGENTS.md grows only via argued decisions**: a new line must be justified by a decision documented in `DECISIONS.md` (why it is, or is expected to be, useful). Retrospectives may remove statements that were never proven, to keep AGENTS.md lean.
 - **Merge, don't delete**: when replacing a section, merge old content into the new rather than deleting outright; confirm each deletion is intentional. On docs-drift review, read `AGENTS.md` top-to-bottom and push detail/rationale down to `MEMORY.md`/`DECISIONS.md` — `AGENTS.md` = pointers, the rest = on-demand detail; keep context small and focused.
+- **Store knowledge in the best-scoped doc**: when told to remember something or a lesson lands, put it in the doc whose scope it matches (AGENTS = agent rules, DECISIONS = decisions with rationale, MEMORY = facts/quirks/retrospectives, ROADMAP = published campaign record, `.PLAN.md` = unfinished local tasks) — not the first doc at hand. `AGENTS.md` stays light and agent-centric (rules/triggers only).
+- **Docs-drift audit is per-doc scope**: when fixing drift, check **each** doc (including `AGENTS.md`) against its own scope — it must contain everything it must, and nothing it mustn't (no detail that belongs elsewhere, no stale claims).
+- **Missed knowledge → suggest next time**: if a doc is missing something, record the gap and propose the fix at the next review; if a repeated suggestion doesn't stick, explore a better home/solution for the knowledge rather than letting it rot.
+- **`.PLAN.md` holds only unfinished tasks**: completed/published work leaves it after push — no COMPLETE/kept-as-history campaign entries (that record belongs in ROADMAP/MEMORY). Why: DECISIONS.md "Why .PLAN.md exists".
 - **Session context is ephemeral**: persist decisions to `AGENTS.md`/`DECISIONS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
 - **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
 - **Docs store experience, not state**: keep only what saves future time and cannot be rediscovered faster than a doc can drift — counts, versions, thresholds, and hashes must be OUT of docs (glob/wrapper/`libs.versions.toml`/build scripts reveal them in seconds). Dated records stay as history; never restate live state. Docs help, not burden: a line that would not save a future step is cut.
