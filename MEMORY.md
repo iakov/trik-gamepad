@@ -1113,19 +1113,21 @@ multipart/x-mixed-replace JPEG frames to the app's real `VideoStreamLoader` +
 `app/src/test/kotlin/com/trikset/gamepad/mjpeg/`.
 
 **Server (`SyntheticMjpegServer.kt`):** `ServerSocket(0)` ephemeral port (3
-parallel JVMs), cycles 3 seeded JPEGs (red-stripe / gradient / blue-stripe,
-comparable encoded sizes), drops the socket after N frames then resumes the
-accept loop (R12 drop/restore). Exposes `servedFrames`/`acceptedConnections`.
+parallel JVMs), cycles the committed CC0 cat fixtures (640×480 / 320×200 /
+1000×600 — `app/src/test/resources/mjpeg/`, license next to them), drops the
+socket after N frames then resumes the accept loop (R12 drop/restore). Exposes
+`servedFrames`/`acceptedConnections`. No in-memory JPEG generation anymore.
 
-**Tests (`SyntheticMjpegServerTest.kt`, `@GraphicsMode(NATIVE)`):**
+**Tests (`mjpeg/MjpegServerTest.kt`, `@GraphicsMode(NATIVE)`):**
 
 - Correctness: parser honors Content-Length exactly — each returned frame's bytes
-  are byte-identical to a seeded JPEG; ≥2 distinct seeded colors surface (cycle
-  advances). Runs at `@Config(sdk=[TARGET_SDK])` only (see quirk below).
+  are byte-identical to a seeded cat fixture; each fixture decodes at its native
+  size and is multi-color (a real photo, not a solid fill).
+- Cycling: a server seeded with two comparable-size fixtures serves ≥2 distinct
+  frames (the cycle advances past the first frame).
 - Drop/restore: server closes after 4 frames → parser surfaces IOException (drop
   detected) → a fresh `VideoStreamLoader.openStream` (same flow as
   `restartVideoStream`) reconnects and decodes again; `acceptedConnections ≥ 2`.
-- Performance: 30 frames decoded ≥10 within a generous window (CI-flake-safe).
 
 **Robolectric quirk (cost debugging — documented):** under `@GraphicsMode(NATIVE)`,
 `BitmapFactory` decodes correctly on the default SDK (TARGET_SDK 36) but on **API 23
@@ -2135,7 +2137,9 @@ registry; the docs-drift fix in this MEMORY section; DECISIONS.md decision recor
 
 ### [2026-08-12] Campaign 17 execution run (Type 1 HUD theme + settings split)
 
-User-driven UX prototyping session (fully local, no commits/pushes). Started from
+User-driven UX prototyping session (fully local, no commits/pushes at the time —
+subsequently committed 2026-08-14 as part of `c71ac63`, pushed, CI green).
+Started from
 a v0.dev mockup (`components/hud/*` in `.tmp/robot-control-interface.zip`),
 translated to Android as the **Type 1 HUD theme**, plus a **settings split** into
 App settings (appearance/controls/wheel/pads/hardware/magic/about) and
@@ -2232,7 +2236,8 @@ Robot/target settings (host/port/video/network/presets). Timing: ~3.5 h
 
 ### [2026-08-12] Campaign 18 execution run (pad render + layout + compact chip)
 
-Local-only UX follow-up to C17 (no commits/pushes — user rule; auto mode).
+Local-only UX follow-up to C17 (no commits/pushes at the time — user rule;
+subsequently committed 2026-08-14 as part of `c71ac63`, pushed, CI green).
 Goal: fix the "pads barely visible" complaint, then implement the approved pad
 visual + layout plan (~260dp centered pads, mockup chrome/knob, compact chip).
 Timing: ~3.7 h (18:40 → 22:25 local, incl. a cold-boot emulator relaunch).
@@ -2304,9 +2309,12 @@ screenshots — wait for it to dismiss before the proof capture.
 (2) two-layer HUD layout (pads layer + visuals layer); (3) content-fitting glass
 error pill replacing the Material Snackbar + drop the `material` dependency;
 (4) timeout-bound tooling (the ~15 h adb hang); (5) RobotChipController
-extraction; (6) docs pass. Working tree only (no commits ??" session rule).
+extraction; (6) docs pass. Working tree only at the time (no commits — session
+rule); **committed + pushed 2026-08-14/15** (6 commits, `9596f72`..`a52c01d`),
+gate green, CI green. See the "Campaign 19 addendum" + "Campaign 19
+retrospective" sections below for what landed and what was learned.
 
-**What landed (uncommitted):**
+**What landed (uncommitted at the time; since committed as `9596f72`..`a52c01d`):**
 
 - `scripts/run_bounded.py` — process-TREE kill (taskkill /T /F / killpg),
   exit 124 + TIMEOUT marker; `_gradle.call_gradle` + `gate.py` non-gradle steps

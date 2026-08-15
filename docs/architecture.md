@@ -49,7 +49,7 @@ constants in `SettingsFragment`.
   `MagicButtonSymbols` (magic buttons), `HardwareGamepadController`,
   `VideoStreamLoader` (MJPEG HTTP opener), `RawSocketHttpStream` (raw-socket
   HTTP client), `VideoRetryController` (bounded retry),
-  `VideoStreamErrorNotifier` (throttled failure Snackbar), `RobotPresetStore`,
+  `VideoStreamErrorNotifier` (throttled failure notice), `RobotPresetStore`,
   `WheelController`, `SystemUiController`, `MainActivitySettingsController`.
 - `com.trikset.gamepad.mjpeg` — the MJPEG player (vendored origin, renamed
   from `com.demo.mjpeg` in Phase 5): `MjpegView` (SurfaceView + render
@@ -321,10 +321,11 @@ battery). Use the slowest rate that works (`SENSOR_DELAY_NORMAL` = 200 ms,
 ### Edge-to-edge (targetSdk 35+/36)
 
 Enforced — the window draws behind the system bars automatically; you must
-handle insets. `WindowCompat.enableEdgeToEdge` for older devices. The
-options-menu + `onCreateOptionsMenu` pattern is still current; the
-modernization is hosting it in a `MaterialToolbar` rather than the legacy
-ActionBar.
+handle insets. `WindowCompat.enableEdgeToEdge` for older devices. There is **no
+action bar and no options menu** on the gamepad HUD (Campaign 17 removed the
+legacy green action bar + `menu.xml`): the top-left robot chip opens Robot
+settings and the gear button opens App settings directly. `SystemUiController`
+hides the system bars for the immersive gamepad view.
 
 ### Kotlin idioms
 

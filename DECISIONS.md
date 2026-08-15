@@ -59,6 +59,9 @@ ______________________________________________________________________
   the downgrade is verified (gate green, jacoco still measures live
   `built_in_kotlinc` output, instrumented 9/9). Future AGP bumps must re-check
   the Studio↔AGP matrix first (rule: AGENTS.md).
+- **Update (2026-08-14):** Gradle was later bumped 9.5.0 → **9.6.1** (the AS
+  Quail 1 bundled Gradle, `7585873`) — the AGP decision is unchanged, the
+  wrapper is current. Toolchain pair today: **AGP 9.2.1 / Gradle 9.6.1**.
 
 ### [2026-08-12] K2 -Wextra warnings-as-errors
 

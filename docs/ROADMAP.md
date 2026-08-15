@@ -637,7 +637,8 @@ Scope (user-driven, 2026-08-12): translate a v0.dev gamepad mockup into the
 Android HUD as the **Type 1 theme** (glass/arcade), remove the legacy green
 action bar, and split Settings into **App** (appearance/controls/wheel/pads/
 hardware/magic/about) and **Robot/target** (host/port/video/network/presets)
-screens. **Fully local — no commits, no pushes** (working-tree changes only).
+screens. **Fully local — no commits, no pushes** (working-tree changes only;
+since committed 2026-08-14 as part of `c71ac63`, pushed, CI green).
 Decision + rationale: DECISIONS.md "[2026-08-12] Type 1 HUD theme + app/robot
 settings split". Retrospective + quirks: MEMORY.md "Campaign 17 execution run".
 
@@ -667,7 +668,8 @@ settings split". Retrospective + quirks: MEMORY.md "Campaign 17 execution run".
   118 keys); screenshots pixel-census + hash-verified on the Swiftshader
   emulator: `_ui_260812-1840-01_gamepad.png`,
   `_ui_260812-1840-02_app-settings.png`, `_ui_260812-1840-03_robot-settings.png`.
-  **CAMPAIGN 17 COMPLETE** (uncommitted; session rules forbid commits/pushes).
+  **CAMPAIGN 17 COMPLETE** (uncommitted at the time — session rules forbid
+  commits/pushes; committed later in `c71ac63`).
 
 ### Deferred (recorded this session)
 
@@ -683,7 +685,8 @@ settings split". Retrospective + quirks: MEMORY.md "Campaign 17 execution run".
 Scope (user-driven, 2026-08-12): fix the C17 "pads barely visible" rendering
 regression, then land the approved pad visuals + layout (~260dp pads centered in
 their halves, mockup chrome/knob, compact robot-IP chip). **Fully local — no
-commits, no pushes** (working-tree changes only; user rule). Decision +
+commits, no pushes** (working-tree changes only; user rule; since committed
+2026-08-14 as part of `c71ac63`, pushed, CI green). Decision +
 rationale: DECISIONS.md "[2026-08-12] Pad render + layout (C18)". Retrospective +
 quirks: MEMORY.md "Campaign 18 execution run".
 
@@ -710,8 +713,9 @@ quirks: MEMORY.md "Campaign 18 execution run".
   (navigation flattened to a single level by the settings split).
 - **Verification** — canonical gate green; 3-variant `test --rerun-tasks` green;
   instrumented **9/9 on both emulators**; proof screenshots pixel-census +
-  hash-matched: `_ui_260812-2205-01.png`. **CAMPAIGN 18 COMPLETE** (uncommitted;
-  session rules forbid commits/pushes).
+  hash-matched: `_ui_260812-2205-01.png`. **CAMPAIGN 18 COMPLETE** (uncommitted
+  at the time — session rules forbid commits/pushes; committed later in
+  `c71ac63`).
 
 ## Deferred — drop AppCompat (re-evaluate later)
 
@@ -744,17 +748,20 @@ framework `AlertDialog`, `ActionBar` handling → framework equivalent,
 `Theme.AppCompat.*` → framework `Theme.Material`/`DeviceDefault` day-night
 parents. Keep `androidx.core`/`lifecycle`/`activity` (not appcompat).
 
-## Campaign 19 — HUD error pill, two-layer layout, timeout tooling (in progress 2026-08-14)
+## Campaign 19 — HUD error pill, two-layer layout, timeout tooling (2026-08-14)
 
 Scope (user-driven, 2026-08-14): bullet-proof symbol glyphs via a bundled mono
 font subset; two-layer HUD layout (pads layer + visuals layer); a
 content-fitting glass error pill replacing the Material Snackbar + the
 `material` dependency drop; timeout-bound tooling (process-tree kill) after a
-~15 h `adb install` hang; `RobotChipController` extraction. **Fully local — no
-commits** (session rules). Decisions + rationale: DECISIONS.md "[2026-08-14]
-HUD error pill …", "Timeout-bound tooling", "Drop the material dependency",
-"RobotChipController extraction", "Delete stale untracked layout-v26".
-Retrospective + quirks: MEMORY.md "Campaign 19 execution run".
+~15 h `adb install` hang; `RobotChipController` extraction; video renderer
+smart-fit; CC0 test fixtures + theme screenshots. Decisions + rationale:
+DECISIONS.md "[2026-08-14] HUD error pill …", "Timeout-bound tooling", "Drop
+the material dependency", "RobotChipController extraction", "Delete stale
+untracked layout-v26", "Video smart-fit", "CC0 test images + theme screenshot
+test". Retrospective + quirks: MEMORY.md "Campaign 19 execution run" +
+"Campaign 19 addendum" + "Campaign 19 retrospective". **Committed + pushed
+2026-08-14/15** (6 commits, `9596f72`..`a52c01d`), CI green.
 
 | Estimated | Actual |
 |-----------|--------|
@@ -783,7 +790,7 @@ Retrospective + quirks: MEMORY.md "Campaign 19 execution run".
   consolidated `mjpeg/MjpegServerTest`; new `HudThemeTest` renders the real HUD
   over the cat frame for each connection state and writes `hud_*.png` to the
   always-on `screenshots.dir` build output. Video-test refactor committed on its
-  own (9803bb5) during an otherwise working-tree-only session.
-- **Open:** material-drop + layout + smart-fit still need an instrumented
-  re-verify (`connectedDebugAndroidTest --no-configuration-cache`); the 4 theme
-  screenshots are the layout/video proof for now; `.PLAN.md` "Campaign 19".
+  own (9803bb5); the rest rode with the HUD commit (`c71ac63`).
+- **CAMPAIGN 19 COMPLETE** — instrumented re-verify covered by the CI emulator
+  job (API 36, green); the 4 theme screenshots are the layout/video proof;
+  `.PLAN.md` trimmed to the remaining deferred items.
