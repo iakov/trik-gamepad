@@ -847,11 +847,12 @@ Root cause: on the phone (landscape) the top-left chip sits inside the top
 not the app — a real on-device UX defect the emulator cannot reproduce. Fix the
 UI, keep the discovered test as the pass criterion. Decision + rationale:
 DECISIONS.md "Inset-aware HUD container"; findings: MEMORY.md "Campaign 21
-execution run". **Committed + pushed 2026-08-15** (CI green).
+execution run". **Committed + pushed 2026-08-15** (CI green: build + gate suite
+and instrumented API 36).
 
 | Estimated | Actual |
 |-----------|--------|
-| — | (fill in elapsed at push) |
+| — | 2 h 50 m (14:26 → 17:16 +03:00; CI green) |
 
 - **Inset-aware HUD container** — the three edge-pinned controls (chip, gear,
   magic buttons) moved into a full-screen `@+id/hudControls` RelativeLayout,
