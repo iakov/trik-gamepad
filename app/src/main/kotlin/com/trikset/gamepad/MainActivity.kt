@@ -17,7 +17,9 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -120,6 +122,23 @@ class MainActivity :
     WindowCompat.setDecorFitsSystemWindows(window, false)
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
+    // Pad the edge-pinned HUD controls (chip, gear, magic buttons) by the window insets so they
+    // clear the system chrome: the status-bar/shade strip, the display cutout and the
+    // gesture-nav zones. The video stays full-bleed (it is a sibling below hudControls). On a
+    // physical phone the chip previously sat inside the top shade strip, which swallowed its taps
+    // (see DECISIONS.md "Inset-aware HUD container"). Robolectric dispatches no insets, so the
+    // container padding stays 0 there and the layout is unchanged for unit tests.
+    ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.hudControls)) { view, insets ->
+      val systemInsets =
+          insets.getInsets(
+              WindowInsetsCompat.Type.systemBars() or
+                  WindowInsetsCompat.Type.displayCutout() or
+                  WindowInsetsCompat.Type.systemGestures() or
+                  WindowInsetsCompat.Type.mandatorySystemGestures()
+          )
+      view.setPadding(systemInsets.left, systemInsets.top, systemInsets.right, systemInsets.bottom)
+      insets
+    }
     systemUiController.setVisibility(false)
     connectionFeedback.attach()
     // No action bar on the gamepad HUD: it was the old green IP bar. The IP now lives in the

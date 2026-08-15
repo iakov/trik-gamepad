@@ -90,109 +90,124 @@
         </FrameLayout>
     </LinearLayout>
 
-    <!-- Robot-target chip (top-left): shows the configured host (or the video stream's host in
-         video-only mode, or a filler when neither is set) flanked by two connection-status glyphs:
-         the move-cross (start) reports the CONTROL connection, the eye (end) reports the VIDEO
-         connection. Each glyph is tinted to its own state color at runtime (green/amber/sepia/red
-         for control, green/amber/red/gray for video — see VideoStatus). The host text is neutral
-         white; the glyphs carry the color ("color is never the only signal", DESIGN.md). The chip
-         is one tappable action that opens the robot/target settings; its dynamic contentDescription
-         announces both connection states. The host text is deliberately NOT selectable
-         (tools:ignore): it is an action, so long-press selection would fight the tap. -->
-    <LinearLayout
-        android:id="@+id/targetChip"
-        style="@style/Hud.Chip"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentStart="true"
-        android:layout_alignParentTop="true"
-        android:layout_margin="@dimen/hud_half_glyph"
-        android:clickable="true"
-        android:contentDescription="@string/target_chip_description"
-        android:focusable="true"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
+    <!-- HUD controls container (edge-to-edge interactive layer): wraps the edge-pinned controls
+         (robot chip, gear, magic buttons) so their padding can be driven by the window insets
+         (status-bar / shade strip, display cutout, system-gesture nav zones) at runtime. Without
+         this the edge-pinned controls sit inside those OS strips, which swallow touches on
+         physical devices (a Samsung status-bar/shade strip ate the chip's tap — see DECISIONS.md
+         "Inset-aware HUD container"). RelativeLayout applies its padding before alignParent* rules,
+         so the child align relations below (buttons→btnSettings→targetChip) are unaffected. The
+         container is a sibling above the pads layer (z-order preserved) and below the center
+         pills; the video stays full-bleed under everything. -->
+    <RelativeLayout
+        android:id="@+id/hudControls"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent">
 
-        <!-- Control status badge: the move-cross glyph, tinted to the control connection accent
-             (set at runtime by MainActivity.applyHudTone). -->
-        <FrameLayout
-            android:layout_width="@dimen/hud_status_badge_size"
-            android:layout_height="@dimen/hud_status_badge_size"
-            android:background="@drawable/hud_status_badge">
-
-            <ImageView
-                android:layout_width="@dimen/hud_status_glyph_size"
-                android:layout_height="@dimen/hud_status_glyph_size"
-                android:layout_gravity="center"
-                android:importantForAccessibility="no"
-                android:src="@drawable/hud_pad_glyph_move"
-                android:tag="controlStatusIcon" />
-        </FrameLayout>
-
-        <TextView
-            android:id="@+id/targetChipText"
+        <!-- Robot-target chip (top-left): shows the configured host (or the video stream's host in
+             video-only mode, or a filler when neither is set) flanked by two connection-status glyphs:
+             the move-cross (start) reports the CONTROL connection, the eye (end) reports the VIDEO
+             connection. Each glyph is tinted to its own state color at runtime (green/amber/sepia/red
+             for control, green/amber/red/gray for video — see VideoStatus). The host text is neutral
+             white; the glyphs carry the color ("color is never the only signal", DESIGN.md). The chip
+             is one tappable action that opens the robot/target settings; its dynamic contentDescription
+             announces both connection states. The host text is deliberately NOT selectable
+             (tools:ignore): it is an action, so long-press selection would fight the tap. -->
+        <LinearLayout
+            android:id="@+id/targetChip"
+            style="@style/Hud.Chip"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="@dimen/hud_chip_badge_gap"
-            android:maxLines="1"
-            android:textColor="@color/white"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            tools:ignore="SelectableText" />
+            android:layout_alignParentStart="true"
+            android:layout_alignParentTop="true"
+            android:layout_margin="@dimen/hud_half_glyph"
+            android:clickable="true"
+            android:contentDescription="@string/target_chip_description"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <!-- Video status badge: the eye glyph, tinted to the video connection state color (set at
-             runtime by MainActivity.applyVideoStatusIcon). -->
-        <FrameLayout
-            android:layout_width="@dimen/hud_status_badge_size"
-            android:layout_height="@dimen/hud_status_badge_size"
-            android:layout_marginStart="@dimen/hud_chip_badge_gap"
-            android:background="@drawable/hud_status_badge">
+            <!-- Control status badge: the move-cross glyph, tinted to the control connection accent
+                 (set at runtime by MainActivity.applyHudTone). -->
+            <FrameLayout
+                android:layout_width="@dimen/hud_status_badge_size"
+                android:layout_height="@dimen/hud_status_badge_size"
+                android:background="@drawable/hud_status_badge">
 
-            <ImageView
-                android:layout_width="@dimen/hud_status_glyph_size"
-                android:layout_height="@dimen/hud_status_glyph_size"
-                android:layout_gravity="center"
-                android:importantForAccessibility="no"
-                android:src="@drawable/hud_pad_glyph_look"
-                android:tag="videoStatusIcon" />
-        </FrameLayout>
+                <ImageView
+                    android:layout_width="@dimen/hud_status_glyph_size"
+                    android:layout_height="@dimen/hud_status_glyph_size"
+                    android:layout_gravity="center"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/hud_pad_glyph_move"
+                    android:tag="controlStatusIcon" />
+            </FrameLayout>
 
-    </LinearLayout>
+            <TextView
+                android:id="@+id/targetChipText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/hud_chip_badge_gap"
+                android:maxLines="1"
+                android:textColor="@color/white"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                tools:ignore="SelectableText" />
 
-    <Button
-        android:id="@+id/btnSettings"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignStart="@+id/targetChip"
-        android:layout_alignParentBottom="true"
-        android:layout_marginStart="@dimen/hud_half_glyph"
-        android:layout_marginBottom="@dimen/hud_half_glyph"
-        android:background="@drawable/btn_settings"
-        android:contentDescription="@string/settings_button_description"
-        android:focusableInTouchMode="false"
-        android:gravity="center"
-        android:minWidth="@dimen/touch_target_min"
-        android:minHeight="@dimen/touch_target_min"
-        android:padding="0dp"
-        android:text="@string/settings_gear_glyph"
-        android:textColor="@color/greenlight"
-        android:textSize="22sp" />
+            <!-- Video status badge: the eye glyph, tinted to the video connection state color (set at
+                 runtime by MainActivity.applyVideoStatusIcon). -->
+            <FrameLayout
+                android:layout_width="@dimen/hud_status_badge_size"
+                android:layout_height="@dimen/hud_status_badge_size"
+                android:layout_marginStart="@dimen/hud_chip_badge_gap"
+                android:background="@drawable/hud_status_badge">
 
-    <LinearLayout
-        android:id="@+id/buttons"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignBottom="@+id/btnSettings"
-        android:layout_centerHorizontal="true"
-        android:gravity="center"
-        android:minHeight="@dimen/touch_target_min"
-        android:orientation="horizontal"
-        android:background="@drawable/hud_action_cluster"
-        android:paddingTop="6dp"
-        android:paddingBottom="6dp"
-        >
+                <ImageView
+                    android:layout_width="@dimen/hud_status_glyph_size"
+                    android:layout_height="@dimen/hud_status_glyph_size"
+                    android:layout_gravity="center"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/hud_pad_glyph_look"
+                    android:tag="videoStatusIcon" />
+            </FrameLayout>
 
-    </LinearLayout>
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btnSettings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignStart="@+id/targetChip"
+            android:layout_alignParentBottom="true"
+            android:layout_marginStart="@dimen/hud_half_glyph"
+            android:layout_marginBottom="@dimen/hud_half_glyph"
+            android:background="@drawable/btn_settings"
+            android:contentDescription="@string/settings_button_description"
+            android:focusableInTouchMode="false"
+            android:gravity="center"
+            android:minWidth="@dimen/touch_target_min"
+            android:minHeight="@dimen/touch_target_min"
+            android:padding="0dp"
+            android:text="@string/settings_gear_glyph"
+            android:textColor="@color/greenlight"
+            android:textSize="22sp" />
+
+        <LinearLayout
+            android:id="@+id/buttons"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignBottom="@+id/btnSettings"
+            android:layout_centerHorizontal="true"
+            android:gravity="center"
+            android:minHeight="@dimen/touch_target_min"
+            android:orientation="horizontal"
+            android:background="@drawable/hud_action_cluster"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            >
+
+        </LinearLayout>
+    </RelativeLayout>
 
     <!-- Kept as the LAST children of main (defensive convention): child order is the z-order, so
          the pads layer (controlsOverlay) is declared before the visuals and the visuals before

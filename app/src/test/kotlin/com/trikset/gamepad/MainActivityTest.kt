@@ -488,6 +488,33 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun hudControlsPaddingShouldFollowWindowInsets() {
+    val hudControls = activity.findViewById<View>(R.id.hudControls)
+    assertNotNull(hudControls)
+
+    // Dispatch a known insets frame; the container must adopt it per edge (the chips clear the
+    // status-bar/shade strip, the cutout and the gesture-nav zones on real devices). Robolectric
+    // may have already dispatched a simulated status-bar inset during activity setup (the minSdk
+    // qualifier does), so assert the effect of THIS dispatch, not an initial zero. The compat
+    // WindowInsetsCompat API is Robolectric-mocked on all SDK qualifiers (the raw platform
+    // WindowInsets.Type is not on API 23).
+    val frame =
+        androidx.core.view.WindowInsetsCompat.Builder()
+            .setInsets(
+                androidx.core.view.WindowInsetsCompat.Type.systemBars(),
+                androidx.core.graphics.Insets.of(1, 2, 3, 4),
+            )
+            .build()
+            .toWindowInsets()
+    assertNotNull(frame)
+    hudControls.dispatchApplyWindowInsets(frame!!)
+    assertEquals(1, hudControls.paddingLeft)
+    assertEquals(2, hudControls.paddingTop)
+    assertEquals(3, hudControls.paddingRight)
+    assertEquals(4, hudControls.paddingBottom)
+  }
+
+  @Test
   fun onDestroyShouldNullOutListeners() {
     method(activity, "onDestroy").invoke(activity)
     // No crash; all listeners nulled and pads cleared.
