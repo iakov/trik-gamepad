@@ -105,7 +105,7 @@ class SenderServiceAdvancedTest : RobolectricTestBase() {
     TestTcpServer().use { server ->
       val client = SenderService(mExecutor)
       client.setTarget("localhost", server.port)
-      client.setKeepaliveTimeout(timeout)
+      client.keepaliveTimeout = timeout
       client.send("bootstrap")
       mExecutor.runAll()
       shadowOf(getMainLooper()).idle()
@@ -207,11 +207,11 @@ class SenderServiceAdvancedTest : RobolectricTestBase() {
   @Test
   fun keepaliveTimeoutBelowMinimumIsStoredUnchanged() {
     val client = SenderService(mExecutor)
-    val before = client.getKeepaliveTimeout()
+    val before = client.keepaliveTimeout
     // The service does not clamp; the caller (MainActivity) enforces the
     // minimum. This just verifies the setter round-trips.
-    client.setKeepaliveTimeout(12345)
-    assertEquals(12345, client.getKeepaliveTimeout())
-    client.setKeepaliveTimeout(before)
+    client.keepaliveTimeout = 12345
+    assertEquals(12345, client.keepaliveTimeout)
+    client.keepaliveTimeout = before
   }
 }

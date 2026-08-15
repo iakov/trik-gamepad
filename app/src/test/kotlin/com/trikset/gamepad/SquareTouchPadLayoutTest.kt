@@ -44,14 +44,14 @@ class SquareTouchPadLayoutTest : RobolectricTestBase() {
   @Before
   fun setUp() {
     sender = SenderService(mExecutor)
-    sender.setKeepaliveTimeout(10000000) // disable keepalive noise
+    sender.keepaliveTimeout = 10000000 // disable keepalive noise
     sender.setTarget("localhost", 12345) // connect attempt is queued, not awaited
 
     val context = org.robolectric.RuntimeEnvironment.getApplication()
     val parent = android.widget.FrameLayout(context)
     pad = SquareTouchPadLayout(context)
-    pad.setPadName("pad 1")
-    pad.setSender(sender)
+    pad.padName = "pad 1"
+    pad.sender = sender
     parent.addView(pad)
     measureAndLayout(200, 200)
     parent.measure(
@@ -75,7 +75,7 @@ class SquareTouchPadLayoutTest : RobolectricTestBase() {
     // Drain any leaked keepalive task that a prior test's connected client may
     // have queued into the shared static executor before asserting.
     val queuedBefore = mExecutor.runAll()
-    pad.setSender(null)
+    pad.sender = null
     pad.send("up")
     // Nothing should be queued when there is no sender wired up.
     assertEquals(queuedBefore, mExecutor.runAll())
@@ -108,7 +108,7 @@ class SquareTouchPadLayoutTest : RobolectricTestBase() {
 
   @Test
   fun padNameShouldRoundTrip() {
-    assertEquals("pad 1", pad.getPadName())
+    assertEquals("pad 1", pad.padName)
   }
 
   @Test

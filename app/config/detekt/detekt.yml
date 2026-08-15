@@ -60,3 +60,15 @@ style:
   LoopWithTooManyJumpStatements:
     # Parser loops break on both "stream end" and "sequence found".
     maxJumpCount: 2
+  # Campaign 20 (Java→Kotlin idiom pass): syntax-only rules that flag Java-conversion
+  # leftovers and need no type resolution (type-resolution rules like
+  # CanBeNonNullable/UseDataClass are gated on the detekt 2.0 bump — see .PLAN.md).
+  ExpressionBodySyntax:
+    active: true
+    # `fun x(): T { return v }` -> `fun x() = v` (Java's `return` habit).
+  UseIfInsteadOfWhen:
+    active: true
+    # A `when` over two boolean outcomes is an `if` (Kotlin convention).
+  UseLet:
+    active: true
+    # `if (x != null) { ... } else null` -> `x?.let { ... }`.

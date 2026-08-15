@@ -72,12 +72,12 @@ class MjpegViewTest : RobolectricTestBase() {
   @Test
   fun isPlayingShouldReflectPlaybackState() {
     val view = MjpegView(RuntimeEnvironment.getApplication())
-    assertFalse(view.isPlaying())
+    assertFalse(view.isPlaying)
     view.setSource(MjpegInputStream(ByteArrayInputStream(ByteArray(0))))
     view.startPlayback()
-    assertTrue(view.isPlaying())
+    assertTrue(view.isPlaying)
     view.stopPlayback()
-    assertFalse(view.isPlaying())
+    assertFalse(view.isPlaying)
   }
 
   @Test
@@ -146,7 +146,7 @@ class MjpegViewTest : RobolectricTestBase() {
         Thread.sleep(100)
         view.setSource(null)
         view.stopPlayback()
-        assertFalse(view.isPlaying())
+        assertFalse(view.isPlaying)
       } finally {
         client.close()
       }

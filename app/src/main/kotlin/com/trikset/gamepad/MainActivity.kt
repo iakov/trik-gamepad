@@ -35,20 +35,22 @@ import kotlinx.coroutines.launch
 class MainActivity :
     AppCompatActivity(), SensorEventListener, MainActivitySettingsController.SettingsUi {
 
-  private var mSensorManager: SensorManager? = null
-  private var mAngle = 0 // -100% .. +100%
-  private var mWheelEnabled = false
-  private var mWheelStep = WHEEL_STEP_DEFAULT
-  private var mVideo: MjpegView? = null
-  private var mVideoURL: URL? = null
-  private var mSettingsController: MainActivitySettingsController? = null
+  private var sensorManager: SensorManager? = null
+  private var angle = 0 // -100% .. +100%
+  override var wheelEnabled: Boolean = false
+  override var wheelStep: Int = WHEEL_STEP_DEFAULT
+  private var video: MjpegView? = null
+  private var videoUrl: URL? = null
+  var settingsController: MainActivitySettingsController? = null
+    private set
+
   private var videoRetryController: VideoRetryController? = null
   // Base pad/button opacity from the "Arrows transparency" setting (1f until the first apply);
   // applyHudTone multiplies it by the connection-state dim factor so the two never fight.
   private var padsAlphaBase = 1f
   private val senderViewModel: SenderViewModel by viewModels()
   private val wheelController = WheelController()
-  private val magicButtons = MagicButtonPanel(this) { getSenderService().send(it) }
+  private val magicButtons = MagicButtonPanel(this) { senderService.send(it) }
   // Lazy: `window` is only assigned during Activity.attach(), which runs after
   // construction — a field initializer touching it would NPE/throw in Robolectric.
   private val systemUiController: SystemUiController by lazy {
@@ -66,10 +68,10 @@ class MainActivity :
         rootViewProvider = { findViewById(R.id.main) },
         statusTextProvider = { findViewById(R.id.connectionStatus) },
         targetProvider = {
-          val sender = getSenderService()
-          sender.getHostAddr()?.let { host -> "$host:${sender.getHostPort()}" }
+          val sender = senderService
+          sender.hostAddr?.let { host -> "$host:${sender.hostPort}" }
         },
-        connectAction = { getSenderService().connect() },
+        connectAction = { senderService.connect() },
     )
   }
   private val connectionIndicator = ConnectionIndicator()
@@ -87,7 +89,7 @@ class MainActivity :
   }
   private val hardwareGamepadController: HardwareGamepadController by lazy {
     HardwareGamepadController(
-        send = { getSenderService().send(it) },
+        send = { senderService.send(it) },
         settings = {
           val prefs = PreferenceManager.getDefaultSharedPreferences(this)
           HardwareGamepadController.Settings(
@@ -102,8 +104,8 @@ class MainActivity :
   private fun createPad(id: Int, strId: String) {
     val pad = findViewById<SquareTouchPadLayout>(id)
     if (pad != null) {
-      pad.setPadName("pad $strId")
-      pad.setSender(getSenderService())
+      pad.padName = "pad $strId"
+      pad.sender = senderService
     }
   }
 
@@ -124,18 +126,17 @@ class MainActivity :
     // tappable top-left chip; the gear opens Settings directly (see below).
     supportActionBar?.hide()
 
-    mSensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
-    mVideo = findViewById(R.id.video)
+    video = findViewById(R.id.video)
 
-    getSenderService().setShowTextCallback { message ->
+    senderService.setShowTextCallback { message ->
       // The gear border is the persistent status; surface only connection *errors* as feedback,
       // using a Snackbar (Material) instead of a transient Toast.
       if (message.endsWith(ERROR_SUFFIX)) {
         runOnUiThread { connectionFeedback.error(message) }
       }
     }
-
     val btnSettings = findViewById<Button>(R.id.btnSettings)
     if (btnSettings != null) {
       btnSettings.setOnClickListener {
@@ -158,9 +159,8 @@ class MainActivity :
     createPad(R.id.leftPad, "1")
     createPad(R.id.rightPad, "2")
 
-    mSettingsController = MainActivitySettingsController(this, getSenderService(), this)
-    mSettingsController?.register()
-
+    settingsController = MainActivitySettingsController(this, senderService, this)
+    settingsController?.register()
     // Bounded video-stream retry, gated on the control connection's keepalive (connectionState is
     // Connected == the same robot is reachable). The gate relaxes for an empty host: a video-only
     // device (no control target) must still auto-recover its stream, so retries run on the URL +
@@ -228,11 +228,11 @@ class MainActivity :
       hardwareGamepadController.onMotionEvent(event) || super.onGenericMotionEvent(event)
 
   override fun onPause() {
-    mSensorManager?.unregisterListener(this)
-    getSenderService().disconnect(ConnectionState.PAUSE_DISCONNECT_REASON)
+    sensorManager?.unregisterListener(this)
+    senderService.disconnect(ConnectionState.PAUSE_DISCONNECT_REASON)
     videoRetryController?.onPause()
     setVideoLoading(false)
-    val video = mVideo
+    val video = video
     if (video != null) {
       video.stopPlayback()
       video.setOnStreamErrorListener(null)
@@ -244,7 +244,7 @@ class MainActivity :
   override fun onResume() {
     super.onResume()
     videoRetryController?.onResume()
-    val video = mVideo
+    val video = video
     if (video != null) {
       // Reconnect-on-error: the render thread reports a dead stream and we
       // drop the HTTP connection and restart it (R12; see DECISIONS.md
@@ -263,7 +263,7 @@ class MainActivity :
       }
       restartVideoStream()
     }
-    val sensorManager = mSensorManager
+    val sensorManager = sensorManager
     if (sensorManager != null) {
       sensorManager.registerListener(
           this,
@@ -279,25 +279,25 @@ class MainActivity :
    * (no control target) still needs its stream to auto-recover.
    */
   private fun shouldReloadVideo(): Boolean {
-    val hostConfigured = !getSenderService().getHostAddr().isNullOrBlank()
+    val hostConfigured = !senderService.hostAddr.isNullOrBlank()
     return (!hostConfigured ||
         senderViewModel.connectionState.value is ConnectionState.Connected) &&
-        mVideoURL != null &&
-        mVideo?.isPlaying() == false
+        videoUrl != null &&
+        video?.isPlaying == false
   }
 
   private fun restartVideoStream() {
     // The error listener may fire from the render thread; always hop to the
     // main thread before touching the view hierarchy / opening the stream.
     runOnUiThread {
-      val video = mVideo ?: return@runOnUiThread
+      val video = video ?: return@runOnUiThread
       // A reload of a stream that WAS playing is a reconnect; a first load is not. The badge
       // distinguishes the two (both share the loading spinner).
-      val wasPlaying = video.isPlaying()
+      val wasPlaying = video.isPlaying
       // Show the loading indicator only while a URL is configured AND the control connection is
       // up (no spinner when disconnected / no stream URL); it stays up until the first frame
       // renders (robot video disabled -> keeps cycling).
-      if (mVideoURL != null && senderViewModel.connectionState.value is ConnectionState.Connected) {
+      if (videoUrl != null && senderViewModel.connectionState.value is ConnectionState.Connected) {
         // A reload of a stream that WAS playing is a reconnect: show the "Video reconnecting…"
         // badge alongside the spinner. A first load is not a reconnect.
         setVideoLoading(true, reconnecting = wasPlaying)
@@ -305,7 +305,7 @@ class MainActivity :
       // Feed the load outcome back into the retry controller: a failed open arms the bounded
       // retry loop, a success disarms it. A failure also surfaces a throttled "video stream
       // unavailable" Snackbar (once per failure episode, not per 5 s retry tick).
-      VideoStreamLoader(video).load(mVideoURL) { ok ->
+      VideoStreamLoader(video).load(videoUrl) { ok ->
         if (ok) {
           videoRetryController?.onLoadSuccess()
         } else {
@@ -341,9 +341,9 @@ class MainActivity :
 
   private fun processSensor(values: FloatArray) {
     val angle =
-        wheelController.nextAngle(values[0], values[1], mAngle, mWheelStep, mWheelEnabled) ?: return
-    mAngle = angle
-    getSenderService().send("wheel $mAngle")
+        wheelController.nextAngle(values[0], values[1], angle, wheelStep, wheelEnabled) ?: return
+    this.angle = angle
+    senderService.send("wheel $angle")
   }
 
   override fun setTargetChip(host: String) {
@@ -363,7 +363,7 @@ class MainActivity :
   }
 
   override fun setVideoUrl(url: URL?) {
-    mVideoURL = url
+    videoUrl = url
     // No URL -> show a hint instead of a silent black area. The placeholder stays hidden while a
     // URL is configured, even if the stream is down (the loading spinner + gear border convey that
     // state).
@@ -419,25 +419,14 @@ class MainActivity :
   }
 
   override fun setShowFps(enabled: Boolean) {
-    mVideo?.showFps = enabled
+    video?.showFps = enabled
   }
 
-  override fun getWheelStep(): Int = mWheelStep
+  val senderService: SenderService
+    get() = senderViewModel.sender
 
-  override fun setWheelStep(step: Int) {
-    mWheelStep = step
-  }
-
-  override fun isWheelEnabled(): Boolean = mWheelEnabled
-
-  override fun setWheelEnabled(enabled: Boolean) {
-    mWheelEnabled = enabled
-  }
-
-  fun getSenderService(): SenderService = senderViewModel.sender
-
-  fun getSettingsController(): MainActivitySettingsController? = mSettingsController
-
+  // A method (not a property setter) because it accepts null as a safe no-op: injecting a null
+  // sender must keep the existing one (asserted by setSenderServiceWithNullShouldBeSafe).
   fun setSenderService(sender: SenderService?) {
     if (sender != null) {
       senderViewModel.sender = sender
@@ -445,14 +434,14 @@ class MainActivity :
   }
 
   override fun onDestroy() {
-    mSensorManager?.unregisterListener(this)
+    sensorManager?.unregisterListener(this)
     setVideoLoading(false)
-    val video = mVideo
+    val video = video
     if (video != null) {
       video.stopPlayback()
       video.setOnStreamErrorListener(null)
       video.setOnFirstFrameListener(null)
-      mVideo = null
+      this.video = null
     }
     systemUiController.detach()
     val buttonsView = findViewById<ViewGroup>(R.id.buttons)
@@ -460,11 +449,11 @@ class MainActivity :
       magicButtons.clearListeners(buttonsView)
     }
     findViewById<Button>(R.id.btnSettings)?.setOnClickListener(null)
-    findViewById<SquareTouchPadLayout>(R.id.leftPad)?.setSender(null)
-    findViewById<SquareTouchPadLayout>(R.id.rightPad)?.setSender(null)
-    mSettingsController?.unregister()
-    mSettingsController = null
-    getSenderService().setShowTextCallback(null)
+    findViewById<SquareTouchPadLayout>(R.id.leftPad)?.sender = null
+    findViewById<SquareTouchPadLayout>(R.id.rightPad)?.sender = null
+    settingsController?.unregister()
+    settingsController = null
+    senderService.setShowTextCallback(null)
     super.onDestroy()
   }
 

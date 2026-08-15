@@ -20,8 +20,8 @@ class SquareTouchPadLayout : RelativeLayout {
   private val paint = Paint()
   private var absX = 0f
   private var absY = 0f
-  private var padName: String? = null
-  private var sender: SenderService? = null
+  var padName: String? = null
+  var sender: SenderService? = null
   private var maxX = 0f
   private var maxY = 0f
   private val touchPadController = TouchPadController()
@@ -40,14 +40,6 @@ class SquareTouchPadLayout : RelativeLayout {
       defStyle: Int,
   ) : super(context, attrs, defStyle) {
     init()
-  }
-
-  // public (not internal) so Java callers (MainActivity, the Java tests) can
-  // reach them — Kotlin mangles internal member names on the JVM.
-  fun getPadName(): String? = padName
-
-  fun setPadName(padName: String?) {
-    this.padName = padName
   }
 
   private fun init() {
@@ -243,10 +235,6 @@ class SquareTouchPadLayout : RelativeLayout {
     absX = x
     absY = y
     invalidate()
-  }
-
-  fun setSender(sender: SenderService?) {
-    this.sender = sender
   }
 
   // internal so the inner TouchPadListener reaches it without a synthetic

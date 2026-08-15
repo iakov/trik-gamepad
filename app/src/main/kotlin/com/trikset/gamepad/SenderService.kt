@@ -42,19 +42,32 @@ class SenderService(
 
   private val syncFlag = Any()
   private var executor: Executor = executor
-  private var keepaliveTimeout: Int = initialKeepaliveTimeout
-  private var mConnectTask: Runnable? = null
+  var keepaliveTimeout: Int = initialKeepaliveTimeout
+    set(value) {
+      if (value != field) {
+        field = value
+        keepAliveTimer.restart()
+      }
+    }
+
+  private var connectTask: Runnable? = null
   // internal (not private) so ConnectRunnable / KeepAliveTimer can reach them.
   internal val mainHandler = Handler(Looper.getMainLooper())
   internal var showTextCallback: OnEventListener<String>? = null
   internal var onDisconnectedListener: OnEventListener<String>? = null
-  internal var mOut: PrintWriter? = null
-  private var mHostAddr: String? = null
-  private var mHostPort = 0
+  internal var out: PrintWriter? = null
+  var hostAddr: String? = null
+    private set
+
+  var hostPort: Int = 0
+    private set
+
   private val keepAliveTimer = KeepAliveTimer(this, keepAliveScheduler)
   private val _connectionState = MutableStateFlow<ConnectionState>(ConnectionState.Disconnected(""))
   val connectionState: StateFlow<ConnectionState> = _connectionState.asStateFlow()
 
+  // Listener-registration setters (Android style, like setOnClickListener): Kotlin does not
+  // SAM-convert a lambda assigned to a fun-interface *property*, so these stay methods.
   fun setShowTextCallback(showTextCallback: OnEventListener<String>?) {
     this.showTextCallback = showTextCallback
   }
@@ -65,12 +78,12 @@ class SenderService(
 
   private fun connectAsync() {
     synchronized(syncFlag) {
-      if (mConnectTask != null) {
+      if (connectTask != null) {
         return
       }
       _connectionState.value = ConnectionState.Connecting
       val task = ConnectRunnable(this)
-      mConnectTask = task
+      connectTask = task
       executor.execute(task)
     }
   }
@@ -80,9 +93,9 @@ class SenderService(
   internal fun connectToTRIK() {
     synchronized(syncFlag) {
       try {
-        AppLog.i(TCP_TAG, "Connecting to $mHostAddr:$mHostPort")
+        AppLog.i(TCP_TAG, "Connecting to $hostAddr:$hostPort")
         val socket = Socket()
-        socket.connect(InetSocketAddress(mHostAddr, mHostPort), TIMEOUT)
+        socket.connect(InetSocketAddress(hostAddr, hostPort), TIMEOUT)
         socket.tcpNoDelay = true
         socket.keepAlive = true
         socket.setSoLinger(true, 0)
@@ -92,7 +105,7 @@ class SenderService(
         val osw = OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8)
         keepAliveTimer.restart()
         try {
-          mOut = PrintWriter(osw, true)
+          out = PrintWriter(osw, true)
           _connectionState.value = ConnectionState.Connected
         } catch (e: Exception) {
           AppLog.e(TCP_TAG, "GetStream: Error", e)
@@ -114,18 +127,18 @@ class SenderService(
 
   internal fun onConnectionFinished() {
     showTextCallback?.onEvent(
-        "Connection to $mHostAddr:$mHostPort" + if (mOut != null) " established." else " error."
+        "Connection to $hostAddr:$hostPort" + if (out != null) " established." else " error."
     )
-    mConnectTask = null
+    connectTask = null
   }
 
   internal fun postCommand(command: String) {
     executor.execute {
       synchronized(syncFlag) {
-        mOut?.println(command)
+        out?.println(command)
       }
       mainHandler.post {
-        val out = mOut
+        val out = out
         if (out == null || out.checkError()) {
           AppLog.e(TCP_TAG, "NotSent: $command")
           disconnect("Send failed.")
@@ -136,22 +149,18 @@ class SenderService(
 
   fun disconnect(reason: String) {
     keepAliveTimer.stop()
-    val out = mOut
+    val out = out
     if (out != null) {
       out.close()
-      mOut = null
+      this.out = null
       AppLog.i(TCP_TAG, "Disconnected.")
       onDisconnectedListener?.onEvent(reason)
       _connectionState.value = ConnectionState.Disconnected(reason)
     }
   }
 
-  fun getHostAddr(): String? = mHostAddr
-
-  fun getHostPort(): Int = mHostPort
-
   fun send(command: String) {
-    if (mOut == null) {
+    if (out == null) {
       connectAsync() // synchronized on the same object as postCommand
     }
     AppLog.d(TCP_TAG, "Sending '$command'")
@@ -165,27 +174,18 @@ class SenderService(
    * is nothing to connect to).
    */
   fun connect() {
-    if (mOut == null && !mHostAddr.isNullOrBlank()) {
+    if (out == null && !hostAddr.isNullOrBlank()) {
       connectAsync()
     }
   }
 
   fun setTarget(hostAddr: String, hostPort: Int) {
-    if (!hostAddr.equals(mHostAddr, ignoreCase = true) || mHostPort != hostPort) {
+    if (!hostAddr.equals(this.hostAddr, ignoreCase = true) || this.hostPort != hostPort) {
       disconnect("Target changed.")
     }
-    mHostAddr = hostAddr
-    mHostPort = hostPort
+    this.hostAddr = hostAddr
+    this.hostPort = hostPort
   }
-
-  fun setKeepaliveTimeout(timeout: Int) {
-    if (timeout != keepaliveTimeout) {
-      keepaliveTimeout = timeout
-      keepAliveTimer.restart()
-    }
-  }
-
-  fun getKeepaliveTimeout(): Int = keepaliveTimeout
 
   companion object {
     const val DEFAULT_KEEPALIVE = 5000

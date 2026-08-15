@@ -44,7 +44,7 @@ class SenderServiceTest : RobolectricTestBase() {
     TestTcpServer().use { server ->
       client = SenderService(mExecutor)
       client!!.setTarget(TestTcpServer.HOST, server.port)
-      client!!.setKeepaliveTimeout(10000000) // to disable keep-alive messages
+      client!!.keepaliveTimeout = 10000000 // to disable keep-alive messages
       client!!.send("Test; check")
       mExecutor.runAll()
       shadowOf(getMainLooper()).idle()
@@ -58,7 +58,7 @@ class SenderServiceTest : RobolectricTestBase() {
     TestTcpServer().use { server ->
       client = SenderService(mExecutor)
       client!!.setTarget(TestTcpServer.HOST, server.port)
-      client!!.setKeepaliveTimeout(10000000) // to disable keep-alive messages
+      client!!.keepaliveTimeout = 10000000 // to disable keep-alive messages
 
       for (i in 0 until 5) {
         client!!.send(String.format(Locale.ROOT, "%d checking", i))
@@ -74,7 +74,7 @@ class SenderServiceTest : RobolectricTestBase() {
   fun setTargetShouldSetServerSuccessfully() {
     client = SenderService(mExecutor)
     client!!.setTarget("someaddr-test", 0)
-    assertEquals("someaddr-test", client!!.getHostAddr())
+    assertEquals("someaddr-test", client!!.hostAddr)
   }
 
   @Test
@@ -108,10 +108,10 @@ class SenderServiceTest : RobolectricTestBase() {
   @Test
   fun senderServiceShouldReturnCorrectKeepaliveTimeout() {
     client = SenderService(mExecutor)
-    client!!.setKeepaliveTimeout(3453)
-    assertEquals(3453, client!!.getKeepaliveTimeout())
-    client!!.setKeepaliveTimeout(1234)
-    assertEquals(1234, client!!.getKeepaliveTimeout())
+    client!!.keepaliveTimeout = 3453
+    assertEquals(3453, client!!.keepaliveTimeout)
+    client!!.keepaliveTimeout = 1234
+    assertEquals(1234, client!!.keepaliveTimeout)
   }
 
   @Test
@@ -133,7 +133,7 @@ class SenderServiceTest : RobolectricTestBase() {
     TestTcpServer().use { server ->
       client = SenderService(mExecutor)
       client!!.setTarget(TestTcpServer.HOST, server.port)
-      client!!.setKeepaliveTimeout(10000000)
+      client!!.keepaliveTimeout = 10000000
       client!!.send("ping")
       mExecutor.runAll()
       shadowOf(getMainLooper()).idle()

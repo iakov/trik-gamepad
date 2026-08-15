@@ -24,7 +24,6 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     var url: URL? = null
     var lastAlpha = 0f
     var previousAlpha = 0f
-    var step = 7
 
     override fun setTargetChip(host: String) {
       this.chipText = host
@@ -43,19 +42,9 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
       this.url = url
     }
 
-    override fun getWheelStep(): Int = step
+    override var wheelStep: Int = 7
 
-    override fun setWheelStep(step: Int) {
-      this.step = step
-    }
-
-    var wheelEnabledState = false
-
-    override fun isWheelEnabled(): Boolean = wheelEnabledState
-
-    override fun setWheelEnabled(enabled: Boolean) {
-      wheelEnabledState = enabled
-    }
+    override var wheelEnabled: Boolean = false
 
     var keepScreenOnState = true
 
@@ -94,7 +83,7 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     prefs = PreferenceManager.getDefaultSharedPreferences(context)
     prefs.edit().clear().commit()
     sender = SenderService(PausedExecutorService())
-    sender.setKeepaliveTimeout(10000000) // disable keepalive noise
+    sender.keepaliveTimeout = 10000000 // disable keepalive noise
     ui = FakeUi()
     controller = MainActivitySettingsController(context, sender, ui)
   }
@@ -155,14 +144,14 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
 
     prefs.edit().putInt(SettingsFragment.SK_WHEEL_STEP, 999).commit()
     controller.onPreferenceChanged(prefs)
-    assertEquals("wheel step clamped to 100", 100, ui.step)
+    assertEquals("wheel step clamped to 100", 100, ui.wheelStep)
   }
 
   @Test
   fun onPreferenceChangedWithWheelEnabledSwitchShouldApply() {
     prefs.edit().putBoolean(SettingsFragment.SK_WHEEL_ENABLED, true).commit()
     controller.onPreferenceChanged(prefs)
-    assertTrue(ui.wheelEnabledState)
+    assertTrue(ui.wheelEnabled)
   }
 
   @Test
@@ -203,8 +192,8 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     try {
       // register() calls onPreferenceChanged with the (empty) prefs -> the
       // defaults are applied: default address + default port.
-      assertEquals("192.168.77.1", sender.getHostAddr())
-      assertEquals(7, ui.step)
+      assertEquals("192.168.77.1", sender.hostAddr)
+      assertEquals(7, ui.wheelStep)
     } finally {
       // Do not leak the shared-prefs listener into later tests in this JVM.
       controller.unregister()
@@ -216,7 +205,7 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     controller.register()
     controller.register() // idempotent: second call is a no-op
     try {
-      assertEquals("192.168.77.1", sender.getHostAddr())
+      assertEquals("192.168.77.1", sender.hostAddr)
       // A single unregister still releases the listener (no double-register leak).
       controller.unregister()
       controller.unregister() // idempotent no-op
@@ -231,9 +220,9 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     for ((value, expected) in cases) {
       // A non-numeric value keeps the CURRENT step, so reset the fake's default
       // per row to reproduce the fresh-state condition each case expects.
-      ui.step = 7
+      ui.wheelStep = 7
       setPref(SettingsFragment.SK_WHEEL_STEP, value)
-      assertEquals("wheel step for '$value'", expected, ui.step)
+      assertEquals("wheel step for '$value'", expected, ui.wheelStep)
     }
   }
 

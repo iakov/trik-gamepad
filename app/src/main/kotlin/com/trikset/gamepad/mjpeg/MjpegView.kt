@@ -75,7 +75,8 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
   }
 
   /** True while the render thread is consuming frames (started and not stopped). */
-  fun isPlaying(): Boolean = running
+  val isPlaying: Boolean
+    get() = running
 
   @Synchronized
   fun startPlayback() {

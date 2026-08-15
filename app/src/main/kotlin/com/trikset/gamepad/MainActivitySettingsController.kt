@@ -34,13 +34,9 @@ class MainActivitySettingsController(
 
     fun setVideoUrl(url: URL?)
 
-    fun getWheelStep(): Int
+    var wheelStep: Int
 
-    fun setWheelStep(step: Int)
-
-    fun isWheelEnabled(): Boolean
-
-    fun setWheelEnabled(enabled: Boolean)
+    var wheelEnabled: Boolean
 
     fun setKeepScreenOn(enabled: Boolean)
 
@@ -81,9 +77,13 @@ class MainActivitySettingsController(
   }
 
   fun onPreferenceChanged(sharedPreferences: SharedPreferences) {
-    val addr = sharedPreferences.getString(SettingsFragment.SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS)!!
+    val addr =
+        sharedPreferences.getString(SettingsFragment.SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS)
+            ?: DEFAULT_HOST_ADDRESS
     var portNumber = DEFAULT_PORT
-    val portStr = sharedPreferences.getString(SettingsFragment.SK_HOST_PORT, DEFAULT_HOST_PORT)!!
+    val portStr =
+        sharedPreferences.getString(SettingsFragment.SK_HOST_PORT, DEFAULT_HOST_PORT)
+            ?: DEFAULT_HOST_PORT
     try {
       portNumber = portStr.toInt()
     } catch (e: NumberFormatException) {
@@ -108,7 +108,8 @@ class MainActivitySettingsController(
     // An empty default -> setVideoUrl(null) -> the placeholder prompts the user to configure one.
     val defaultVideoUri = if (addr.isBlank()) "" else "http://$addr:8080/?action=stream"
     val videoStreamURI =
-        sharedPreferences.getString(SettingsFragment.SK_VIDEO_URI, defaultVideoUri)!!
+        sharedPreferences.getString(SettingsFragment.SK_VIDEO_URI, defaultVideoUri)
+            ?: defaultVideoUri
 
     // The top-left chip shows the robot target: the host when set; else the video stream's host
     // when a stream is configured (video-only mode); else a filler so the chip stays readable
@@ -132,12 +133,12 @@ class MainActivitySettingsController(
         SettingsFragment.readSeekBarValue(
             sharedPreferences,
             SettingsFragment.SK_WHEEL_STEP,
-            ui.getWheelStep(),
+            ui.wheelStep,
         )
-    ui.setWheelStep(Math.max(WHEEL_STEP_MIN, Math.min(WHEEL_STEP_MAX, wheelStep)))
+    ui.wheelStep = Math.max(WHEEL_STEP_MIN, Math.min(WHEEL_STEP_MAX, wheelStep))
 
     val wheelEnabled = sharedPreferences.getBoolean(SettingsFragment.SK_WHEEL_ENABLED, false)
-    ui.setWheelEnabled(wheelEnabled)
+    ui.wheelEnabled = wheelEnabled
 
     val keepScreenOn = sharedPreferences.getBoolean(SettingsFragment.SK_KEEP_SCREEN_ON, true)
     ui.setKeepScreenOn(keepScreenOn)
@@ -167,8 +168,8 @@ class MainActivitySettingsController(
               .getString(
                   SettingsFragment.SK_KEEPALIVE,
                   SenderService.DEFAULT_KEEPALIVE.toString(),
-              )!!
-              .toInt()
+              )
+              ?.toInt() ?: SenderService.DEFAULT_KEEPALIVE
       if (timeout < SenderService.MINIMAL_KEEPALIVE) {
         ui.toast(
             String.format(
@@ -178,15 +179,15 @@ class MainActivitySettingsController(
             )
         )
         sharedPreferences.edit {
-          putString(SettingsFragment.SK_KEEPALIVE, sender.getKeepaliveTimeout().toString())
+          putString(SettingsFragment.SK_KEEPALIVE, sender.keepaliveTimeout.toString())
         }
       } else {
-        sender.setKeepaliveTimeout(timeout)
+        sender.keepaliveTimeout = timeout
       }
     } catch (e: NumberFormatException) {
       ui.toast(context.getString(R.string.keepalive_must_be_positive_decimal))
       sharedPreferences.edit {
-        putString(SettingsFragment.SK_KEEPALIVE, sender.getKeepaliveTimeout().toString())
+        putString(SettingsFragment.SK_KEEPALIVE, sender.keepaliveTimeout.toString())
       }
     }
   }

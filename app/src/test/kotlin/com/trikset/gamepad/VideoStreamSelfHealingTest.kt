@@ -44,18 +44,18 @@ class VideoStreamSelfHealingTest : RobolectricTestBase() {
     shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
     executor.runAll()
     shadowOf(Looper.getMainLooper()).idle()
-    assertFalse("an offline robot must not start playback", view.isPlaying())
+    assertFalse("an offline robot must not start playback", view.isPlaying)
 
     // Robot comes back: the retry tick reloads and the video starts within a bounded time.
     server.start()
     try {
       val deadline = System.currentTimeMillis() + 5000
-      while (!view.isPlaying() && System.currentTimeMillis() < deadline) {
+      while (!view.isPlaying && System.currentTimeMillis() < deadline) {
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100))
         executor.runAll()
         shadowOf(Looper.getMainLooper()).idle()
       }
-      assertTrue("video must recover after the robot returns", view.isPlaying())
+      assertTrue("video must recover after the robot returns", view.isPlaying)
       assertTrue(
           "the recovery must have opened a fresh connection",
           server.acceptedConnections.get() >= 1,
@@ -82,7 +82,7 @@ class VideoStreamSelfHealingTest : RobolectricTestBase() {
       reload()
       executor.runAll()
       shadowOf(Looper.getMainLooper()).idle()
-      assertTrue("initial load must start playback", view.isPlaying())
+      assertTrue("initial load must start playback", view.isPlaying)
 
       // Server drops after 4 frames -> render-thread error -> controller reloads -> new connection.
       val deadline = System.currentTimeMillis() + 15000
@@ -118,7 +118,7 @@ class VideoStreamSelfHealingTest : RobolectricTestBase() {
         VideoRetryController(
             mainHandler = Handler(Looper.getMainLooper()),
             retryIntervalMs = 100,
-            shouldReload = { !view.isPlaying() },
+            shouldReload = { !view.isPlaying },
             reload = reloadAction,
         )
     view.setOnStreamErrorListener { controller?.onStreamError() }

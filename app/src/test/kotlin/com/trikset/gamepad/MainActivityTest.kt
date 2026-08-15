@@ -43,7 +43,7 @@ class MainActivityTest : RobolectricTestBase() {
   private fun setPref(key: String, value: String) {
     val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
     prefs.edit().putString(key, value).commit()
-    requireNotNull(activity.getSettingsController()).onPreferenceChanged(prefs)
+    requireNotNull(activity.settingsController).onPreferenceChanged(prefs)
   }
 
   private fun prefs() = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
@@ -68,7 +68,7 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun onCreateShouldSetUpSenderServiceAndPads() {
-    assertNotNull(activity.getSenderService())
+    assertNotNull(activity.senderService)
     val left = activity.findViewById<SquareTouchPadLayout>(R.id.leftPad)
     assertNotNull(left)
     assertNotNull(activity.findViewById<SquareTouchPadLayout>(R.id.rightPad))
@@ -77,7 +77,7 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun onSharedPreferenceChangedShouldSetTarget() {
     setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
-    assertEquals("10.0.0.7", activity.getSenderService().getHostAddr())
+    assertEquals("10.0.0.7", activity.senderService.hostAddr)
   }
 
   @Test
@@ -85,7 +85,7 @@ class MainActivityTest : RobolectricTestBase() {
     setPref(SettingsFragment.SK_HOST_PORT, "not-a-number")
     // No crash; target still set with default 4444 because the parse failure is
     // caught and the port variable keeps its initial value.
-    assertNotNull(activity.getSenderService().getHostAddr())
+    assertNotNull(activity.senderService.hostAddr)
   }
 
   @Test
@@ -101,9 +101,9 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun onOptionsItemSelectedShouldToggleWheel() {
-    assertFalse(field(activity, "mWheelEnabled") as Boolean)
-    setField(activity, "mWheelEnabled", true)
-    assertTrue(field(activity, "mWheelEnabled") as Boolean)
+    assertFalse(field(activity, "wheelEnabled") as Boolean)
+    setField(activity, "wheelEnabled", true)
+    assertTrue(field(activity, "wheelEnabled") as Boolean)
   }
 
   @Test
@@ -132,7 +132,7 @@ class MainActivityTest : RobolectricTestBase() {
       // Integer.getInteger reads a SYSTEM property named by the pref value, so
       // arbitrary values fall back to the default (7); the clamp keeps [1,100].
       setPref(SettingsFragment.SK_WHEEL_STEP, value)
-      val step = field(activity, "mWheelStep") as Int
+      val step = field(activity, "wheelStep") as Int
       assertTrue("expected wheel step in [1,100] for '$value', got $step", step in 1..100)
     }
   }
@@ -142,15 +142,15 @@ class MainActivityTest : RobolectricTestBase() {
     for (value in listOf("not a uri", "foo:bar")) {
       setPref(SettingsFragment.SK_VIDEO_URI, value)
       // "not a uri" fails URI parsing, "foo:bar" is a valid URI but toURL()
-      // throws MalformedURLException; both leave mVideoURL null.
-      assertNull("video url must stay null for '$value'", field(activity, "mVideoURL"))
+      // throws MalformedURLException; both leave videoUrl null.
+      assertNull("video url must stay null for '$value'", field(activity, "videoUrl"))
     }
   }
 
   @Test
   fun onSharedPreferenceChangedWithValidVideoUriShouldSetUrl() {
     setPref(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
-    assertNotNull(field(activity, "mVideoURL"))
+    assertNotNull(field(activity, "videoUrl"))
   }
 
   @Test
@@ -159,7 +159,7 @@ class MainActivityTest : RobolectricTestBase() {
     // Default true keeps the screen on.
     assertTrue(main.keepScreenOn)
     prefs().edit().putBoolean(SettingsFragment.SK_KEEP_SCREEN_ON, false).commit()
-    requireNotNull(activity.getSettingsController()).onPreferenceChanged(prefs())
+    requireNotNull(activity.settingsController).onPreferenceChanged(prefs())
     assertFalse(main.keepScreenOn)
   }
 
@@ -211,14 +211,14 @@ class MainActivityTest : RobolectricTestBase() {
   fun onSharedPreferenceChangedWithValidKeepaliveShouldApply() {
     setPref(SettingsFragment.SK_KEEPALIVE, "2000")
     // >= MINIMAL_KEEPALIVE -> applied to the sender.
-    assertEquals(2000, activity.getSenderService().getKeepaliveTimeout())
+    assertEquals(2000, activity.senderService.keepaliveTimeout)
   }
 
   @Test
   fun onPauseShouldDisconnectAndStopVideo() {
-    // Force a video view to cover the mVideo != null branch in onPause.
+    // Force a video view to cover the video != null branch in onPause.
     val video = MjpegView(activity)
-    setField(activity, "mVideo", video)
+    setField(activity, "video", video)
     method(activity, "onPause").invoke(activity)
     // No crash; sensor listener unregistered and sender disconnected.
   }
@@ -226,16 +226,16 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun onPauseWithNullFieldsShouldBeSafe() {
     // Null out both collaborators so the null branches in onPause run.
-    setField(activity, "mSensorManager", null)
-    setField(activity, "mVideo", null)
+    setField(activity, "sensorManager", null)
+    setField(activity, "video", null)
     method(activity, "onPause").invoke(activity)
   }
 
   @Test
   fun onResumeWithNullFieldsShouldBeSafe() {
     // Null out both collaborators so the null branches in onResume run.
-    setField(activity, "mVideo", null)
-    setField(activity, "mSensorManager", null)
+    setField(activity, "video", null)
+    setField(activity, "sensorManager", null)
     method(activity, "onResume").invoke(activity)
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
@@ -243,7 +243,7 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun restartVideoStreamShouldLoadWhenVideoPresent() {
     val video = MjpegView(activity)
-    setField(activity, "mVideo", video)
+    setField(activity, "video", video)
     method(activity, "restartVideoStream").invoke(activity)
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
@@ -258,16 +258,16 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun wheelEnabledPreferenceShouldDriveWheel() {
     prefs().edit().putBoolean(SettingsFragment.SK_WHEEL_ENABLED, true).commit()
-    requireNotNull(activity.getSettingsController()).onPreferenceChanged(prefs())
-    assertTrue(activity.isWheelEnabled())
+    requireNotNull(activity.settingsController).onPreferenceChanged(prefs())
+    assertTrue(activity.wheelEnabled)
     prefs().edit().putBoolean(SettingsFragment.SK_WHEEL_ENABLED, false).commit()
-    requireNotNull(activity.getSettingsController()).onPreferenceChanged(prefs())
-    assertFalse(activity.isWheelEnabled())
+    requireNotNull(activity.settingsController).onPreferenceChanged(prefs())
+    assertFalse(activity.wheelEnabled)
   }
 
   @Test
   fun restartVideoStreamShouldBeSafeWithoutVideo() {
-    // mVideo null -> runOnUiThread closure returns early.
+    // video null -> runOnUiThread closure returns early.
     val m = method(activity, "restartVideoStream")
     m.invoke(activity)
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
@@ -279,9 +279,9 @@ class MainActivityTest : RobolectricTestBase() {
     // through the retry controller (here it fast-fails to an unreachable address and the
     // onLoadFailed path runs). Exercises the collector's Connected branch and the shouldReload
     // gate.
-    setField(activity, "mVideo", MjpegView(activity))
-    setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
-    val sender = activity.getSenderService()
+    setField(activity, "video", MjpegView(activity))
+    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
+    val sender = activity.senderService
     awaitControlConnection(sender)
     // The reload's load() runs on a real executor; give the fast-failing open + its onResult
     // post time to reach the main looper so the onLoadFailed path is deterministically covered.
@@ -296,8 +296,8 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun connectionConnectedWithNullVideoUrlShouldNotReload() {
     // Gate: Connected with no video URL configured -> shouldReload short-circuits at
-    // mVideoURL != null (false) and nothing is armed.
-    val sender = activity.getSenderService()
+    // videoUrl != null (false) and nothing is armed.
+    val sender = activity.senderService
     awaitControlConnection(sender)
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
     sender.disconnect("test done")
@@ -323,9 +323,9 @@ class MainActivityTest : RobolectricTestBase() {
   /** Sets a configured video and triggers a reload (the common spinner-test setup). */
   private fun restartVideoStreamWithConfiguredVideo() {
     // The spinner gate (restartVideoStream) requires a live control connection — connect first.
-    awaitControlConnection(activity.getSenderService())
-    setField(activity, "mVideo", MjpegView(activity))
-    setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
+    awaitControlConnection(activity.senderService)
+    setField(activity, "video", MjpegView(activity))
+    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
     method(activity, "restartVideoStream").invoke(activity)
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
@@ -346,7 +346,7 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun restartVideoStreamWithoutVideoUrlShouldNotShowLoading() {
     // Gate: no URL configured -> the spinner stays hidden even while Connected. An unset URI pref
-    // defaults to a real URL (MainActivitySettingsController), so set it to "" to get mVideoURL
+    // defaults to a real URL (MainActivitySettingsController), so set it to "" to get videoUrl
     // null.
     setPref(SettingsFragment.SK_VIDEO_URI, "")
     assertSpinnerHiddenAfterRestart(null, connectFirst = true)
@@ -355,11 +355,11 @@ class MainActivityTest : RobolectricTestBase() {
   /** Restarts the stream and asserts the loading spinner stays hidden (spinner-gate coverage). */
   private fun assertSpinnerHiddenAfterRestart(videoUrl: URL?, connectFirst: Boolean) {
     if (connectFirst) {
-      awaitControlConnection(activity.getSenderService())
+      awaitControlConnection(activity.senderService)
     }
-    setField(activity, "mVideo", MjpegView(activity))
+    setField(activity, "video", MjpegView(activity))
     if (videoUrl != null) {
-      setField(activity, "mVideoURL", videoUrl)
+      setField(activity, "videoUrl", videoUrl)
     }
     method(activity, "restartVideoStream").invoke(activity)
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
@@ -378,9 +378,9 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun shouldReloadVideoWhenConnectedWithUrl() {
     setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
-    setField(activity, "mVideo", MjpegView(activity))
-    setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
-    awaitControlConnection(activity.getSenderService())
+    setField(activity, "video", MjpegView(activity))
+    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
+    awaitControlConnection(activity.senderService)
     val m = method(activity, "shouldReloadVideo")
     assertTrue(m.invoke(activity) as Boolean)
   }
@@ -389,8 +389,8 @@ class MainActivityTest : RobolectricTestBase() {
   fun shouldReloadVideoWhenVideoOnlyEmptyHost() {
     // Empty host = video-only: the retry gate relaxes the Connected requirement.
     setPref(SettingsFragment.SK_HOST_ADDRESS, "")
-    setField(activity, "mVideo", MjpegView(activity))
-    setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
+    setField(activity, "video", MjpegView(activity))
+    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
     val m = method(activity, "shouldReloadVideo")
     assertTrue(
         "video-only (empty host) must retry without a control connection",
@@ -401,8 +401,8 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun shouldNotReloadVideoWhenHostConfiguredButDisconnected() {
     setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
-    setField(activity, "mVideo", MjpegView(activity))
-    setField(activity, "mVideoURL", URL("http://127.0.0.1:1/nope"))
+    setField(activity, "video", MjpegView(activity))
+    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
     val m = method(activity, "shouldReloadVideo")
     assertFalse("configured host needs Connected to retry", m.invoke(activity) as Boolean)
   }
@@ -431,33 +431,33 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun onSensorChangedAccelerometerShouldProcessWheel() {
-    setField(activity, "mWheelEnabled", true)
-    setField(activity, "mAngle", 0)
-    setField(activity, "mWheelStep", 7)
+    setField(activity, "wheelEnabled", true)
+    setField(activity, "angle", 0)
+    setField(activity, "wheelStep", 7)
 
     // Accelerometer samples reach the wheel path only when the sensor type matches.
     activity.onSensorChanged(sensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER))
-    // Wheel enabled -> the accelerometer sample is processed: mAngle changes from 0
-    // (mirrors onSensorChangedWhenWheelDisabledShouldReturnEarly asserting mAngle == 0).
-    assertNotEquals(0, field(activity, "mAngle") as Int)
+    // Wheel enabled -> the accelerometer sample is processed: angle changes from 0
+    // (mirrors onSensorChangedWhenWheelDisabledShouldReturnEarly asserting angle == 0).
+    assertNotEquals(0, field(activity, "angle") as Int)
   }
 
   @Test
   fun onSensorChangedWhenWheelDisabledShouldReturnEarly() {
-    setField(activity, "mWheelEnabled", false)
-    setField(activity, "mAngle", 0)
-    setField(activity, "mWheelStep", 7)
+    setField(activity, "wheelEnabled", false)
+    setField(activity, "angle", 0)
+    setField(activity, "wheelStep", 7)
 
     activity.onSensorChanged(sensorEvent(android.hardware.Sensor.TYPE_ACCELEROMETER))
-    // Wheel disabled -> no command sent, mAngle unchanged.
-    assertEquals(0, field(activity, "mAngle") as Int)
+    // Wheel disabled -> no command sent, angle unchanged.
+    assertEquals(0, field(activity, "angle") as Int)
   }
 
   @Test
   fun onSensorChangedWithNonAccelerometerShouldLogOnly() {
     activity.onSensorChanged(sensorEvent(android.hardware.Sensor.TYPE_GRAVITY))
     // Non-accelerometer sensors hit the else branch; no wheel command.
-    assertEquals(0, field(activity, "mAngle") as Int)
+    assertEquals(0, field(activity, "angle") as Int)
   }
 
   @Test
@@ -504,13 +504,13 @@ class MainActivityTest : RobolectricTestBase() {
   fun setSenderServiceShouldStoreSender() {
     val replacement = SenderService()
     activity.setSenderService(replacement)
-    assertSame(replacement, activity.getSenderService())
+    assertSame(replacement, activity.senderService)
   }
 
   @Test
   fun setShowFpsShouldToggleVideoOverlay() {
     val video = MjpegView(activity)
-    setField(activity, "mVideo", video)
+    setField(activity, "video", video)
     activity.setShowFps(true)
     assertTrue(video.showFps)
     activity.setShowFps(false)
@@ -519,7 +519,7 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun setShowFpsWithoutVideoShouldBeSafe() {
-    setField(activity, "mVideo", null)
+    setField(activity, "video", null)
     activity.setShowFps(true)
   }
 
@@ -634,15 +634,15 @@ class MainActivityTest : RobolectricTestBase() {
   fun setSenderServiceWithNullShouldBeSafe() {
     activity.setSenderService(null)
     // Null guard: the original sender is kept.
-    assertNotNull(activity.getSenderService())
+    assertNotNull(activity.senderService)
   }
 
   @Test
   fun onDestroyWithNullCollaboratorsShouldBeSafe() {
     // Null the collaborators so the null branches in onDestroy run.
-    setField(activity, "mSensorManager", null)
-    setField(activity, "mVideo", null)
-    setField(activity, "mSettingsController", null)
+    setField(activity, "sensorManager", null)
+    setField(activity, "video", null)
+    setField(activity, "settingsController", null)
     method(activity, "onDestroy").invoke(activity)
   }
 
@@ -651,7 +651,7 @@ class MainActivityTest : RobolectricTestBase() {
     // Null the retry controller so the ?. null branches in onPause/onResume and
     // the Connected edge-trigger all run.
     setField(activity, "videoRetryController", null)
-    val sender = activity.getSenderService()
+    val sender = activity.senderService
     awaitControlConnection(sender)
     method(activity, "onPause").invoke(activity)
     method(activity, "onResume").invoke(activity)

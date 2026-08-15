@@ -91,7 +91,7 @@ class HudThemeTest : RobolectricTestBase() {
 
     // Drive the real state machine: setting the flow value triggers the lifecycle collector's
     // connectionFeedback.update + applyHudTone (the same path the app uses on a real connect).
-    val sender = activity.getSenderService()
+    val sender = activity.senderService
     val flow =
         @Suppress("UNCHECKED_CAST")
         (field(sender, "_connectionState") as MutableStateFlow<ConnectionState>)

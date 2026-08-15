@@ -21,10 +21,8 @@ class ConnectionAnnouncer(
         is ConnectionState.Connected -> context.getString(R.string.connection_status_connected)
         is ConnectionState.Disconnected ->
             // No configured target (video-only device): nothing to connect to, nothing to announce.
-            if (targetProvider() != null) {
+            targetProvider()?.let {
               context.getString(R.string.connection_status_disconnected)
-            } else {
-              null
             }
       }
 

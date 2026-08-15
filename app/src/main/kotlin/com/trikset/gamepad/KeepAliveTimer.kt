@@ -19,7 +19,7 @@ internal class KeepAliveTimer(
   fun restart() {
     stop()
     // '300' compensates ping
-    val realTimeout = sender.getKeepaliveTimeout() - KEEPALIVE_COMPENSATION_MS
+    val realTimeout = sender.keepaliveTimeout - KEEPALIVE_COMPENSATION_MS
     task =
         scheduler.scheduleWithFixedDelay(
             { tick() },
@@ -35,9 +35,9 @@ internal class KeepAliveTimer(
   }
 
   private fun tick() {
-    val out = sender.mOut
+    val out = sender.out
     if (out != null) {
-      val command = "keepalive ${sender.getKeepaliveTimeout()}"
+      val command = "keepalive ${sender.keepaliveTimeout}"
       AppLog.i(TCP_TAG, "Sending $command message")
       sender.postCommand(command)
     } else {
