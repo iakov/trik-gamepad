@@ -367,7 +367,8 @@ restate their findings here only when a checklist entry needs an anchor.
 1. What was the biggest process win this campaign (worth repeating)?
 1. What was the committability constraint — would each commit compile against
    HEAD's design?
-1. What nearly got lost (uncommitted work, crash-safety near-miss)?
+1. What could have been lost, and what kept it safe (uncommitted work,
+   crash-safety near-miss)?
 1. Elapsed vs Estimated — recorded in the ROADMAP header table?
 
 **Learning**
@@ -411,7 +412,7 @@ restate their findings here only when a checklist entry needs an anchor.
    useful part into another question) if a useful part remains, otherwise
    **drop it from this checklist**. Update the *last revised* stamp.
 
-*Last revised: 2026-08-15*
+*Last revised: 2026-08-15 (Q3 rephrased — see "Campaign 20 retrospective", checklist-review step)*
 
 ### [2026-08-06] Quality-gate implementation quirks (checkstyle/SpotBugs/JaCoCo)
 
@@ -2642,3 +2643,116 @@ keeps the existing sender (asserted by `setSenderServiceWithNullShouldBeSafe`).
   its scope; generalize similar findings; `.PLAN.md` holds only unfinished
   tasks (the C19 COMPLETE history section was trimmed as published work). See
   DECISIONS.md "[2026-08-15] Docs-discipline rules".
+
+### [2026-08-15] Campaign 20 retrospective (checklist protocol)
+
+Full retrospective run through the checklist in "Campaign retrospective
+checklist" (MEMORY.md). This is the first run of that checklist; the final
+step therefore evaluates the checklist itself.
+
+**Process**
+
+1. **Biggest process win worth repeating?** The single-commit discipline:
+   code + tests + detekt config in one `refactor:` commit, gate + 3-variant
+   `test` twice before push, CI green on the first push (no amend cycle). The
+   plan's "2-arg `getString` is non-null" assumption was wrong; the compiler
+   caught it before push — compile-before-trust pays.
+1. **Committability constraint?** A single commit avoided the cross-commit
+   entanglement entirely; the "compile against HEAD's design" question did not
+   bite because there was no commit split. Confirmed the rule holds but had no
+   new evidence to add.
+1. **What nearly got lost?** Nothing — the working tree stayed clean the whole
+   campaign; the earlier `.PLAN.md` trim removed the C19 COMPLETE history
+   (published work, correctly gone). No near-miss.
+1. **Elapsed vs Estimated?** ROADMAP header: Estimated —, Actual 1 h 9 m
+   (07:18→08:27 +03:00). No estimate was set (user-directed, no baseline).
+
+**Learning**
+
+1. **New facts worth saving?** (a) 2-arg `SharedPreferences.getString` is
+   nullable → `?: default`; (b) Kotlin does not SAM-convert a lambda into a
+   fun-interface property → listener-registration setters stay methods; (c)
+   reflection-based tests reach renamed fields by string, so renames must
+   update those strings too; (d) detekt 1.23.8 + AGP 9 has no type-resolution
+   tasks. All persisted (MEMORY App protocol / C20 record, `.PLAN.md`).
+1. **Wrong assumption the compiler/CI/gate caught?** The `getString` non-null
+   assumption (caught at compile: "nullable receiver"). Also detekt's `UseLet`
+   surfaced a real finding in `ConnectionAnnouncer`. Gate passed first try
+   after that.
+1. **Similar shapes → generalize?** Three generalizations (SAM/listener
+   setters, type-resolution detekt gating, mechanical-rewrites-need-compile),
+   each folded into one rule rather than re-recorded. See the C20 execution
+   run above.
+
+**Signal**
+
+1. **Frequency scan?** Re-ran over all C20 logs: "incompatible with Gradle 10"
+   in every build (known, pending `.PLAN.md` "Gradle-10-era bump" — NOT
+   re-marked resolved). No config-cache invalidation, no spotlessKotlinCheck
+   failures. No new systemic signals.
+1. **Rule deviations / missing rules?** None observed. The docs-discipline
+   rules (best-scoped doc, per-doc audit, plan-trim-after-push, generalize)
+   were added this session (DECISIONS.md) — they came out of the C20 docs
+   pass itself, not a deviation.
+
+**Drift**
+
+1. **Per-doc scope audit?** Performed on all docs incl. AGENTS.md: fixed
+   stale renamed-symbol refs (`mOut`→`out` ×2, accessor-clash example,
+   TESTING `mVideo`/`mSensorManager`/`getHostAddr`, architecture
+   `isPlaying()`); AGENTS.md stayed light (pointers only). Found the C20
+   ROADMAP entry's `\*\*Committed` escaped-asterisk (committed in `d39a426`)
+   and fixed it here.
+1. **Stale comments / API refs?** The six live-state refs above; plus stale
+   `m`-name comments in MainActivityTest (fixed). Dated campaign records
+   correctly left as history.
+1. **Every lesson in the best-scoped doc?** Yes — rules → AGENTS, decisions →
+   DECISIONS, facts/retrospectives → MEMORY, published campaign → ROADMAP,
+   unfinished → `.PLAN.md`.
+
+**Value**
+
+1. **Measurable profit?** ~230/253 net lines of Java-ism removed from 18
+   files; 3 detekt idiom rules now enforce canonicality in CI; `SettingsUi`
+   interface is idiomatic Kotlin (properties instead of accessors). No
+   behavior change — a maintainability win, not user-facing.
+1. **Deferred and why?** Type-resolution detekt rules (`CanBeNonNullable`,
+   `UseDataClass`, `ObjectLiteralToLambda`) → `.PLAN.md`, gated on the
+   detekt 2.0.0 bump (detekt 1.23.8 has no type-resolution tasks under AGP
+   9). Also the standing deferred list (toolchain/release/phone/HUD
+   follow-ups) unchanged.
+1. **Next automation candidate?** When detekt 2.0 lands: enable the
+   type-resolution rules and add `detektMain`/`detektVariant` to the gate
+   (the `detekt` syntax-only task is the current gate step). Not yet — tool
+   is not stable.
+1. **What should I have asked the user earlier?** The scope-boundary
+   questions were asked up front (framework calls untouched, defer-to-detekt-2.0).
+   One thing: whether `setSenderService(null)` semantics had to survive (it
+   did — null-guard kept as a method). Resolved during design, but asking
+   would have saved a moment of second-guessing.
+
+**Checklist review (final step — this run's evaluation)**
+
+1. **New questions produced this campaign?** Yes — "was the C20 ROADMAP entry
+   re-read after mdformat for escaped markers?" is campaign-specific, not
+   general; the general lesson (re-read `.md` diffs after mdformat) is
+   already an AGENTS guardrail. No new general question earned a place; the
+   existing 17 covered this campaign well.
+
+The **most useless question this campaign**: #3 "What nearly got lost?" —
+nothing was at risk and the answer added no insight; a clean single-commit
+campaign with a clean tree has no near-miss story, and the checklist's own
+frame ("document what happened") already surfaces losses when they occur. It
+was useful when added because crash-safety is a recurring session risk in this
+repo (uncommitted-fix trap, stash dance, C19's ~15 h hang); it is useless
+*now* only because this campaign had nothing to lose. Rather than drop it, the
+useful part (loss-awareness) is better enveloped by asking it about *the
+process* not *the campaign*: rephrase to "What could have been lost, and what
+kept it safe?" — that produces a positive answer (what the discipline
+prevented) even on a clean campaign. Applied to the checklist (revised below);
+one unproductive campaign alone is not grounds for removal, and this phrasing
+keeps the insight while making the question productive every run.
+
+*Checklist revision: #3 rephrased from "What nearly got lost (uncommitted
+work, crash-safety near-miss)?" to "What could have been lost, and what kept
+it safe?" — see checklist *Last revised* stamp.*

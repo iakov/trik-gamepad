@@ -805,9 +805,9 @@ redundant `!!` on nullable `getString` (elvis instead), `m`-prefixed fields
 `isWheelEnabled`/`setWheelEnabled` → `var wheelStep`/`var wheelEnabled`), plus
 syntax-only detekt idiom rules (`ExpressionBodySyntax`, `UseIfInsteadOfWhen`,
 `UseLet`). Decision + rationale: DECISIONS.md "[2026-08-15] Idiomatic Kotlin
-pass"; discovery + findings: MEMORY.md "Campaign 20 execution run". \*\*Committed
-
-- pushed 2026-08-15\*\* (single commit, `212791b`), CI green.
+pass"; discovery + findings: MEMORY.md "Campaign 20 execution run". **Committed + pushed
+2026-08-15** (single commit, `212791b`), CI green. Full retrospective (checklist
+protocol): MEMORY.md "Campaign 20 retrospective".
 
 | Estimated | Actual |
 |-----------|--------|
