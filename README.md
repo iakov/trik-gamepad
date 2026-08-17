@@ -2,6 +2,8 @@
 
 [![CI](https://github.com/iakov/trik-gamepad/actions/workflows/ci.yml/badge.svg)](https://github.com/iakov/trik-gamepad/actions/workflows/ci.yml)
 
+![TRIK Gamepad connected to a robot](docs/img/hud_connected.jpg)
+
 Simple Android application that mimics a gamepad and is used to control TRIK
 robots.
 
