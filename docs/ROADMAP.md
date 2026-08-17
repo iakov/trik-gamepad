@@ -870,6 +870,49 @@ and instrumented API 36).
 - **Device-identifier guardrail (user instruction)** — adb serial/model/IMEI
   are session-only, never committed (AGENTS.md "Repo hygiene" + DECISIONS.md
   "Device identifiers never enter repo content"; 521 commits verified clean).
-- **Deferred** — the on-device confirmation (unchanged `SettingsTests` on the
-  phone + real `input tap` + screenshot): the phone dropped off adb mid-campaign.
-  Recorded in `.PLAN.md` (A.1); re-run when the phone returns.
+- **Deferred → RESOLVED 2026-08-15** — the on-device confirmation (unchanged
+  `SettingsTests` on the phone + real `input tap` + screenshot): the phone
+  dropped off adb mid-campaign, then reconnected the same day. Result:
+  **9/9 on the phone** including both `SettingsTests`; a real `input tap` at
+  the chip center opened `RobotSettingsActivity` (the tap the shade strip used
+  to eat); pixel-census shows the chip clear of the top OS strip. Full record:
+  MEMORY.md "Campaign 21".
+
+## Campaign 22 — magic-button cluster fix + S10e screenshot profile + README hero (2026-08-17)
+
+Scope (user-driven): (1) the magic-button cluster's torn top arcs and
+pill-centered glyph read — root-caused to `centerGlyph()`'s `translationY`
+moving the whole button into the cluster's clip area (DECISIONS.md "Magic-button
+glyph centering: asymmetric padding, not view translation"); (2) drop the
+cluster capsule so the buttons render as separate bare circles; (3) make the
+`HudThemeTest` screenshots realistic — the mdpi render was useless (every dp =
+1px), so switched to the S10e profile (2280×1080 @ 440dpi) and verified by
+pixel-census (buttons 132px = 48dp, glyphs centered ±0.18dp); (4) README hero
+screenshot from the connected-state render, exported lightweight
+(1.87 MiB → 103 KiB JPEG) via `scripts/export_readme_screenshot.py`. **Committed
+2026-08-17** (3 commits, local; push pending CI/retrospective).
+
+| Estimated | Actual |
+|-----------|--------|
+| — | 4 h 30 m (2026-08-15 evening → 2026-08-17 14:03; incl. laptop-crash recovery) |
+
+- **Borderless magic-button cluster** — removed
+  `android:background="@drawable/hud_action_cluster"`, deleted the drawable;
+  glyph centering now uses asymmetric per-button padding (glyph ink only), so
+  the circular backgrounds stay centered in the cluster while each glyph reads
+  centered in its circle. Verified on the emulator (5 intact circle rings, no
+  capsule stroke, all glyphs ±0.18dp centered).
+- **S10e screenshot profile** — `HudThemeTest` now renders at
+  `w829dp-h393dp-land-440dpi` → 2280×1080, the S10e landscape resolution, and
+  hides the loading spinner/reconnect badge (a real device hides them on the
+  first video frame; no frame renders in the test). Verified: 4 PNGs all
+  2280×1080, circles 132px, connected center clean.
+- **README hero screenshot** — `docs/img/hud_connected.jpg` (1280×606, JPEG
+  q82, 103 KiB) added to the README, regenerable via the export script. Kept
+  fresh by the AGENTS.md "Before release" checklist (user chose a note, no
+  hook).
+- **Emulator-launch fix (tooling)** — launching the emulator from the tool now
+  goes through run_bounded wrapping a detached-launcher `.ps1` (returns in
+  3.5 s, no boot block) + a separate bounded boot-wait, instead of a raw
+  `Start-Process` (third shape of the caller-blocking trap). DECISIONS.md
+  "[2026-08-17] Emulator launch".

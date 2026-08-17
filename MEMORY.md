@@ -140,6 +140,29 @@ by the shim, gradle goes through `call_gradle`, and ad-hoc calls route through
 `run_bounded` or get an explicit bash-tool `timeout` (which alone is
 INSUFFICIENT — it kills only the direct process).
 
+**Emulator launch (hit + fixed 2026-08-17):** launching the emulator bare via
+`Start-Process` was a third caller-blocking trap shape (unbounded launch +
+cadence-breach turn end). The working pattern:
+
+1. `.tmp/launch_emulator.ps1` — `Start-Process -PassThru -RedirectStandardOutput/-RedirectStandardError` (fully detached), print
+   `PID=`/`HasExited=` after ~2 s, exit. Run it **through** run_bounded
+   (`--timeout 180`). The launcher returns in ~3.5 s / exit 0, so run_bounded's
+   timeout never fires and its tree-kill only ever catches a hung launch — the
+   emulator survives detached. Never wrap the emulator itself in run_bounded
+   (timeout kills a healthy emulator).
+1. Same turn: `.tmp/wait_boot.ps1` — loop `adb -s <serial> shell getprop sys.boot_completed` until `1`, under `run_bounded --timeout 360`. Never
+   inline a PowerShell `$var` loop through run_bounded (nested quoting mangles
+   `$b`/`$i` — hit again 2026-08-17; route through a `.tmp/*.ps1` file).
+1. `adb emu kill` spawns transient `emulator -kill <pid> -sleep 20` helper
+   processes that linger up to ~20 s — they are NOT real emulators (no qemu
+   child); wait for them to clear before confirming the kill.
+1. The emulator serial drifts after kills (was `emulator-5556`, is
+   `emulator-5554` now) — always read `adb devices` rather than assuming.
+
+Measured: launch 3.5 s, boot wait ~15 s (cold `-no-snapshot`). Rationale:
+DECISIONS.md "[2026-08-17] Emulator launch: run_bounded-wrapped detached
+Start-Process".
+
 ## Testing
 
 ### Test task structure
@@ -210,6 +233,14 @@ window focus is never granted under the software GPU), wait for
 launcher too — avg brightness 0.0) — a capture-path artifact, not an app defect.
 `Swiftshader_API36` captures correctly. For `.tmp` screenshot proofs (AGENTS.md
 "UI changes ship with a screenshot proof"), use the swiftshader AVD.
+
+**Screenshot resolution (2026-08-15):** `Swiftshader_API36`'s `config.ini` was
+changed to Galaxy-S10e-like dimensions — `hw.lcd.width=1080`,
+`hw.lcd.height=2280` (was 2340), `hw.lcd.density=440` unchanged (2.75).
+Resolution-only, per user request; density unchanged so all dp math / pixel-census
+scripts still compute 2.75. AVD `config.ini` is the source of truth (DECISIONS.md)
+and edits apply only at the next cold boot — kill the emulator, edit, relaunch with
+`-no-snapshot`, verify with `adb shell wm size` → `1080x2280`.
 
 ## App protocol
 
@@ -2795,3 +2826,157 @@ in tests.
 `SettingsTests` passing on the phone + real `input tap` + screenshot) — the
 phone dropped off adb mid-campaign (USB status Unknown) and was unavailable;
 the fix's CI gate (green on push) stands in for it until the phone returns.
+
+**RESOLVED 2026-08-15 (same day, phone reconnected):** on-device verification
+PASSED. (1) Phone-scoped `connectedDebugAndroidTest`: **9/9** including both
+`SettingsTests` (the fix's pass criterion). (2) Real `input tap` at the chip
+center — the exact tap the shade strip used to eat — opened
+`RobotSettingsActivity` (verified via `dumpsys activity activities`
+topResumedActivity). (3) Pixel-census of the live gamepad screenshot: chip at
+y≈97–170, clear of the top OS strip (pre-fix it was y≈18–92 inside it); the
+top strip owns no HUD pixels. Proof shots:
+`.tmp/_ui_260815-1519-settings.png` (Settings screen after the real tap) and
+`.tmp/_ui_260815-1521-gamepad.png` (chip clear of the strip). The unchanged
+test + real-input tap together prove the inset-aware HUD fix on real hardware.
+A.1 is complete; `.PLAN.md` updated.
+
+### [2026-08-15] Magic-button cluster centering fix + S10e-resolution emulator + cadence breach
+
+Follow-up to C21: the user reported the magic-button circles' top arcs were
+clipped by the cluster pill (`.tmp/_ui_260815-1521-gamepad.png`), and the glyph
+read as centered to the pill, not the button. Root-caused + fixed (DECISIONS.md
+"Magic-button glyph centering: asymmetric padding, not view translation"):
+`centerGlyph()`'s `translationY` shifted the WHOLE button (~6.5px up) into the
+cluster's `clipToPadding` area; fix = per-button asymmetric padding (glyph only)
+
+- cluster vertical padding 6dp→2dp, `clipToPadding=false` kept. Emulator-verified
+  all 5 circles with full top arcs (apex ~905 vs ~1033 before).
+
+**Emulator for screenshot proofs now renders S10e-like resolution** 1080×2280
+(`Swiftshader_API36` config.ini height 2340→2280, density 440 kept) — see
+"Emulator prerequisites" above. Cold boot after the edit; `wm size` verified.
+
+**Cadence breach (repeat, 2026-08-07 → 2026-08-15):** after relaunching the
+emulator with `Start-Process -PassThru`, I verified liveness ("RUNNING") and ENDED
+the turn without the bounded readiness poll. The next turn's poll then blocked
+through the cold boot (boot had completed; the poll/pipe kept the call open) and
+the user had to interrupt — exactly the documented "Autonomous-run stall" pattern
+(DECISIONS.md, AGENTS.md "Async turns"). The rule already says it: a turn that
+launches an async process is NOT complete until the readiness result is recorded,
+and the poll must be bounded, in the same working loop. Mistake was splitting
+launch+liveness from the poll across turns, not the rule being absent. Correction
+applied this session: readiness (`adb shell wm size`) polled in the same turn.
+
+**Same-session tooling repeat (gradle pipe):** hours later I piped `.\gradlew.bat spotlessApply` through `Tee-Object | Select-Object -Last` — the documented
+forbidden pattern again ("Never pipe long-lived children through Tee/Select",
+AGENTS.md "Windows/PowerShell quirks": the daemon inherits the pipe handles and
+the pipeline never sees EOF). The build itself succeeded (daemon was already
+warm) but the call was stuck/had to be interrupted. Correct invocation for
+ad-hoc gradle from the tool: `uv run python scripts/run_bounded.py --timeout N --label X --log .tmp/x.log -- .\gradlew.bat ...` (also used for every gradle
+call below) — never Tee/Select, never a bare pipe. Lesson re-confirmed: the
+rule is enforced at invocation time, not remembered; when a "stuck" call shows
+up, the first suspect is the pipe, not the build.
+
+### [2026-08-17] Campaign 22 retrospective — borderless cluster, S10e screenshots, README hero, emulator-launch fix
+
+Follows the "Campaign retrospective checklist" (MEMORY.md above; this entry is
+also a worked example).
+
+**Process**
+
+- **Biggest process win:** the emulator-launch fix (run_bounded wrapping a
+  detached-launcher `.ps1` + separate bounded boot-wait) — the THIRD shape of
+  the caller-blocking trap, solved with one measured pattern (launch 3.5 s /
+  exit 0, no boot block). It also fixes the cadence-breach root cause: the
+  readiness poll now completes in the same turn, always.
+- **Committability constraint:** every commit compiled against HEAD's design —
+  the `HudThemeTest` change references `videoLoading`/`videoReconnecting`
+  (present at HEAD), and the two cluster tests reference `R.id.buttons`
+  semantics that existed at HEAD.
+- **What could have been lost:** the laptop crashed mid-build (12:11; the
+  `assemble_borderless` log came back as NUL bytes, both tool calls
+  interrupted). Safe because `.PLAN.md` held the full mission state + git
+  kept the working tree. Recovery = re-check state (git status, logs, process
+  list), rebuild cleanly, relaunch emulator via the NEW pattern.
+- **Elapsed vs Estimated:** ROADMAP Campaign 22 header — Estimated `—`, Actual
+  ~4 h 30 m (two working evenings: centering fix + S10e emulator resolution;
+  then borderless + screenshots + README hero + crash recovery).
+
+**Learning**
+
+- **New facts worth saving:** (1) Robolectric qualifier ORDER matters —
+  `w829dp-h393dp-440dpi-land` fails to parse; the valid order is
+  `w{width}dp-h{height}dp-land-{density}dpi` (`IllegalArgumentException`
+  caught by the test). (2) A 440dpi S10e landscape profile = `w829dp-h393dp`,
+  canvas 2280×1080 (displayMetrics may round to 2280×1081 — the explicit
+  canvas + EXACTLY measure keep the PNG exact). (3) `HudThemeTest`'s connected
+  render shows the 120dp loading spinner (dark disc + green ring) because no
+  real video frame ever renders to hide it — a test artifact, not an app bug.
+  (4) The export script is deterministic (same Pillow + input → same bytes).
+- **Wrong assumption caught:** the "video must be present" center-pixel probe
+  failed after the density change — the centered connection pill covers the
+  exact screen center. Fix: probe `screenHeight / 4` (above the pill, between
+  the pads). Also `Set-Content` corrupted `HudThemeTest.kt` (BOM + em-dash
+  mojibake) — the documented PS trap, caught by `git diff` review, reverted +
+  re-applied byte-preserving.
+- **Generalize:** the S10e density story (mdpi screenshots are toy-scale; the
+  user called them useless) generalizes to "always render screenshot tests at a
+  real device profile" — now the default for HudThemeTest.
+
+**Signal**
+
+- **Frequency-scan:** `Deprecated Gradle features` = 157 hits — the KNOWN
+  Gradle-10-era deprecation, still present in every build, still correctly
+  marked pending (NOT wrongly re-resolved). `configuration cache cannot be reused` = 66 hits — all historical (08-08 → 08-15) except ONE expected
+  first-build-after-change entry today; the config-cache reuses cleanly, the
+  resolution claim stands.
+- **Rule deviations surfaced:** cadence-breach repeat (08-07 → 08-15 → fixed
+  this campaign by the emulator-launch pattern) and the gradle-pipe repeat (both
+  already documented; the emulator-launch rule is the NEW one captured in
+  AGENTS.md + DECISIONS.md + this MEMORY section).
+
+**Drift**
+
+- **Per-doc audit:** AGENTS.md — emulator-launch rule added (scope-correct);
+  DECISIONS.md — 2 new entries + 2 index rows updated (correct scope); MEMORY.md
+  — emulator-launch + S10e-resolution facts + C21 resolution + this
+  retrospective (facts/quirks scope); ROADMAP — C21 deferred→RESOLVED + C22
+  entry (published campaign record scope). DESIGN.md was EOL-churned only by
+  mdformat and reverted (no content change).
+- **Stale content (deferred by user):** `dimens.xml:30-32` comment still says
+  "top padding 4dp" (was 6dp, now 2dp); `DESIGN.md` line ~114 still calls the
+  magic-button cluster "rounded capsule buttons" (now borderless). Both are
+  user-deferred "fixes later" — recorded in `.PLAN.md` so they are not lost.
+
+**Value**
+
+- **Measurable profit:** screenshots went from useless toy-scale mdpi renders
+  to realistic S10e 2280×1080 @ 440dpi (buttons 132px = 48dp, verified by
+  pixel-census); README hero 1.87 MiB → 103 KiB JPEG (~6%); emulator launch
+  3.5 s with zero caller-blocking; borderless cluster verified on-device.
+- **Deferred (`.PLAN.md`):** dimens comment + DESIGN.md capsule note; A.2
+  dual-network socket binding; A.3 release smoke + DummyRobotServer; A.4
+  snapshot cleanup.
+- **Next automation candidate:** the README-hero export could become a
+  pre-commit hook (2nd escalation tier) — the user chose a release-checklist
+  note only this time; revisit when it next goes stale.
+- **Should have asked earlier:** the screenshot resolution/ppi question — I
+  proposed the emulator-capture workflow before the user's own hint ("change
+  Robolectric resolution and ppi?") surfaced the simpler, better fix. The
+  Robolectric qualifier route should have been option #1 from the start.
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added this campaign:** "Is the committed README hero
+  screenshot the current HUD render?" (freshness anchor for the release
+  checklist note).
+- **Most useless question this campaign:** the elaborate old-vs-new
+  boundary-strip comparison (`.tmp/census_borderless.py`) — it confirmed what
+  the button-palette comparison already showed (capsule gone) and added no new
+  insight beyond the first strip check. *Why useful when added:* it was the
+  first quantifiable proof the stroke was gone. *Why useless now:* the same
+  signal is covered by the simple "green pixels outside the buttons = 0"
+  census. *How to envelop it:* one strip check + button-palette comparison
+  suffice; don't build a second census tool for the same claim.
+- **Checklist itself reviewed:** kept all questions; the "most useless" review
+  above is this campaign's contribution. Next campaign re-audits.

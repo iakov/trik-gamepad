@@ -30,9 +30,9 @@ Each note follows the same shape:
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-14] Video smart-fit: center-crop cover instead of letterbox |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
-| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD | [2026-08-15] Inset-aware HUD container |
+| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering | [2026-08-15] Magic-button glyph centering: asymmetric padding, not view translation |
 | Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-15] Device identifiers never enter repo content |
-| Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction | [2026-08-14] Timeout-bound tooling: process-TREE kill + host adb shim |
+| Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-17] Emulator launch: run_bounded-wrapped detached Start-Process |
 
 ______________________________________________________________________
 
@@ -1246,6 +1246,36 @@ ______________________________________________________________________
   verified by pixel-census (chrome/knob/ring present in sepia idle; gear + chip
   render) and hash-matched against fresh captures.
 
+### [2026-08-17] Emulator launch: run_bounded-wrapped detached Start-Process
+
+- **Problem:** launching the emulator from the tool is a third shape of the
+  same caller-blocking trap as Gradle daemons. A raw `Start-Process` emulator
+  launch is unbounded, and a turn ending on its bare liveness check repeats the
+  documented cadence breach (the readiness poll lands in a later turn and can
+  block the user). Running the emulator as run_bounded's wrapped process is
+  wrong too — its `taskkill /T /F` on timeout kills a *healthy* emulator.
+- **Alternatives considered:** raw `Start-Process` (unbounded, cadence trap —
+  rejected); run_bounded wrapping the emulator directly with a long timeout
+  (kills a healthy emulator at timeout — rejected); wrap only a launcher that
+  detaches the emulator, and do the readiness poll as a separate bounded call.
+- **Chosen solution:** a `.tmp/launch_emulator.ps1` that runs
+  `Start-Process -PassThru -RedirectStandardOutput/-RedirectStandardError`
+  (fully detached), prints `PID=` + `HasExited=` after ~2 s, and exits; that
+  launcher runs **through** `run_bounded --timeout 180`. The emulator itself
+  stays detached and alive; run_bounded only bounds the launcher (returns in
+  ~3 s, so its timeout never fires and its tree-kill only ever catches a hung
+  launch). The readiness poll is a separate `wait_boot.ps1` (loop on
+  `getprop sys.boot_completed`) also under run_bounded, in the same turn.
+- **Why:** measured — launcher returned in 3.5 s / exit 0 (no boot block), and
+  the boot wait completed in ~15 s in the same turn. Both constraints hold:
+  the emulator survives past the launch command, and every native command is
+  bounded + tree-killable. This is the same pattern as the `Start-Process`
+  servers already documented, but the launch itself is now bounded too.
+- **Out of scope / consequences:** a `.tmp/wait_boot.ps1` is needed (never
+  inline a PowerShell `$var` loop through `run_bounded` — nested quoting
+  mangles `$b`/`$i`); the emulator serial may drift after kills (was
+  `emulator-5556`, is `emulator-5554` now — always read `adb devices`).
+
 ### [2026-08-14] Timeout-bound tooling: process-TREE kill + host adb shim
 
 - **Problem:** an `adb install` during an emulator offline blip hung the caller
@@ -1295,6 +1325,37 @@ ______________________________________________________________________
   insets frame and asserts the container adopts it per edge. The unchanged
   `SettingsTests` becomes the on-device verification (deferred — the phone
   dropped off adb after the change; recorded in `.PLAN.md`).
+
+### [2026-08-15] Magic-button glyph centering: asymmetric padding, not view translation
+
+- **Problem:** the round magic buttons were clipped at the top by the cluster
+  pill, and the glyph read as centered to the pill, not the button circle.
+  `MagicButtonPanel.centerGlyph()` applied `btn.translationX/Y` to center the
+  glyph's ink box — but translation moves the WHOLE view, so each button's
+  circular background shifted up (~6.5px) inside the cluster; the cluster's
+  default `clipToPadding=true` then cut the circle's top arc flat (torn tops
+  on phone + emulator screenshots, 2026-08-15).
+- **Alternatives:** `clipToPadding=false` only (fixes the clip but the circle
+  stays off-center — the glyph then reads as pill-centered, which the user
+  reported); re-center via the row's padding (impossible — one row padding,
+  but each glyph has a DIFFERENT ink offset); asymmetric padding per button
+  (chosen).
+- **Chosen solution:** `centerGlyph()` converts the ink offset into asymmetric
+  `setPadding` on each button (`paddingTop/Bottom = max(0, ∓2·offsetY)`, same
+  for start/end) and keeps `translationX/Y` at 0, so the circular background
+  stays centered in the cluster while only the glyph ink moves. The cluster
+  keeps `clipToPadding="false"` (defensive) and its vertical padding drops
+  6dp→2dp so the pill hugs the 48dp buttons (pill 60dp→52dp). Button size is
+  NOT changed — measured equal to the settings button (48dp) already.
+- **Why:** padding changes only the content box (TextView gravity still centers
+  the line box inside it), leaving the full-view background untouched; the
+  padding math is the exact inverse of the old translation
+  (`padTop − padBottom + 2·offsetY = 0`). Per-button padding centers each
+  circle independently — which a single row padding cannot.
+- **Out of scope / consequences:** the glyph can no longer overflow its button
+  (irrelevant — ink ≈46px in a 132px circle). Regression tests: every magic
+  button asserts `translationX/Y == 0`; the cluster test asserts the drawn
+  circle top/bottom land on `row.paddingTop` / `row.height − paddingBottom`.
 
 ### [2026-08-15] Device identifiers never enter repo content
 
