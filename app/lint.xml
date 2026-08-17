@@ -21,6 +21,13 @@
          versions (compileSdk 36, core-ktx 1.16.0) are deliberate locks; ignore
          the check rather than carry an un-baselinable absolute path. -->
     <issue id="GradleDependency" severity="ignore" />
+    <!-- NewerVersionAvailable fires on the version catalog when lint's
+         environment knows a newer plugin/library release than the pinned one
+         (hit 2026-08-17: spotless 8.10.0 became available after the last green
+         run). Same class as AndroidGradlePluginVersion: environment-dependent,
+         un-baselinable (machine-specific absolute path), and the pin is a
+         deliberate lock. Ignore rather than chase every dependency release. -->
+    <issue id="NewerVersionAvailable" severity="ignore" />
     <!-- TouchPadListener#onTouch delegates to SquareTouchPadLayout.onTouch,
          which DOES call View#performClick() in the ACTION_UP and ACTION_DOWN
          branches; lint's interprocedural analysis cannot see it through the
