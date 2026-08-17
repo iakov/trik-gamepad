@@ -77,10 +77,14 @@ class MagicButtonPanel(
   }
 
   /**
-   * Centers the glyph's INK box (not the font's line box) in the button. TextView gravity centers
-   * the ascent/descent box, but pictograms (▲ ● ■ ✕ ◆) carry their ink asymmetrically inside that
-   * box, so they sit off-center. Measuring the real text bounds and nudging the view centers the
-   * visible glyph; the remaining space inside the circle is only the char-vs-circle size gap.
+   * Centers the glyph's INK box (not the font's line box) in the button WITHOUT moving the button.
+   * TextView gravity centers the ascent/descent box, but pictograms (▲ ● ■ ✕ ◆) carry their ink
+   * asymmetrically inside that box, so they sit off-center. The fix is asymmetric padding, never
+   * `translation*`: padding shrinks only the text content box, so the circular background keeps its
+   * centered spot in the cluster while the ink box lands on the view center (`padTop - padBottom +
+   * 2 * offsetY == 0`). A `translationY` would move the whole button — background included — out of
+   * center, and the cluster's padding clip would cut its top arc (hit 2026-08-15, see DECISIONS.md
+   * "Magic-button glyph centering").
    */
   private fun centerGlyph(btn: Button) {
     val paint = btn.paint
@@ -92,9 +96,15 @@ class MagicButtonPanel(
     val lineCenter = (fm.ascent + fm.descent) / 2f
     val inkCenterY = (bounds.top + bounds.bottom) / 2f
     val inkCenterX = (bounds.left + bounds.right) / 2f
-    btn.translationY = lineCenter - inkCenterY
-    // Monospace advance is 1 em; center the ink horizontally within it.
-    btn.translationX = (paint.measureText(text) / 2f) - inkCenterX
+    // Asymmetric padding = GLYPH_CENTER_PADDING_FACTOR * the ink offset, on the side opposite the
+    // offset, so the ink center lands on the view center while the background stays put.
+    val offsetY = inkCenterY - lineCenter
+    val offsetX = inkCenterX - (paint.measureText(text) / 2f)
+    val paddingTop = (-GLYPH_CENTER_PADDING_FACTOR * offsetY).coerceAtLeast(0f).toInt()
+    val paddingBottom = (GLYPH_CENTER_PADDING_FACTOR * offsetY).coerceAtLeast(0f).toInt()
+    val paddingStart = (-GLYPH_CENTER_PADDING_FACTOR * offsetX).coerceAtLeast(0f).toInt()
+    val paddingEnd = (GLYPH_CENTER_PADDING_FACTOR * offsetX).coerceAtLeast(0f).toInt()
+    btn.setPaddingRelative(paddingStart, paddingTop, paddingEnd, paddingBottom)
   }
 
   fun clearListeners(container: ViewGroup) {
@@ -120,5 +130,9 @@ class MagicButtonPanel(
   private companion object {
     // Magic-button glyph height as a fraction of the circle diameter (60%).
     const val MAGIC_GLYPH_SIZE_RATIO = 0.6f
+    // Padding must be twice the ink offset to cancel it (`padTop - padBottom + 2 * offsetY == 0`
+    // with gravity=CENTER: the line box is centered in the content box, so a `1 * offset` padding
+    // would only move the line box by half the needed amount).
+    const val GLYPH_CENTER_PADDING_FACTOR = 2f
   }
 }

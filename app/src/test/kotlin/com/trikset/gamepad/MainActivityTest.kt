@@ -208,6 +208,45 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun magicButtonCirclesShouldNotBeClippedByClusterPadding() {
+    // The cluster must not clip the button circles, and each circle must sit vertically
+    // centered in the cluster. centerGlyph() used to shift each button up via translationY to
+    // center its glyph, which moved the circular background off the cluster's vertical center
+    // and into the top padding where clipToPadding clipped it flat (regression: phone + emulator
+    // screenshots showed torn tops); glyph padding keeps the circle centered instead (see
+    // DECISIONS.md "Magic-button glyph centering: asymmetric padding, not view translation").
+    // clipToPadding=false stays as a belt-and-braces guard.
+    val row = activity.findViewById<android.view.ViewGroup>(R.id.buttons)!!
+    assertFalse("cluster must not clip the button circles", row.clipToPadding)
+    // Robolectric does not lay out the hierarchy on its own; measure + layout the row so the
+    // child positions are real. Row is wrap_content, so UNSPECIFIED specs resolve to the true
+    // content size (buttons 48dp + 2dp top/bottom padding).
+    row.measure(
+        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+    )
+    row.layout(0, 0, row.measuredWidth, row.measuredHeight)
+    val contentCenter = row.paddingTop + (row.height - row.paddingTop - row.paddingBottom) / 2f
+    for (i in 0 until row.childCount) {
+      val child = row.getChildAt(i)
+      // A translation-based centerGlyph (the pre-fix bug) would move the whole button; assert it
+      // directly so the regression is caught regardless of Robolectric's font metrics (where the
+      // vertical ink offset is ~0 and would slip past the center-tolerance check below).
+      assertEquals("button $i translationX must stay 0", 0f, child.translationX, 0f)
+      assertEquals("button $i translationY must stay 0", 0f, child.translationY, 0f)
+      // The circular background fills the button, so the drawn button center is the circle
+      // center; it must sit on the cluster's content center.
+      val drawnCenter = child.top + child.height / 2f + child.translationY
+      assertEquals(
+          "button $i circle must be vertically centered in the cluster",
+          contentCenter,
+          drawnCenter,
+          0.5f,
+      )
+    }
+  }
+
+  @Test
   fun onSharedPreferenceChangedWithValidKeepaliveShouldApply() {
     setPref(SettingsFragment.SK_KEEPALIVE, "2000")
     // >= MINIMAL_KEEPALIVE -> applied to the sender.

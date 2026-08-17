@@ -92,6 +92,51 @@ class MagicButtonPanelTest : RobolectricTestBase() {
   }
 
   @Test
+  fun centerGlyphShouldNotTranslateTheWholeButton() {
+    val container = FrameLayout(context)
+    panel.populate(container, 3, symbols)
+
+    for (i in 0 until container.childCount) {
+      val btn = container.getChildAt(i) as Button
+      // The glyph centering must move only the ink (via padding), never the whole button:
+      // a translation would shift the circular background off-center in the cluster and into
+      // the cluster's clip area (regression guard — hit 2026-08-15).
+      assertEquals("button $i translationX must stay 0", 0f, btn.translationX, 0f)
+      assertEquals("button $i translationY must stay 0", 0f, btn.translationY, 0f)
+    }
+  }
+
+  @Test
+  fun centerGlyphShouldCancelTheInkOffsetViaPadding() {
+    val container = FrameLayout(context)
+    panel.populate(container, 1, symbols)
+    val btn = container.getChildAt(0) as Button
+    val paint = btn.paint
+    val text = btn.text.toString()
+    val bounds = android.graphics.Rect()
+    paint.getTextBounds(text, 0, text.length, bounds)
+    val fm = paint.fontMetrics
+    // Ink-box center minus line-box center (the offset the old translation used to cancel).
+    val offsetY = (bounds.top + bounds.bottom) / 2f - (fm.ascent + fm.descent) / 2f
+    val offsetX = (bounds.left + bounds.right) / 2f - paint.measureText(text) / 2f
+    // The asymmetric padding must be the exact inverse of the offset
+    // (padTop - padBottom + 2*offsetY == 0), so the ink center lands on the view center
+    // while the background stays put.
+    assertEquals(
+        "vertical padding must cancel the ink offset",
+        0f,
+        btn.paddingTop - btn.paddingBottom + 2f * offsetY,
+        0.5f,
+    )
+    assertEquals(
+        "horizontal padding must cancel the ink offset",
+        0f,
+        btn.paddingLeft - btn.paddingRight + 2f * offsetX,
+        0.5f,
+    )
+  }
+
+  @Test
   fun clickShouldSendBtnDownCommand() {
     val container = FrameLayout(context)
     panel.populate(container, 3, symbols)

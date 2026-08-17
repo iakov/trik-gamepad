@@ -201,9 +201,9 @@
             android:gravity="center"
             android:minHeight="@dimen/touch_target_min"
             android:orientation="horizontal"
-            android:background="@drawable/hud_action_cluster"
-            android:paddingTop="6dp"
-            android:paddingBottom="6dp"
+            android:clipToPadding="false"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp"
             >
 
         </LinearLayout>
