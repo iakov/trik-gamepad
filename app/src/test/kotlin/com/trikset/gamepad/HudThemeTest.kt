@@ -34,10 +34,13 @@ import org.robolectric.annotation.GraphicsMode
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@Config(sdk = [Config.TARGET_SDK])
+@Config(sdk = [Config.TARGET_SDK], qualifiers = "w829dp-h393dp-land-440dpi")
 class HudThemeTest : RobolectricTestBase() {
 
-  private val screenWidth = 2340
+  // S10e profile: 1080x2280 @ 440dpi (2.75x); landscape 2280x1080. The explicit canvas + EXACTLY
+  // measure specs below keep the PNG at exactly this physical size regardless of Robolectric's
+  // displayMetrics dp rounding (w829dp*2.75=2279.75, h393dp*2.75=1080.75 -> 2280x1081).
+  private val screenWidth = 2280
   private val screenHeight = 1080
   private val screenshotsDir: String? = System.getProperty("screenshots.dir")
 
@@ -103,6 +106,11 @@ class HudThemeTest : RobolectricTestBase() {
     activity.findViewById<View>(R.id.video)?.visibility = View.GONE
     // The placeholder prompts "configure a video URI" — not a live-stream look.
     activity.findViewById<View>(R.id.videoPlaceholder)?.visibility = View.GONE
+    // The loading spinner/relaunch badge are hidden by the first rendered frame on a real device;
+    // no frame ever renders here (the cat is a static stand-in), so hide them to match the
+    // "connected + playing" state the screenshot represents.
+    activity.findViewById<View>(R.id.videoLoading)?.visibility = View.GONE
+    activity.findViewById<View>(R.id.videoReconnecting)?.visibility = View.GONE
 
     // Lay the HUD out at the full screen size, then draw the real view hierarchy over the video.
     val main = activity.findViewById<ViewGroup>(R.id.main)
@@ -129,6 +137,15 @@ class HudThemeTest : RobolectricTestBase() {
     val b = rgb and 0xFF
     return (r + g + b) / 3 >= 40
   }
+
+  /**
+   * Probes the video at a point guaranteed to be HUD-free: the top-center band above the connection
+   * pill (which is centered at screen height / 2) and horizontally between the pads (which live in
+   * the outer left/right thirds). The pill would otherwise cover the exact screen center and fail
+   * the "video must be present" check on its own pixels.
+   */
+  private fun videoIsBright(bitmap: Bitmap): Boolean =
+      isBright(pixel(bitmap, screenWidth / 2, screenHeight / 4))
 
   private fun distinctColors(bitmap: Bitmap): Int {
     val seen = mutableSetOf<Int>()
@@ -176,6 +193,9 @@ class HudThemeTest : RobolectricTestBase() {
 
     // Pill hidden while connected (the video/gear border convey the state).
     assertEquals(View.GONE, activity.findViewById<TextView>(R.id.connectionStatus).visibility)
+    // Loading affordances are gone too — the first rendered frame hides them on a real device.
+    assertEquals(View.GONE, activity.findViewById<View>(R.id.videoLoading).visibility)
+    assertEquals(View.GONE, activity.findViewById<View>(R.id.videoReconnecting).visibility)
     // Controls at full (user) alpha while connected.
     assertEquals(1f, activity.findViewById<View>(R.id.controlsOverlay).alpha, 0.001f)
     save(frame, "hud_connected.png")
@@ -186,7 +206,7 @@ class HudThemeTest : RobolectricTestBase() {
     val activity = buildActivity()
     val frame = render(activity, ConnectionState.Connecting)
 
-    assertTrue("video must be present", isBright(pixel(frame, screenWidth / 2, screenHeight / 2)))
+    assertTrue("video must be present", videoIsBright(frame))
     val pill = activity.findViewById<TextView>(R.id.connectionStatus)
     assertEquals(View.VISIBLE, pill.visibility)
     // The connecting pill shows the ↺ glyph (bundled symbol font).
@@ -204,7 +224,7 @@ class HudThemeTest : RobolectricTestBase() {
     val activity = buildActivity()
     val frame = render(activity, ConnectionState.Disconnected(""))
 
-    assertTrue("video must be present", isBright(pixel(frame, screenWidth / 2, screenHeight / 2)))
+    assertTrue("video must be present", videoIsBright(frame))
     val pill = activity.findViewById<TextView>(R.id.connectionStatus)
     assertEquals(View.VISIBLE, pill.visibility)
     assertEquals("⏻", pill.text.toString())
@@ -216,7 +236,7 @@ class HudThemeTest : RobolectricTestBase() {
     val activity = buildActivity()
     val frame = render(activity, ConnectionState.Disconnected("boom"))
 
-    assertTrue("video must be present", isBright(pixel(frame, screenWidth / 2, screenHeight / 2)))
+    assertTrue("video must be present", videoIsBright(frame))
     assertEquals(View.VISIBLE, activity.findViewById<TextView>(R.id.connectionStatus).visibility)
     // A real connection error surfaces the transient error pill too (the theme's error affordance).
     assertEquals(View.VISIBLE, activity.findViewById<TextView>(R.id.connectionError).visibility)
