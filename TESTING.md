@@ -294,6 +294,19 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
 - **`@string/copy` (and friends) collide with private androidx.preference
   strings** — lint `PrivateResource`. Prefix app-specific button strings
   (`copy_button`) or reference the string from your own XML.
+- **Network capability fixtures cannot be fabricated in Robolectric.**
+  `NetworkCapabilities$Builder` is absent from every installed SDK stub
+  (android-23/30/35/36/36.1) and `Network(int)` is package-private. Build
+  networks with `ShadowNetwork.newInstance(id)` and assert binding via
+  `shadowOf(network).isSocketBound(socket)`. When the code under test needs to
+  *choose* a network, inject a provider seam (e.g. `WifiSocketBinder`'s
+  `wifiNetworkProvider: () -> Network?`) instead of faking capabilities.
+- **Verify overload API levels against the OLDEST_SDK variant, not
+  compileSdk.** `ConnectivityManager.registerNetworkCallback(request, cb, Handler)` is API 26+ — the 2-arg form is API 21+. Under the OLDEST_SDK (23)
+  Robolectric config the 3-arg form throws `NoSuchMethodError` at runtime
+  (hit 2026-08-17, C23). Some overloads are newer than their base method;
+  confirm against the minSdk stub jar (`javap` on the platform android.jar).
+  (`Network.bindSocket(Socket)` is minSdk-23-safe, verified in android-23.)
 
 ### WCAG & accessibility regression tests
 

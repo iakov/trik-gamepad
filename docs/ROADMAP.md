@@ -916,3 +916,46 @@ screenshot from the connected-state render, exported lightweight
   3.5 s, no boot block) + a separate bounded boot-wait, instead of a raw
   `Start-Process` (third shape of the caller-blocking trap). DECISIONS.md
   "[2026-08-17] Emulator launch".
+
+## Campaign 23 — dual-network socket binding + emulator snapshot cleanup + deferred docs fixes (2026-08-17)
+
+Scope (user-driven): (1) push + green CI to open the campaign; (2) **A.2** —
+bind TCP/video sockets to the robot's Wi-Fi when cellular is the system
+default network (user-reported connection loss, tracked since Campaign 17);
+(3) **A.4** — emulator snapshot-policy cleanup; (4) the deferred
+`dimens.xml`/`DESIGN.md` comment fixes. Decision + rationale: DECISIONS.md
+"[2026-08-17] A.2 dual-network socket binding: injectable Wi-Fi provider
+seam"; findings + retrospective: MEMORY.md "Campaign 23 retrospective".
+**Committed + pushed 2026-08-17** (CI green: build + gate suite and
+instrumented API 36).
+
+| Estimated | Actual |
+|-----------|--------|
+| — | 1 h 48 m (14:20 → 16:08 +03:00; CI green) |
+
+- **A.2 dual-network socket binding** — `SocketBinder` fun interface +
+  `WifiSocketBinder` with an injectable `wifiNetworkProvider` seam; the
+  production provider tracks `TRANSPORT_WIFI` via the non-deprecated
+  `registerNetworkCallback` flow (the `allNetworks()` scan was rejected by the
+  user even though suppressible; the `Handler` overload of
+  `registerNetworkCallback` is API 26+, so the 2-arg form is used). Sockets
+  bound via `Network.bindSocket` (verified minSdk-23-safe in android-23.jar)
+  at both connect sites (`SenderService.connectToTRIK`,
+  `RawSocketHttpStream.open`); the https path stays on the default network;
+  `ACCESS_NETWORK_STATE` added. New `SocketBinderTest` (4 tests,
+  mutation-checked red) — 8 variants green; coverage 96.7% line / 85.1%
+  branch. On-robot verification (cellular + robot Wi-Fi) is a manual user step.
+- **A.4 emulator snapshot cleanup** — set `firstboot.saveToLocalSnapshot=no`
+  in both `Atd_API36`/`Swiftshader_API36` `config.ini` (machine-local AVD
+  configs, so no repo commit was warranted); verified the Swiftshader AVD
+  cold-boots (51 s). Finding: the key is firstboot-era; launch args govern
+  snapshot behavior (`-no-snapshot` for Swiftshader; Atd keeps snapshots for
+  fast reboots per TESTING.md) — the discrepancy is cosmetic.
+- **Deferred docs fixes** — `dimens.xml` magic-button margin comment (was the
+  6dp+4dp capsule rationale, now a 2dp borderless cluster) + `DESIGN.md`
+  "rounded capsule buttons" → "borderless bare-circle magic buttons".
+- **Tooling note** — the run_bounded-wrapped emulator launch hung this session
+  (no PID output, bash-tool timeout killed the wrapper; the detached emulator
+  still booted). Root cause not pinned; the AGENTS.md emulator-launch rule was
+  updated to verify liveness independently and never treat a hung wrapper as a
+  failed launch.

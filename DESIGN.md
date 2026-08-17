@@ -111,8 +111,8 @@ and dark (48,48,48) mode.
 ## HUD themes (Type 1)
 
 The gamepad chrome ships as **"Type 1"** — a glass/arcade look (translucent dark
-fake-glass fills, brand-green glow strokes, rounded capsule buttons, one tintable
-pad-chrome vector). Two principles:
+fake-glass fills, brand-green glow strokes, borderless bare-circle magic buttons,
+one tintable pad-chrome vector). Two principles:
 
 - **XML-first, code-only-where-runtime.** Shapes, gradients, ripples, corners,
   padding, glass fills and styles live in `hud_*` resources and `Hud.*` styles;

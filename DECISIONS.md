@@ -27,7 +27,7 @@ Each note follows the same shape:
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-15] Idiomatic Kotlin pass (Java→Kotlin leftovers) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-14] Video smart-fit: center-crop cover instead of letterbox |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting | [2026-08-17] A.2 dual-network socket binding: injectable Wi-Fi provider seam |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
 | UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering | [2026-08-15] Magic-button glyph centering: asymmetric padding, not view translation |
@@ -636,6 +636,49 @@ ______________________________________________________________________
 ______________________________________________________________________
 
 ## Architecture
+
+### [2026-08-17] A.2 dual-network socket binding: injectable Wi-Fi provider seam
+
+- **Problem:** phones on the robot Wi-Fi with cellular data enabled lost the
+  TCP/MJPEG connection — a bare `Socket()` routes over the *default* network
+  (cellular; the robot AP has no internet, so the system keeps cellular
+  default). Fix: bind sockets to `TRANSPORT_WIFI` before connect. Two
+  sub-problems surfaced while implementing: (1) `NetworkCapabilities.Builder`
+  is absent from every installed SDK stub jar
+  (android-23/30/35/36/36.1), so Robolectric cannot fabricate capability
+  fixtures; (2) the synchronous scan `ConnectivityManager.getAllNetworks()` is
+  deprecated since API 33 — and the user rejected suppressing it even though
+  the repo has a documented suppression registry (TESTING.md).
+- **Alternatives considered:** (a) `allNetworks()` scan +
+  `@Suppress("DEPRECATION")` (rejected by user — avoid the deprecated API, do
+  not suppress); (b) fabricate `NetworkCapabilities` in tests to assert
+  Wi-Fi-preference (impossible — Builder absent from SDK stubs, verified by
+  javap on all installed android.jar); (c) non-deprecated async
+  `requestNetwork`/`registerNetworkCallback` tracker with an injectable seam.
+- **Chosen solution:** a `SocketBinder` fun interface (`identity` = no binding)
+  - `WifiSocketBinder(context, wifiNetworkProvider: () -> Network? = WifiNetworkTracker(context)::current)`. The provider is the injectable seam:
+    tests supply fixed `ShadowNetwork`s (bind path) or `null` (fallback). The
+    production provider is a `ConnectivityManager.registerNetworkCallback`
+    (`NetworkRequest` with `TRANSPORT_WIFI`; the 2-arg form — the `Handler`
+    overload is API 26+) tracker caching the network in a `@Volatile` field,
+    updated `onAvailable`/`onLost`. `bind()` calls `Network.bindSocket(socket)`
+    (present in android-23.jar → minSdk-23-safe, verified by javap) inside a
+    catch → default-network fallback. Applied at both `Socket()` sites
+    (`SenderService.connectToTRIK`, `RawSocketHttpStream.open`); the https path
+    stays on `HttpURLConnection` (default network — it cannot be bound).
+    Manifest gains `ACCESS_NETWORK_STATE`. When no Wi-Fi network exists, fall
+    back to the default network (user decision — preserves hotspot/cellular
+    setups).
+- **Why:** the seam unit-tests bind/fallback without `NetworkCapabilities`;
+  `registerNetworkCallback` is the non-deprecated flow; default-network
+  fallback keeps the app usable off the robot AP; `bindSocket` is minSdk-safe.
+- **Out of scope / consequences:** the `IOException` catch branch stays
+  uncovered (Robolectric's `bindSocket` never throws) — within the 0.95/0.85
+  gate headroom (LINE 96.7% / BRANCH 85.1% measured). The first connect before
+  the tracker's first `onAvailable` falls back; the next reconnect binds.
+  On-robot verification (cellular + robot Wi-Fi) remains a manual user step.
+  Lesson generalized: prefer avoiding a deprecated API over suppressing it,
+  even when suppression is permitted.
 
 ### [2026-08-06] MJPEG: reconnect-on-error replaces the 30 s forced restart
 
@@ -1275,6 +1318,15 @@ ______________________________________________________________________
   inline a PowerShell `$var` loop through `run_bounded` — nested quoting
   mangles `$b`/`$i`); the emulator serial may drift after kills (was
   `emulator-5556`, is `emulator-5554` now — always read `adb devices`).
+  **C23 addendum (2026-08-17):** the pattern's ~3.5 s-return promise did NOT
+  hold once — the launcher's output never flushed, the bash-tool timeout killed
+  the wrapper chain, and the detached emulator still booted (51 s cold). Root
+  cause not pinned (hypothesis: `2>&1 | Out-String`-piped native output +
+  detached-child handle inheritance under PS 5.1). Consequence: a hung wrapper
+  must never be treated as a failed launch — verify liveness independently
+  (`adb devices` + boot poll) before any kill/relaunch (AGENTS.md
+  emulator-launch rule extended; re-audit the invocation before the next
+  launch).
 
 ### [2026-08-14] Timeout-bound tooling: process-TREE kill + host adb shim
 

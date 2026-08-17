@@ -27,8 +27,8 @@
     <dimen name="hud_status_badge_size">18dp</dimen>
     <dimen name="hud_status_glyph_size">14dp</dimen>
     <dimen name="hud_chip_badge_gap">6dp</dimen>
-    <!-- Horizontal gap between magic buttons, matching the space above the circles in the cluster
-         (hud_action_cluster top padding 6dp + the buttons row top padding 4dp). -->
+    <!-- Horizontal gap between the borderless magic-button circles (the cluster's capsule background
+         and its 6dp padding were dropped in a45b34c; the row padding is now 2dp). -->
     <dimen name="hud_magic_button_margin_start">10dp</dimen>
     <!-- Connection-error Snackbar text: caption scale (the pill's 20sp is too loud for a transient
          error bar; white on the glass fill keeps it readable over bright video). -->

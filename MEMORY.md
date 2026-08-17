@@ -443,7 +443,7 @@ restate their findings here only when a checklist entry needs an anchor.
    useful part into another question) if a useful part remains, otherwise
    **drop it from this checklist**. Update the *last revised* stamp.
 
-*Last revised: 2026-08-15 (Q3 rephrased — see "Campaign 20 retrospective", checklist-review step)*
+*Last revised: 2026-08-17 (checklist reviewed in the C23 retrospective — all questions kept; Process Q3 is crash-campaign-only)*
 
 ### [2026-08-06] Quality-gate implementation quirks (checkstyle/SpotBugs/JaCoCo)
 
@@ -2980,3 +2980,113 @@ also a worked example).
   suffice; don't build a second census tool for the same claim.
 - **Checklist itself reviewed:** kept all questions; the "most useless" review
   above is this campaign's contribution. Next campaign re-audits.
+
+### [2026-08-17] Campaign 23 retrospective — dual-network socket binding, emulator snapshot cleanup, docs fixes
+
+Follows the "Campaign retrospective checklist" (MEMORY.md above).
+
+**Process**
+
+- **Biggest process win:** the injectable-seam + avoid-deprecated-API design
+  came from two user answers that forced a rework of the first
+  (suppressed-`allNetworks()`) implementation — but the rework was cheap
+  because the `SocketBinder` wiring (SenderService / RawSocketHttpStream /
+  SenderViewModel / VideoStreamLoader + manifest) was already in place. Keeping
+  A.2 as ONE `fix:` commit (not wiring-then-design) is what made the redesign a
+  2-file change instead of a 6-file redo.
+- **Committability constraint:** A.2's seam + binder + tests are mutually
+  dependent (a test referencing `wifiNetworkProvider` cannot compile before
+  the binder exists), so they had to land in one commit.
+- **What could have been lost:** the SDK-stub investigation
+  (`NetworkCapabilities$Builder` absent, `Network(int)` package-private,
+  `bindSocket` minSdk-safe, `Handler`-overload API 26+) — without it the
+  first test-fixture approach would have failed at the first test compile.
+  `.PLAN.md` + the working tree kept all state safe; no near-miss this
+  campaign.
+- **Elapsed vs Estimated:** ROADMAP Campaign 23 header — Estimated `—`,
+  Actual ~1 h 50 m (14:20 → 16:10 +03:00).
+
+**Learning**
+
+- **New facts worth saving:** (1) `NetworkCapabilities$Builder` is absent from
+  every installed SDK stub jar — Robolectric cannot fabricate capability
+  fixtures; (2) `Network(int)` is package-private — use
+  `ShadowNetwork.newInstance(id)`; (3) the 3-arg
+  `registerNetworkCallback(..., Handler)` is API 26+ — the 2-arg form is API
+  21+ (caught by the OLDEST_SDK 23 config: `NoSuchMethodError`, not a compile
+  error); (4) `Network.bindSocket(Socket)` is minSdk-23-safe (verified in
+  android-23.jar via javap). Both shadow/API facts now in TESTING.md
+  "Robolectric shadow traps".
+- **Wrong assumption caught:** assumed the `Handler` overload was API 21+ like
+  the 2-arg form — the SDK-23 Robolectric variant caught it at runtime, which
+  is exactly what the OLDEST_SDK config is for.
+- **Generalize:** (1) "verify each overload's API level against the minSdk
+  stub jar, not compileSdk" (TESTING.md); (2) "prefer avoiding a deprecated
+  API over suppressing it, even when the repo's suppression registry permits
+  it" — a design preference from the user's A.2 answers (DECISIONS.md A.2
+  entry).
+
+**Signal**
+
+- **Frequency-scan:** `Deprecated Gradle features` — still 1 per build (the
+  KNOWN Gradle-10-era `ReportingExtension.file` deprecation; left pending, NOT
+  wrongly re-resolved). `configuration cache` hits are all the benign
+  "Configuration cache entry reused." — reuse still working. No new systemic
+  diagnostics this session.
+- **Rule deviations surfaced:** (1) I used `Add-Content -Encoding utf8` to
+  append the ROADMAP header — the documented PS corruption trap. It happened
+  to be ASCII-only with no BOM on the existing file, so no damage, but the
+  violation is recorded: appends must use the byte-preserving edit tool.
+  (2) The run_bounded-wrapped emulator launch HUNG (documented pattern
+  promised a ~3.5 s return): no PID output ever surfaced, and the bash-tool
+  timeout killed the wrapper chain — while the Start-Process-detached emulator
+  still booted (51 s cold). Root cause not pinned (hypothesis: the
+  `2>&1 | Out-String`-piped native output + detached-child handle inheritance
+  under PS 5.1). Behavior confirmed the AGENTS emulator-launch rule still
+  holds — liveness was verified independently (adb device + boot poll) — and
+  the rule was extended: a hung wrapper is NOT a failed launch; verify
+  liveness before any kill/relaunch.
+
+**Drift**
+
+- **Per-doc audit:** AGENTS.md — emulator-launch rule clause added
+  (scope-correct); DECISIONS.md — A.2 entry + Architecture index row
+  (correct scope); MEMORY.md — this retrospective + facts; ROADMAP — Campaign
+  23 entry; TESTING.md — 2 shadow/API facts (correct scope); DESIGN.md +
+  dimens.xml — the two C22-deferred comment fixes landed (Phase 3, now no
+  longer stale).
+- **Stale content:** none of C22's deferrals remain open; `.PLAN.md` A.2/A.4
+  and the snapshot-discrepancy cleanup entries updated to DONE.
+- **Best-scoped store:** API-level/test-design facts → TESTING.md; design
+  decision → DECISIONS.md; operational rule → AGENTS.md; campaign record →
+  ROADMAP; this retrospective → MEMORY.
+
+**Value**
+
+- **Measurable profit:** TCP/MJPEG sockets now route over the robot Wi-Fi when
+  present — the user-reported connection-loss fix — with default-network
+  fallback preserving hotspot/cellular setups; unit-tested (mutation-checked
+  red/green, 8 variants) with no coverage regression (96.7% line / 85.1%
+  branch vs 0.95/0.85 gate).
+- **Deferred (`.PLAN.md`):** A.3 release smoke + DummyRobotServer (phone
+  SM-S9210 not attached); toolchain bumps; Play release; the launch-wrapper
+  hang root cause (pending; re-audit before the next emulator launch).
+- **Next automation candidate:** none surfaced this campaign.
+- **Should have asked earlier:** the seam-vs-fabricate question — asking it
+  before writing the first test fixture (rather than after the compile failed)
+  would have saved a cycle. Minor.
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added this campaign:** none — the two API-level facts are
+  covered by the existing "New facts worth saving (tooling / Robolectric /
+  test-design)" entry, and the OLDEST_SDK lesson is anchored in TESTING.md.
+- **Most useless question this campaign:** none rose to removal level —
+  closest was Process Q3 "what could have been lost" (answered thinly: no
+  near-miss). *Why useful when added:* drove crash-safety discipline (the C22
+  laptop crash). *Why less useful now:* this campaign had no near-loss. *How
+  to envelop:* it pays off on crash campaigns only — per the checklist's own
+  rule, one quiet campaign is NOT grounds for removal; keep it.
+- **Checklist itself reviewed:** kept all questions; the launch-wrapper
+  deviation and the Add-Content slip are this campaign's contributions.
+  Next campaign re-audits.
