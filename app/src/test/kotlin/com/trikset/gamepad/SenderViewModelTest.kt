@@ -4,13 +4,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 
 @RunWith(RobolectricTestRunner::class)
 class SenderViewModelTest : RobolectricTestBase() {
 
   @Test
   fun onClearedDisconnectsTheSenderWithoutThrowing() {
-    val viewModel = SenderViewModel()
+    val viewModel = SenderViewModel(RuntimeEnvironment.getApplication())
     val sender = SenderService()
     viewModel.sender = sender
     assertTrue(viewModel.connectionState.value is ConnectionState.Disconnected)

@@ -111,9 +111,9 @@ private constructor(
 
     /** Opens [url] (http only) over a raw socket and returns a stream of the response body. */
     @Throws(IOException::class)
-    fun open(url: URL): RawSocketHttpStream {
+    fun open(url: URL, socketBinder: SocketBinder = SocketBinder.identity): RawSocketHttpStream {
       val port = if (url.port >= 0) url.port else DEFAULT_HTTP_PORT
-      val socket = Socket()
+      val socket = socketBinder.bind(Socket())
       try {
         socket.connect(InetSocketAddress(url.host, port), CONNECT_TIMEOUT_MS)
         socket.soTimeout = READ_TIMEOUT_MS

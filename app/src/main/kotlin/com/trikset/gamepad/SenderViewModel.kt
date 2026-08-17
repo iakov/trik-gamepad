@@ -1,6 +1,7 @@
 package com.trikset.gamepad
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -8,11 +9,13 @@ import kotlinx.coroutines.flow.StateFlow
  * and keepalive timer are not torn down and rebuilt on rotation, and closes the socket in
  * [onCleared] instead of relying on the Activity's onDestroy. Settings already live in
  * SharedPreferences, so a process death re-derives the target for free. No DI framework: the
- * service is created here and injected into the views by [MainActivity].
+ * service is created here and injected into the views by [MainActivity]. The [AndroidViewModel]
+ * [Application] gives the [SenderService] the `ACCESS_NETWORK_STATE`-backed [WifiSocketBinder] so
+ * sockets route over the robot's Wi-Fi even when cellular is the system default network (A2).
  */
-class SenderViewModel : ViewModel() {
+class SenderViewModel(application: Application) : AndroidViewModel(application) {
 
-  var sender: SenderService = SenderService()
+  var sender: SenderService = SenderService(socketBinder = WifiSocketBinder(application))
     internal set
 
   val connectionState: StateFlow<ConnectionState> = sender.connectionState

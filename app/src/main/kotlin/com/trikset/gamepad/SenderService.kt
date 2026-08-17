@@ -34,6 +34,7 @@ class SenderService(
         Executors.newSingleThreadScheduledExecutor { runnable ->
           Thread(runnable, "SenderServiceKeepAlive").apply { isDaemon = true }
         },
+    private val socketBinder: SocketBinder = SocketBinder.identity,
 ) {
 
   fun interface OnEventListener<ArgT> {
@@ -94,7 +95,7 @@ class SenderService(
     synchronized(syncFlag) {
       try {
         AppLog.i(TCP_TAG, "Connecting to $hostAddr:$hostPort")
-        val socket = Socket()
+        val socket = socketBinder.bind(Socket())
         socket.connect(InetSocketAddress(hostAddr, hostPort), TIMEOUT)
         socket.tcpNoDelay = true
         socket.keepAlive = true

@@ -21,6 +21,7 @@ constructor(
     private val view: MjpegView,
     private val executor: Executor = Executors.newSingleThreadExecutor(),
     private val mainHandler: Handler = Handler(Looper.getMainLooper()),
+    private val socketBinder: SocketBinder = WifiSocketBinder(view.context),
 ) {
 
   /**
@@ -48,7 +49,7 @@ constructor(
       // robot host works regardless of the NSC cleartext whitelist.
       val stream =
           if (url.protocol.equals("http", ignoreCase = true)) {
-            RawSocketHttpStream.open(url)
+            RawSocketHttpStream.open(url, socketBinder)
           } else {
             val connection = url.openConnection() as HttpURLConnection
             connection.connectTimeout = CONNECT_TIMEOUT_MS
