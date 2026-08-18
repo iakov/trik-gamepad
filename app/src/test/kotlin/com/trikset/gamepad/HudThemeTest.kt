@@ -101,7 +101,7 @@ class HudThemeTest : RobolectricTestBase() {
     flow.value = state
     shadowOf(android.os.Looper.getMainLooper()).idle()
 
-    // The video is a SurfaceView with no real surface under Robolectric; the cat frame already
+    // The video view has no real stream under Robolectric; the cat frame already
     // stands in for its content, so hide the view to keep it from painting over the background.
     activity.findViewById<View>(R.id.video)?.visibility = View.GONE
     // The placeholder prompts "configure a video URI" — not a live-stream look.

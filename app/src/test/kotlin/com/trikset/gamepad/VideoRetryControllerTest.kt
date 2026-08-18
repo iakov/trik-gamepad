@@ -16,8 +16,8 @@ import org.robolectric.annotation.LooperMode.Mode.PAUSED
 
 /**
  * Deterministic retry-loop tests under the PAUSED main looper. The tick interval is shortened to
- * 1000 ms and the retry-gate predicates are injected, so "control connection connected / not
- * playing" is simulated without sockets.
+ * 1000 ms and the retry-gate predicate is injected, so the gate (a configured URL + not playing) is
+ * simulated without sockets.
  */
 @RunWith(RobolectricTestRunner::class)
 @LooperMode(PAUSED)
@@ -51,7 +51,9 @@ class VideoRetryControllerTest : RobolectricTestBase() {
   }
 
   @Test
-  fun shouldNotRetryWhileControlDisconnected() {
+  fun shouldNotRetryWhenGatePredicateVetoes() {
+    // The injected gate vetoes every reload: no ticks fire (the app wires this to "no configured
+    // URL or stream playing", not to the control state — see DECISIONS.md Option B).
     shouldReload = false
     val c = controller()
     c.onResume()

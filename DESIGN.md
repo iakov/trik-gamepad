@@ -147,7 +147,7 @@ Rationale: the connection state was color-only (invisible to screen readers).
 
 Interactive controls on the gamepad screen are ≥ 48dp: the tap-to-connect pill
 (`minHeight 48dp`), the magic buttons (`minWidth`/`minHeight 48dp`), the gear
-(50dp). Non-interactive indicators (spinner, FPS) may be smaller. Enforced by
+(`touch_target_min` 48dp). Non-interactive indicators (spinner, FPS) may be smaller. Enforced by
 `TouchTargetSizeTest` + `MagicButtonPanelTest`.
 
 ## Magic button symbols (advanced)
@@ -208,12 +208,13 @@ one tintable pad-chrome vector). Two principles:
   gradient (accent → darkened edge) with a translucent glow halo and a bright
   center dot, drawn in `onDraw`, following the touch point.
 - **Glass panel:** `hud_pad_glass` (translucent fill, 2dp brand-green border, soft
-  outer glow layer). The pad chrome + glyph are child `ImageView`s tagged
-  `padChrome`/`padGlyph` and recolored via one `SRC_IN` filter in
+  outer glow layer). The pad chrome is a single child `ImageView` tagged
+  `padChrome` (crosshair rings, full lines and edge arrows in one tintable
+  vector) recolored via one `SRC_IN` filter in
   `SquareTouchPadLayout.setAccent` — same connection-state tone as the gear/pill.
 - **Measurement trap (fixed C18):** `SquareTouchPadLayout.onMeasure` must measure
   its children (`super.onMeasure(squareSpec, squareSpec)` after the square
-  `setMeasuredDimension`), or the chrome/glyph collapse to 0×0 and the pad renders
+  `setMeasuredDimension`), or the chrome collapses to 0×0 and the pad renders
   as an empty glass panel (see DECISIONS.md "[2026-08-12] Pad render + layout").
 
 ## Robot-target chip
@@ -269,8 +270,12 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
 
 ## Connection & video state UX
 
-- The status pill shows the *target* while connecting: `Connecting to host:port:` (and announces it). `Disconnected` shows `Tap to connect:`; a
-  blank host (video-only mode) hides the pill entirely.
+- The status pill is **symbol-only** in the Type 1 HUD: a rotating arrow (`↺`)
+  while connecting and a power glyph (`⏻`) when disconnected, tinted to the
+  connection accent. The *target* (`Connecting to host:port:` / `Tap to connect:`)
+  is carried in the pill's `contentDescription` (announced for screen readers;
+  the robot chip already shows the host visually). A blank host (video-only
+  mode) hides the pill entirely — there is nothing to connect to.
 - **Video recovery is control-independent (scenarios S3/S4/S5/S6/S7/S14).** A
   dead stream reloads whenever a URL is configured, the view is not playing and
   the activity is resumed — the control connection never gates the video. This

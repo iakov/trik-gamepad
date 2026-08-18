@@ -4,11 +4,11 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * Bounded MJPEG video-stream retry. While the activity is resumed, the control connection is
- * Connected (the TCP keepalive proxy — same robot, same wifi) and the video view is not playing,
- * reloads the stream on a fixed interval, and also immediately when the control connection flips to
- * Connected (a pad touch reconnects the control connection → instant video reload instead of
- * waiting for the next tick).
+ * Bounded MJPEG video-stream retry. While the activity is resumed and the retry-gate predicate
+ * ([shouldReload]) returns true (a configured URL with the video view not playing), reloads the
+ * stream on a fixed interval, and also immediately when the control connection flips to Connected
+ * (a pad touch reconnects the control connection → instant video reload instead of waiting for the
+ * next tick). The control state is a reload *trigger*, not part of the gate.
  *
  * Replaces the safety net lost when the original unconditional 30 s MJPEG restart was removed (the
  * socket-leak driver): a failed open / a silently-stalled stream no longer leaves the video black

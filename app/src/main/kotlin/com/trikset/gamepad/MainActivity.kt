@@ -48,7 +48,8 @@ class MainActivity :
 
   private var videoRetryController: VideoRetryController? = null
   // Base pad/button opacity from the "Arrows transparency" setting (1f until the first apply);
-  // applyHudTone multiplies it by the connection-state dim factor so the two never fight.
+  // applyHudTone caps it at the connection-state dim factor via minOf (an upper bound, never a
+  // multiplier) so the two never fight.
   private var padsAlphaBase = 1f
   private val senderViewModel: SenderViewModel by viewModels()
   private val wheelController = WheelController()
@@ -71,7 +72,10 @@ class MainActivity :
         statusTextProvider = { findViewById(R.id.connectionStatus) },
         targetProvider = {
           val sender = senderService
-          sender.hostAddr?.let { host -> "$host:${sender.hostPort}" }
+          // Blank host (video-only mode) = no control target: the pill hides entirely (DESIGN.md
+          // "Connection & video state UX"). A null target also stops the "tap to connect"
+          // affordance (connect() no-ops on a blank host).
+          sender.hostAddr?.takeIf { it.isNotBlank() }?.let { host -> "$host:${sender.hostPort}" }
         },
         connectAction = { senderService.connect() },
     )
@@ -102,8 +106,8 @@ class MainActivity :
     )
   }
   private val videoStreamErrorNotifier = VideoStreamErrorNotifier()
-  // Disconnect-alert haptics (two short ticks + a longer thump); scheduled on the main thread so
-  // the pulses read as a pattern (see Haptics.rejectSequence).
+  // Disconnect-alert haptics (two strong pulses, 200 ms between starts); scheduled on the main
+  // thread so the pulses read as a pattern (see Haptics.rejectSequence).
   private val rejectHaptic: RejectHaptic by lazy {
     RejectHaptic(viewProvider = { findViewById(R.id.main) })
   }
@@ -194,13 +198,13 @@ class MainActivity :
 
     settingsController = MainActivitySettingsController(this, senderService, this)
     settingsController?.register()
-    // Bounded video-stream retry, gated on the control connection's keepalive (connectionState is
-    // Connected == the same robot is reachable). The gate relaxes for an empty host: a video-only
-    // device (no control target) must still auto-recover its stream, so retries run on the URL +
-    // not-playing checks alone there. Reloads only while the view is not playing, so a healthy
-    // stream is never disturbed; a failed open / silent stall / foldable surface recreation all
-    // leave the view not-playing and are recovered by the 5 s tick or by the control-Connected
-    // edge (see VideoRetryController).
+    // Bounded video-stream retry, gated on a configured URL + a not-playing view only — the control
+    // connection is deliberately NOT part of the gate (a dead control must never freeze a dead
+    // stream; S2, see DECISIONS.md "Scenario-driven video retry — control gate removed (Option
+    // B)").
+    // Reloads only while the view is not playing, so a healthy stream is never disturbed; a failed
+    // open / silent stall / foldable surface recreation all leave the view not-playing and are
+    // recovered by the 5 s tick or by the control-Connected edge (see VideoRetryController).
     videoRetryController =
         VideoRetryController(
             shouldReload = { shouldReloadVideo() },
@@ -223,7 +227,7 @@ class MainActivity :
                   state.reason != ConnectionState.PAUSE_DISCONNECT_REASON
           ) {
             if (previous is ConnectionState.Connected) {
-              // Edge: just lost control while driving — the alert buzz (two ticks + a thump)
+              // Edge: just lost control while driving — the alert buzz (two strong pulses)
               // must be felt even when the eyes are on the robot.
               rejectHaptic.play()
             }
@@ -330,8 +334,6 @@ class MainActivity :
     // main thread before touching the view hierarchy / opening the stream.
     runOnUiThread {
       val video = video ?: return@runOnUiThread
-      // A reload of a stream that WAS playing is a reconnect; a first load is not. The badge
-      // distinguishes the two (both share the loading spinner).
       val wasPlaying = video.isPlaying
       // URL-gated spinner: shown while a URL is configured, hidden otherwise (a null URL means
       // video is disabled — the placeholder conveys that, no spinner). Control state is irrelevant.

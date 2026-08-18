@@ -154,7 +154,7 @@ class MagicButtonPanelTest : RobolectricTestBase() {
 
     val button = container.getChildAt(0) as Button
     // The haptic contract: the button is haptic-enabled and its click performs
-    // the CLICK feedback. (The old `isPressed || !isPressed` tautology asserted
+    // the HEAVY (strong) feedback. (The old `isPressed || !isPressed` tautology asserted
     // nothing — hit 2026-08-11.)
     assertTrue(button.isHapticFeedbackEnabled)
     button.performClick()

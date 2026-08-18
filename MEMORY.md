@@ -297,7 +297,7 @@ timing on real hardware only.
   `setTrafficClass(0x0F)`. Connect and send run on a single-thread executor
   injected via the constructor (default `Executors.newSingleThreadExecutor()`;
   tests substitute a Robolectric `PausedExecutorService`).
-- Commands are newline-terminated plain text: `pad1 x y`, `pad2 x y`,
+- Commands are newline-terminated plain text: `pad 1 x y`, `pad 2 x y`,
   `btn N down`, `wheel <angle>`, `keepalive <ms>`.
 - `send()` lazily connects (`connectAsync()` guarded by `syncFlag`); a failed
   send is detected via `out.checkError()` posted back to the main thread

@@ -61,12 +61,11 @@ class SquareTouchPadLayout : RelativeLayout {
   fun setAccent(@androidx.annotation.ColorRes colorRes: Int) {
     val color = ContextCompat.getColor(context, colorRes)
     paint.color = color
-    // The chrome + glyph are child ImageViews tagged "padChrome"/"padGlyph" sharing one accent
-    // color, so a single SRC_IN filter recolors them (alpha preserved, color replaced). Tags are
-    // used (not ids) because both pads host the same tagged views in their own subtrees.
+    // The pad chrome is a single child ImageView tagged "padChrome" (crosshair rings, lines and
+    // edge arrows in one tintable vector); one SRC_IN filter recolors it (alpha preserved, color
+    // replaced). Tags are used (not ids) because both pads host the same tagged view in their own
+    // subtrees.
     findViewWithTag<android.widget.ImageView>("padChrome")?.colorFilter =
-        android.graphics.PorterDuffColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN)
-    findViewWithTag<android.widget.ImageView>("padGlyph")?.colorFilter =
         android.graphics.PorterDuffColorFilter(color, android.graphics.PorterDuff.Mode.SRC_IN)
     invalidate()
   }
@@ -190,9 +189,9 @@ class SquareTouchPadLayout : RelativeLayout {
         } else {
           DEFAULT_SIZE
         }
-    // The pad chrome + mode glyph are child views (ImageViews tagged "padChrome"/"padGlyph");
-    // they must be measured too, or they collapse to 0x0 and the pad renders as an empty glass
-    // panel (C17 regression: the pad originally had a single background drawable and no children).
+    // The pad chrome is a child view (an ImageView tagged "padChrome"); it must be measured too, or
+    // it collapses to 0x0 and the pad renders as an empty glass panel (C17 regression: the pad
+    // originally had a single background drawable and no children).
     val squareSpec = MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY)
     setMeasuredDimension(size, size)
     super.onMeasure(squareSpec, squareSpec)

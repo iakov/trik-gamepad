@@ -70,7 +70,6 @@ class VideoStreamSelfHealingTest : RobolectricTestBase() {
     val server = SyntheticMjpegServer(framesPerConnection = 4, frameIntervalMs = 5)
     val port = server.start()
     val view = MjpegView(RuntimeEnvironment.getApplication())
-    // surfaceDone must be true or the render loop never reads and cannot detect the drop.
     val executor = PausedExecutorService()
     val loader = VideoStreamLoader(view, executor, Handler(Looper.getMainLooper()))
     val (controller, reload) =

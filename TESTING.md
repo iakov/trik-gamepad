@@ -550,21 +550,21 @@ testable-through-adjacent test where a real robot/device is required):
 |----------|-------|
 | S1 default WAP, robot alive | instrumented smoke (`MainWindowTests`), e2e `MjpegServerTest` decode/play |
 | S2 WAP out of range → tap reconnect | `VideoRetryControllerTest` edge tests + `MainActivityTest` `connection*` suite (control reconnect edge) |
-| S3 same-host video | `shouldReloadVideo*` gate tests (URL + not-playing, control-agnostic) |
-| S4 video from a different IP | `shouldReloadVideoWhenVideoFromDifferentIp*` gate test (video host ≠ control host → reload regardless of control) |
-| S5 video-only (empty host) | `shouldReloadVideoWhenVideoOnlyEmptyHost` gate test + `MainActivityTest` empty-host UI tests |
+| S3 same-host video | `shouldReloadVideoWithUrlShouldBeControlAgnostic` gate test (URL + not-playing, control-agnostic) |
+| S4 video from a different IP | same gate test — the control-agnostic gate reloads regardless of control (video independence is one code path) |
+| S5 video-only (empty host) | `shouldReloadVideoWithUrlShouldBeControlAgnostic` + `MainActivityTest` empty-host UI tests (pads/buttons/pill hidden) |
 | S6 two controllers / two robots | same gate rule as S4 (video independence is one code path) |
-| S7 same-host watch-only | `shouldReloadVideoWhenHostConfiguredButDisconnected` gate test (dead stream reloads even with control `Disconnected`) |
-| S8 hostname vs IP mismatch | covered by the different-host gate path (string mismatch → reload) |
+| S7 same-host watch-only | `deadStreamShouldSelfHealWithControlPermanentlyDisconnected` e2e (dead stream reloads even with control `Disconnected`) |
+| S8 hostname vs IP mismatch | covered by the control-agnostic gate path (no string coupling to gate video) |
 | S9 robot reboot | `VideoRetryControllerTest` tick tests + the control-`Connected` edge reload |
 | S10 half-open control | `VideoRetryControllerTest` (reload allowed on `!isPlaying` alone) |
-| S11 re-host, old video URL | same-host-vs-different-host gate tests |
+| S11 re-host, old video URL | same control-agnostic gate tests (an old URL keeps retrying) |
 | S12 multiple gamepads | no shared state: each `SenderService`/`VideoRetryController` is per-activity (unit tests run independent instances) |
-| S13 WAP ↔ cellular routing | `WifiSocketBinderTest` (bind/fallback seams) + `RawSocketHttpStreamTest` (video socket binds) |
-| S14 control off, video open | same gate rule as S7 (video recovers without control `Connected`) |
+| S13 WAP ↔ cellular routing | `SocketBinderTest` (bind/fallback seams) + `RawSocketHttpStreamTest` (video socket binds) |
+| S14 control off, video open | `deadStreamShouldSelfHealWithControlPermanentlyDisconnected` e2e (video recovers without control `Connected`) |
 
 The video-retry scenarios were consolidated in 2026-08-18 (Option B): the gate
 is control-agnostic, so S3/S4/S5/S6/S7/S8/S11/S14 all reduce to one code path
-("URL configured ∧ not playing → reload") pinned by the `shouldReloadVideo*`
-tests + the e2e "dead stream self-heals with control permanently disconnected"
-test.
+("URL configured ∧ not playing → reload") pinned by the
+`shouldReloadVideoWithUrlShouldBeControlAgnostic` gate test + the e2e
+`deadStreamShouldSelfHealWithControlPermanentlyDisconnected` test.

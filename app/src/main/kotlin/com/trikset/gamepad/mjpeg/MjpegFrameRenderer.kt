@@ -109,7 +109,10 @@ class MjpegFrameRenderer(
     return fpsString
   }
 
-  /** Draws the current bitmap (letterboxed) plus the FPS overlay; returns the fps string. */
+  /**
+   * Draws the current bitmap into [destRect] (center-crop scale) plus the FPS overlay; returns the
+   * fps string.
+   */
   fun drawFrame(
       canvas: Canvas,
       destRect: Rect,

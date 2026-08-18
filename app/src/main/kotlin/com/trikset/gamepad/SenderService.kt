@@ -17,8 +17,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Maintains one TCP connection to the robot and sends newline-terminated plain-text commands (`pad1
- * x y`, `btn N down`, `wheel <angle>`, `keepalive <ms>`).
+ * Maintains one TCP connection to the robot and sends newline-terminated plain-text commands (`pad
+ * 1 x y`, `btn N down`, `wheel <angle>`, `keepalive <ms>`).
  *
  * All network/keepalive collaborators are injected via the constructor (defaults preserved) so
  * tests substitute a

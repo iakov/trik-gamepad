@@ -522,6 +522,20 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun emptyHostShouldHideStatusPill() {
+    // Empty host = video-only: no control target -> no "tap to connect" affordance; the pill is
+    // hidden entirely (DESIGN.md "Connection & video state UX"). Set the pref BEFORE the activity
+    // is built so the first Disconnected emission carries the blank host.
+    prefs().edit().putString(SettingsFragment.SK_HOST_ADDRESS, "").commit()
+    activity = org.robolectric.Robolectric.buildActivity(MainActivity::class.java).setup().get()
+    org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+    assertEquals(
+        View.GONE,
+        activity.findViewById<View>(R.id.connectionStatus)?.visibility,
+    )
+  }
+
+  @Test
   fun shouldReloadVideoWithUrlShouldBeControlAgnostic() {
     // Option B: the retry gate is URL + not-playing only — the control connection state never
     // gates video recovery (S2: the stream must self-heal even while control is down).
