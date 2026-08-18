@@ -831,8 +831,7 @@ ______________________________________________________________________
     keeps the control↔video coupling the scenarios reject.
   - *Drop the control gate entirely (Option B — chosen)* — video reloads on
     `URL configured ∧ !playing ∧ activity resumed` alone.
-- **Chosen solution:** `shouldReloadVideo()` becomes `videoUrl != null && video?.isPlaying == false`; the loading spinner is URL-gated (shown whenever
-  a URL is configured and a load is in flight); the control-`Connected` edge
+- **Chosen solution:** `shouldReloadVideo()` becomes `videoUrl != null && video?.isPlaying == false`; the loading spinner is URL-gated (shown while a URL is configured and hidden when it is not — the reverse half matters because `restartVideoStream` runs on every `onResume`, so a now-empty URL must also *hide* a spinner a previous state showed); the control-`Connected` edge
   keeps the immediate-reload sugar (`onControlConnected`) so a pad touch still
   returns the video instantly instead of after a ≤5 s tick. The `SenderService`,
   `WifiSocketBinder` and haptics are untouched. Empty host = video-only (S5),

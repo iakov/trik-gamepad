@@ -333,6 +333,32 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun deadStreamShouldSelfHealWithControlPermanentlyDisconnected() {
+    // e2e (Option B): a configured URL + a dead stream must keep retrying even though the control
+    // connection never comes up (S2 — the video is independent of control; the old gate froze it
+    // in the Connecting window). The retry tick reloads, the open fails fast, onLoadFailed
+    // re-arms the loop, and the spinner stays visible the whole time.
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
+    setField(activity, "video", MjpegView(activity))
+    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
+    val sender = activity.senderService
+    // Control stays Disconnected forever: no setTarget/send is ever issued.
+    assertTrue(sender.connectionState.value is ConnectionState.Disconnected)
+    // Drive several retry ticks (5 s each) — each reload fails fast, the loop re-arms.
+    val settleDeadline = System.currentTimeMillis() + 3000
+    while (System.currentTimeMillis() < settleDeadline) {
+      org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      Thread.sleep(20)
+    }
+    val indicator = activity.findViewById<android.widget.ProgressBar>(R.id.videoLoading)
+    assertEquals(
+        "a configured URL must show the loading indicator even while control is down",
+        android.view.View.VISIBLE,
+        indicator!!.visibility,
+    )
+  }
+
+  @Test
   fun connectionConnectedWithNullVideoUrlShouldNotReload() {
     // Gate: Connected with no video URL configured -> shouldReload short-circuits at
     // videoUrl != null (false) and nothing is armed.
@@ -364,6 +390,10 @@ class MainActivityTest : RobolectricTestBase() {
     val sender = activity.senderService
     val server = openControlConnection(sender)
     try {
+      // Let the main-looper collector process the Connected emission first (StateFlow conflation
+      // would otherwise drop it: the previous-state edge only sees Connected once the collector
+      // runs, and a quick disconnect can race ahead of it).
+      org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
       // Lost control while connected -> the strong two-pulse alert plays; the final pulse is
       // the second strong one. The root's last haptic moves off the connect medium click.
       sender.disconnect("connection lost")
@@ -384,6 +414,9 @@ class MainActivityTest : RobolectricTestBase() {
     val sender = activity.senderService
     val server = openControlConnection(sender)
     try {
+      // Drain the Connected emission first (same StateFlow-conflation rationale as above) so the
+      // connect CLICK is on the root before the pause disconnect runs.
+      org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
       // App-pause disconnect is not an error -> no alert; the last haptic stays the
       // connection medium click.
       sender.disconnect(ConnectionState.PAUSE_DISCONNECT_REASON)
@@ -427,9 +460,13 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   /** Sets a configured video and triggers a reload (the common spinner-test setup). */
-  private fun restartVideoStreamWithConfiguredVideo() {
-    // The spinner gate (restartVideoStream) requires a live control connection — connect first.
-    awaitControlConnection(activity.senderService)
+  private fun restartVideoStreamWithConfiguredVideo(connectFirst: Boolean = true) {
+    // The spinner gate (restartVideoStream) is URL-gated: a configured URL shows it, a missing one
+    // hides it — control state is irrelevant. Connecting first is only needed by tests that assert
+    // the control-coupled path.
+    if (connectFirst) {
+      awaitControlConnection(activity.senderService)
+    }
     setField(activity, "video", MjpegView(activity))
     setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
     method(activity, "restartVideoStream").invoke(activity)
@@ -444,9 +481,12 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun restartVideoStreamWhenDisconnectedShouldNotShowLoading() {
-    // Gate: not Connected -> the spinner stays hidden even with a URL configured.
-    assertSpinnerHiddenAfterRestart(URL("http://127.0.0.1:1/nope"), connectFirst = false)
+  fun restartVideoStreamWhenDisconnectedShouldShowLoading() {
+    // Option B: the spinner is URL-gated only — a configured URL shows it even without a control
+    // connection (a video-only device / dead control must not hide the stream state).
+    restartVideoStreamWithConfiguredVideo(connectFirst = false)
+    val indicator = activity.findViewById<android.widget.ProgressBar>(R.id.videoLoading)
+    assertEquals(android.view.View.VISIBLE, indicator!!.visibility)
   }
 
   @Test
@@ -482,35 +522,17 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun shouldReloadVideoWhenConnectedWithUrl() {
+  fun shouldReloadVideoWithUrlShouldBeControlAgnostic() {
+    // Option B: the retry gate is URL + not-playing only — the control connection state never
+    // gates video recovery (S2: the stream must self-heal even while control is down).
     setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
-    setField(activity, "video", MjpegView(activity))
-    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
-    awaitControlConnection(activity.senderService)
-    val m = method(activity, "shouldReloadVideo")
-    assertTrue(m.invoke(activity) as Boolean)
-  }
-
-  @Test
-  fun shouldReloadVideoWhenVideoOnlyEmptyHost() {
-    // Empty host = video-only: the retry gate relaxes the Connected requirement.
-    setPref(SettingsFragment.SK_HOST_ADDRESS, "")
     setField(activity, "video", MjpegView(activity))
     setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
     val m = method(activity, "shouldReloadVideo")
     assertTrue(
-        "video-only (empty host) must retry without a control connection",
+        "a configured URL must arm the retry regardless of control state",
         m.invoke(activity) as Boolean,
     )
-  }
-
-  @Test
-  fun shouldNotReloadVideoWhenHostConfiguredButDisconnected() {
-    setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
-    setField(activity, "video", MjpegView(activity))
-    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
-    val m = method(activity, "shouldReloadVideo")
-    assertFalse("configured host needs Connected to retry", m.invoke(activity) as Boolean)
   }
 
   @Test

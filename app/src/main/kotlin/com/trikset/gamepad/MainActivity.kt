@@ -318,17 +318,12 @@ class MainActivity :
   }
 
   /**
-   * Retry gate for the bounded video-stream reload. Requires a configured URL and a not-playing
-   * view; the control connection must be Connected, unless the host is blank — a video-only device
-   * (no control target) still needs its stream to auto-recover.
+   * Retry gate for the bounded video-stream reload: a configured URL and a not-playing view. The
+   * control connection state is deliberately NOT part of the gate — a dead control must never
+   * freeze a dead stream (S2; see DECISIONS.md "Scenario-driven video retry — control gate removed
+   * (Option B)").
    */
-  private fun shouldReloadVideo(): Boolean {
-    val hostConfigured = !senderService.hostAddr.isNullOrBlank()
-    return (!hostConfigured ||
-        senderViewModel.connectionState.value is ConnectionState.Connected) &&
-        videoUrl != null &&
-        video?.isPlaying == false
-  }
+  private fun shouldReloadVideo(): Boolean = videoUrl != null && video?.isPlaying == false
 
   private fun restartVideoStream() {
     // The error listener may fire from the render thread; always hop to the
@@ -338,13 +333,14 @@ class MainActivity :
       // A reload of a stream that WAS playing is a reconnect; a first load is not. The badge
       // distinguishes the two (both share the loading spinner).
       val wasPlaying = video.isPlaying
-      // Show the loading indicator only while a URL is configured AND the control connection is
-      // up (no spinner when disconnected / no stream URL); it stays up until the first frame
-      // renders (robot video disabled -> keeps cycling).
-      if (videoUrl != null && senderViewModel.connectionState.value is ConnectionState.Connected) {
+      // URL-gated spinner: shown while a URL is configured, hidden otherwise (a null URL means
+      // video is disabled — the placeholder conveys that, no spinner). Control state is irrelevant.
+      if (videoUrl != null) {
         // A reload of a stream that WAS playing is a reconnect: show the "Video reconnecting…"
         // badge alongside the spinner. A first load is not a reconnect.
         setVideoLoading(true, reconnecting = wasPlaying)
+      } else {
+        setVideoLoading(false)
       }
       // Feed the load outcome back into the retry controller: a failed open arms the bounded
       // retry loop, a success disarms it. A failure also surfaces a throttled "video stream
