@@ -29,10 +29,14 @@ class MjpegFrameRenderer(
     private val tempStorage: ByteArray = ByteArray(FRAME_TEMP_STORAGE_BYTES),
 ) {
 
-  private var bitmap: Bitmap? = null
+  // Read by the view's onDraw (UI render pass) after the render thread decodes: @Volatile for
+  // cross-thread visibility of the latest frame + its center-crop rectangle.
+  @Volatile private var bitmap: Bitmap? = null
+  /** The most recent frame's destination rectangle, for the view's [android.view.View.onDraw]. */
+  @Volatile var lastDestRect: Rect? = null
   private var frameCounter = 0
   private var startTimeMs = 0L
-  private var fpsString = ""
+  @Volatile private var fpsString = ""
 
   private companion object {
     const val TAG = "MjpegFrameRenderer"
@@ -84,7 +88,25 @@ class MjpegFrameRenderer(
       AppLog.v(TAG, "Bitmap was not reused, recycled.")
     }
     bitmap = decoded
-    return destRect(decoded.width, decoded.height, dispWidth, dispHeight)
+    return destRect(decoded.width, decoded.height, dispWidth, dispHeight).also { lastDestRect = it }
+  }
+
+  /**
+   * Counts one decoded frame into the FPS window (called from the render thread per decoded frame,
+   * so the overlay reflects the VIDEO rate — the draw happens at the UI vsync). Returns the current
+   * fps string (may be empty until the first window elapses).
+   */
+  fun recordFrame(): String {
+    frameCounter++
+    val now = System.currentTimeMillis()
+    val elapsedMs = now - startTimeMs
+    if (elapsedMs >= FPS_WINDOW_MS) {
+      startTimeMs = now
+      val fps = MILLIS_PER_SECOND * frameCounter / FPS_WINDOW_MS
+      frameCounter = 0
+      fpsString = String.format(Locale.getDefault(), "%.1f", fps)
+    }
+    return fpsString
   }
 
   /** Draws the current bitmap (letterboxed) plus the FPS overlay; returns the fps string. */
@@ -95,16 +117,6 @@ class MjpegFrameRenderer(
       fpsTextPaint: Paint,
       showFps: Boolean = true,
   ): String {
-    frameCounter++
-    val now = System.currentTimeMillis()
-    val elapsedMs = now - startTimeMs
-    if (elapsedMs >= FPS_WINDOW_MS) {
-      startTimeMs = now
-      val fps = MILLIS_PER_SECOND * frameCounter / FPS_WINDOW_MS
-      frameCounter = 0
-      fpsString = String.format(Locale.getDefault(), "%.1f", fps)
-    }
-
     canvas.drawColor(Color.BLACK)
     val current = bitmap
     if (current != null) {

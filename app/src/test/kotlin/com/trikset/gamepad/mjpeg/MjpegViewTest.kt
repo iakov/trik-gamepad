@@ -44,13 +44,14 @@ class MjpegViewTest : RobolectricTestBase() {
   }
 
   @Test
-  fun surfaceCallbacksShouldNotThrow() {
+  fun onSizeChangedShouldTrackDisplaySize() {
     val view = MjpegView(RuntimeEnvironment.getApplication())
-    val holder = view.holder
-    view.surfaceCreated(holder)
-    view.surfaceChanged(holder, 0, 640, 480)
-    // surfaceDestroyed stops playback; safe.
-    view.surfaceDestroyed(holder)
+    view.measure(
+        android.view.View.MeasureSpec.makeMeasureSpec(640, android.view.View.MeasureSpec.EXACTLY),
+        android.view.View.MeasureSpec.makeMeasureSpec(480, android.view.View.MeasureSpec.EXACTLY),
+    )
+    view.layout(0, 0, 640, 480)
+    // No crash; the render thread uses the tracked size for the center crop.
   }
 
   @Test
@@ -99,7 +100,6 @@ class MjpegViewTest : RobolectricTestBase() {
     val server = SyntheticMjpegServer(framesPerConnection = 10, frameIntervalMs = 10)
     val port = server.start()
     val view = MjpegView(RuntimeEnvironment.getApplication())
-    view.surfaceCreated(view.holder)
     val fired = AtomicInteger(0)
     view.setOnFirstFrameListener { fired.incrementAndGet() }
     val url = URL("http://127.0.0.1:$port/?action=stream")
@@ -140,7 +140,6 @@ class MjpegViewTest : RobolectricTestBase() {
       val client = Socket("127.0.0.1", server.localPort)
       try {
         val view = MjpegView(RuntimeEnvironment.getApplication())
-        view.surfaceCreated(view.holder)
         view.setSource(MjpegInputStream(client.getInputStream()))
         view.startPlayback()
         Thread.sleep(100)
@@ -160,7 +159,6 @@ class MjpegViewTest : RobolectricTestBase() {
    * closed so the read unblocks.
    */
   private fun blockedReadCycle(view: MjpegView, client: Socket) {
-    view.surfaceCreated(view.holder) // surfaceDone -> the render loop actually reads
     view.setSource(MjpegInputStream(client.getInputStream()))
     view.startPlayback()
     // Best-effort: give the render thread a moment to reach the blocking read.

@@ -102,6 +102,14 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
   }
 
   @Test
+  fun extractFrameShouldExposeLastDestRect() {
+    val renderer = MjpegFrameRenderer(decoder = stubDecoder(bitmap(100, 50)))
+    val rect = renderer.extractFrame(emptyFrame(), 320, 240)
+    // The view's onDraw consumes lastDestRect; it must mirror the returned rect.
+    assertEquals(rect, renderer.lastDestRect)
+  }
+
+  @Test
   fun extractFrameSkipsRecycleWhenBitmapIsReused() {
     // The decoder returns the same bitmap instance both times -> the renderer
     // reuses it and skips the recycle branch.
@@ -114,10 +122,12 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
   @Test
   fun drawFrameDrawsBitmapAndFpsOverlay() {
     val renderer = MjpegFrameRenderer(decoder = stubDecoder(bitmap(100, 100)))
-    // Force the FPS window to elapse so the fps string is computed.
+    // Force the FPS window to elapse so the fps string is computed (the render
+    // thread counts frames via recordFrame; drawFrame only draws).
     renderer.onRenderStarted(System.currentTimeMillis() - 6000)
     val dest = renderer.extractFrame(emptyFrame(), 320, 240)
     assertNotNull(dest)
+    renderer.recordFrame()
     val canvas = Canvas(bitmap(320, 240))
     val fps = renderer.drawFrame(canvas, dest!!, 320, Paint())
     assertTrue("expected a computed fps string, got '$fps'", fps.isNotEmpty())
@@ -129,6 +139,7 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
     renderer.onRenderStarted(System.currentTimeMillis())
     val dest = renderer.extractFrame(emptyFrame(), 320, 240)
     assertNotNull(dest)
+    renderer.recordFrame()
     val fps = renderer.drawFrame(Canvas(bitmap(320, 240)), dest!!, 320, Paint())
     assertEquals("", fps)
   }
@@ -139,6 +150,7 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
     // FPS text and not touch a null bitmap.
     val renderer = MjpegFrameRenderer(decoder = stubDecoder(bitmap(100, 100)))
     renderer.onRenderStarted(System.currentTimeMillis())
+    renderer.recordFrame()
     val rect = renderer.destRect(100, 100, 320, 240)
     val fps = renderer.drawFrame(Canvas(bitmap(320, 240)), rect, 320, Paint())
     assertEquals("", fps)
@@ -152,6 +164,7 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
     renderer.onRenderStarted(System.currentTimeMillis() - 6000)
     val dest = renderer.extractFrame(emptyFrame(), 320, 240)
     assertNotNull(dest)
+    renderer.recordFrame()
     val fps = renderer.drawFrame(Canvas(bitmap(320, 240)), dest!!, 320, Paint(), showFps = false)
     assertTrue("expected a computed fps string, got '$fps'", fps.isNotEmpty())
   }

@@ -4,15 +4,28 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.graphics.Rect
 import android.graphics.Typeface
 import android.util.AttributeSet
-import android.view.SurfaceHolder
-import android.view.SurfaceView
+import android.view.View
 import com.trikset.gamepad.diagnostics.AppLog
 import java.io.IOException
 import org.apache.commons.io.input.BoundedInputStream
 
-class MjpegView : SurfaceView, SurfaceHolder.Callback {
+/**
+ * MJPEG player view. Frames are decoded on a background thread and presented in [onDraw], which
+ * runs on the hardware-accelerated (HWUI) canvas — the center-crop scale is done by the GPU instead
+ * of the CPU rasterizer (the old `SurfaceView` + `lockCanvas()` path was software, measured as the
+ * Skia `lowp` pipeline at ~29% CPU in the 2026-08-17 on-device profile).
+ *
+ * The render thread is de-spun: it blocks on the socket read for real frames and sleeps briefly
+ * after a dropped frame, so the buffer-full null fast-path cannot spin a core (the same profile
+ * measured the property-accessor poll at ~36% CPU).
+ *
+ * Playback lifecycle is driven by the activity (onPause/onDestroy call [stopPlayback]) — a plain
+ * view has no surface-destroyed signal to hang this on.
+ */
+class MjpegView : View {
 
   /** Invoked from the render thread when the MJPEG stream fails (e.g. socket closed). */
   fun interface OnStreamErrorListener {
@@ -25,24 +38,36 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
   }
 
   private val fpsTextPaint = Paint()
-  /** When false (default) the render thread skips the FPS overlay; read on the render thread. */
+  /** When false (default) the FPS overlay is skipped; read in [onDraw] (UI thread). */
   @Volatile var showFps: Boolean = false
   private var viewThread: MjpegViewThread? = null
   @Volatile private var input: MjpegInputStream? = null
   @Volatile private var running = false
   @Volatile private var stopping = false
-  @Volatile private var surfaceDone = false
   @Volatile private var dispWidth = 0
   @Volatile private var dispHeight = 0
   private var onStreamErrorListener: OnStreamErrorListener? = null
   private var onFirstFrameListener: OnFirstFrameListener? = null
   @Volatile private var frameReported = false
 
+  private val renderer = MjpegFrameRenderer()
+
+  // Reused until the first frame decodes (lint DrawAllocation: no allocation per draw).
+  private val fallbackDestRect = Rect()
+
   constructor(context: Context) : super(context) {
     init()
   }
 
   constructor(context: Context, attrs: AttributeSet?) : super(context, attrs) {
+    init()
+  }
+
+  constructor(
+      context: Context,
+      attrs: AttributeSet?,
+      defStyle: Int,
+  ) : super(context, attrs, defStyle) {
     init()
   }
 
@@ -56,7 +81,6 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
   }
 
   private fun init() {
-    holder.addCallback(this)
     viewThread = MjpegViewThread()
     // Decorative video surface: never focusable (the XML sets focusable=false; the code must not
     // contradict it, or TalkBack/keyboard navigation stop on a surface with no interaction).
@@ -68,6 +92,12 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
     fpsTextPaint.color = Color.WHITE
     dispWidth = width
     dispHeight = height
+  }
+
+  override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+    super.onSizeChanged(w, h, oldw, oldh)
+    dispWidth = w
+    dispHeight = h
   }
 
   fun setSource(source: MjpegInputStream?) {
@@ -110,22 +140,19 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
     }
   }
 
-  override fun surfaceChanged(holder: SurfaceHolder, format: Int, w: Int, h: Int) {
-    viewThread?.setSurfaceSize(w, h)
-  }
-
-  override fun surfaceCreated(holder: SurfaceHolder) {
-    surfaceDone = true
-  }
-
-  override fun surfaceDestroyed(holder: SurfaceHolder) {
-    surfaceDone = false
-    stopPlayback()
+  /** GPU-backed presentation: the decoded frame is scaled by HWUI on this canvas. */
+  override fun onDraw(canvas: Canvas) {
+    super.onDraw(canvas)
+    val rect = renderer.lastDestRect ?: fallbackDestRect.also { it.set(0, 0, width, height) }
+    renderer.drawFrame(canvas, rect, width, fpsTextPaint, showFps)
   }
 
   private companion object {
     const val FPS_TEXT_SIZE = 12f
     const val JOIN_TIMEOUT_MS = 3000L
+    // After a dropped frame (readMjpegFrame() null fast-path) idle briefly so a
+    // full socket buffer cannot spin the loop (measured: property-accessor spin).
+    const val FRAME_IDLE_SLEEP_MS = 5L
     const val TAG = "MjpegView"
   }
 
@@ -146,11 +173,6 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
       thread = null
     }
 
-    fun setSurfaceSize(width: Int, height: Int) {
-      dispWidth = width
-      dispHeight = height
-    }
-
     fun start() {
       join()
       thread = MjpegRenderThread()
@@ -159,38 +181,36 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
   }
 
   private inner class MjpegRenderThread : Thread() {
-    private val renderer = MjpegFrameRenderer()
-
     override fun run() {
       renderer.onRenderStarted(System.currentTimeMillis())
       while (running) {
-        if (surfaceDone) {
-          renderNextFrame()
-        }
+        renderNextFrame()
       }
     }
 
     @Suppress("SwallowedException") // a broken stream stops the loop and reports the error
     private fun renderNextFrame() {
-      var canvas: Canvas? = null
       var frame: BoundedInputStream? = null
       try {
         val stream = input?.readMjpegFrame()
-        if (stream != null) {
-          frame = stream
-          val destRect = renderer.extractFrame(stream, dispWidth, dispHeight)
-          if (destRect != null) {
-            // A frame is decoded: report the first one of this playback cycle
-            // (the loading indicator hides here, before the canvas draw).
-            if (!frameReported) {
-              frameReported = true
-              onFirstFrameListener?.onFirstFrame()
-            }
-            canvas = holder.lockCanvas()
-            if (canvas != null) {
-              renderer.drawFrame(canvas, destRect, dispWidth, fpsTextPaint, showFps)
-            }
+        if (stream == null) {
+          // Fast null return (buffer-full frame drop or EOF recovery): don't
+          // spin the loop — let the socket buffer catch up.
+          Thread.sleep(FRAME_IDLE_SLEEP_MS)
+          return
+        }
+        frame = stream
+        val destRect = renderer.extractFrame(stream, dispWidth, dispHeight)
+        if (destRect != null) {
+          // A frame is decoded: report the first one of this playback cycle
+          // (the loading indicator hides here, before the draw).
+          if (!frameReported) {
+            frameReported = true
+            onFirstFrameListener?.onFirstFrame()
           }
+          renderer.recordFrame()
+          // Present on the next UI render pass (GPU-backed onDraw).
+          postInvalidate()
         }
       } catch (e: IOException) {
         running = false
@@ -198,9 +218,6 @@ class MjpegView : SurfaceView, SurfaceHolder.Callback {
           onStreamErrorListener?.onStreamError()
         }
       } finally {
-        if (canvas != null) {
-          holder.unlockCanvasAndPost(canvas)
-        }
         if (frame != null) {
           try {
             frame.close()

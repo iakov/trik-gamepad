@@ -267,6 +267,31 @@ tasks.register('jacocoTestCoverageVerification', JacocoCoverageVerification) {
     }
 }
 
+// Host-side mock of a TRIK robot for on-device smoke tests and profiling (pure
+// Kotlin in the test source set; see DummyRobotServer.kt). Runs both fixed ports
+// (TCP 4444 log-only + MJPEG 8080) so the phone only needs the host LAN IP.
+tasks.register('runDummyRobotServer', JavaExec) {
+    dependsOn 'compileDebugUnitTestKotlin'
+    // The unit-test task's classpath carries app + test classes and the
+    // Android unit-test dependencies (Robolectric, junit, commons-io) in one
+    // collection; read lazily at execution time (config-cache safe).
+    classpath = files { tasks.named('testDebugUnitTest').get().classpath }
+    mainClass = 'com.trikset.gamepad.DummyRobotServer'
+}
+
+// One-shot: writes the unit-test runtime classpath to a file so the detached
+// .tmp/launch_dummy.ps1 can run `java -cp ...` directly. The detached launcher
+// is invoked via scripts/run_bounded.py — a bare tool call blocks forever
+// because ANY detached long-lived child (plain `java` included, not just a
+// Gradle daemon) inherits the caller's output-pipe handle and EOF never comes.
+def dummyServerClasspath = files { tasks.named('testDebugUnitTest').get().classpath }
+tasks.register('writeDummyServerClasspath') {
+    dependsOn 'compileDebugUnitTestKotlin'
+    doLast {
+        new File(projectDir.parentFile, '.tmp/dummy_server_cp.txt').text = dummyServerClasspath.asPath
+    }
+}
+
 dependencies {
     implementation libs.appcompat
     implementation libs.coreKtx
