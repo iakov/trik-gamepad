@@ -102,6 +102,14 @@ class MainActivity :
     )
   }
   private val videoStreamErrorNotifier = VideoStreamErrorNotifier()
+  // Disconnect-alert haptics (two short ticks + a longer thump); scheduled on the main thread so
+  // the pulses read as a pattern (see Haptics.rejectSequence).
+  private val rejectHaptic: RejectHaptic by lazy {
+    RejectHaptic(viewProvider = { findViewById(R.id.main) })
+  }
+  // Previous control-connection state, for edge-triggered haptics (medium click on connect, alert
+  // on unexpected loss) — fires on the transition, not on every re-emission.
+  private var previousConnectionState: ConnectionState? = null
 
   private fun createPad(id: Int, strId: String) {
     val pad = findViewById<SquareTouchPadLayout>(id)
@@ -158,7 +166,11 @@ class MainActivity :
     }
     val btnSettings = findViewById<Button>(R.id.btnSettings)
     if (btnSettings != null) {
+      btnSettings.isHapticFeedbackEnabled = true
       btnSettings.setOnClickListener {
+        // Every button vibrates (user report: the gear was the one that did not); one strong
+        // pulse per tap, matching the magic buttons.
+        btnSettings.haptic(Haptics.Level.HEAVY)
         // The gear is the settings affordance (was: toggle the action bar).
         startActivity(Intent(this, SettingsActivity::class.java))
       }
@@ -168,6 +180,8 @@ class MainActivity :
     if (targetChip != null) {
       // The IP chip opens the robot/target settings (host, port, video, presets).
       targetChip.setOnClickListener {
+        // The chip is a button too — it vibrates like the rest of the HUD controls.
+        targetChip.haptic(Haptics.Level.HEAVY)
         startActivity(Intent(this, RobotSettingsActivity::class.java))
       }
     }
@@ -199,6 +213,8 @@ class MainActivity :
     lifecycleScope.launch {
       repeatOnLifecycle(Lifecycle.State.STARTED) {
         senderViewModel.connectionState.collect { state ->
+          val previous = previousConnectionState
+          previousConnectionState = state
           connectionFeedback.update(state)
           applyHudTone(state)
           if (
@@ -206,9 +222,18 @@ class MainActivity :
                   state.reason.isNotEmpty() &&
                   state.reason != ConnectionState.PAUSE_DISCONNECT_REASON
           ) {
+            if (previous is ConnectionState.Connected) {
+              // Edge: just lost control while driving — the alert buzz (two ticks + a thump)
+              // must be felt even when the eyes are on the robot.
+              rejectHaptic.play()
+            }
             connectionFeedback.error(getString(R.string.disconnected_notice, state.reason))
           }
           if (state is ConnectionState.Connected) {
+            if (previous !is ConnectionState.Connected) {
+              // Edge: control acquired (initial connect or reconnect) — a single medium click.
+              findViewById<View>(R.id.main)?.haptic(Haptics.Level.CLICK)
+            }
             // Edge trigger: robot reachable again -> reload the video right away if it is dead.
             videoRetryController?.onControlConnected()
           }
@@ -463,6 +488,7 @@ class MainActivity :
       this.video = null
     }
     systemUiController.detach()
+    rejectHaptic.cancel()
     val buttonsView = findViewById<ViewGroup>(R.id.buttons)
     if (buttonsView != null) {
       magicButtons.clearListeners(buttonsView)

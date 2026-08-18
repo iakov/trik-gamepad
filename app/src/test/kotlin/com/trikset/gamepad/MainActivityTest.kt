@@ -342,21 +342,88 @@ class MainActivityTest : RobolectricTestBase() {
     sender.disconnect("test done")
   }
 
-  /** Connects [sender] to an ephemeral server and waits until the state flips to Connected. */
-  private fun awaitControlConnection(sender: SenderService) {
-    TestTcpServer().use { server ->
-      sender.setTarget(TestTcpServer.HOST, server.port)
-      sender.send("")
-      val deadline = System.currentTimeMillis() + 5000
-      while (
-          sender.connectionState.value !is ConnectionState.Connected &&
-              System.currentTimeMillis() < deadline
-      ) {
-        org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
-        Thread.sleep(10)
-      }
-      assertTrue(sender.connectionState.value is ConnectionState.Connected)
+  @Test
+  fun connectionConnectedShouldConfirmHaptic() {
+    // Edge: control acquired (initial connect) -> a single medium click on the root view.
+    val server = openControlConnection(activity.senderService)
+    try {
+      org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      val root = activity.findViewById<View>(R.id.main)
+      assertEquals(
+          "connecting must fire the medium click",
+          Haptics.constant(Haptics.Level.CLICK),
+          org.robolectric.Shadows.shadowOf(root).lastHapticFeedbackPerformed(),
+      )
+    } finally {
+      server.close()
     }
+  }
+
+  @Test
+  fun connectionUnexpectedDisconnectShouldPlayRejectSequence() {
+    val sender = activity.senderService
+    val server = openControlConnection(sender)
+    try {
+      // Lost control while connected -> the strong two-pulse alert plays; the final pulse is
+      // the second strong one. The root's last haptic moves off the connect medium click.
+      sender.disconnect("connection lost")
+      org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      val root = activity.findViewById<View>(R.id.main)
+      assertEquals(
+          "unexpected disconnect must end the reject sequence on the strong pulse",
+          Haptics.constant(Haptics.Level.HEAVY),
+          org.robolectric.Shadows.shadowOf(root).lastHapticFeedbackPerformed(),
+      )
+    } finally {
+      server.close()
+    }
+  }
+
+  @Test
+  fun connectionPauseDisconnectShouldNotPlayRejectSequence() {
+    val sender = activity.senderService
+    val server = openControlConnection(sender)
+    try {
+      // App-pause disconnect is not an error -> no alert; the last haptic stays the
+      // connection medium click.
+      sender.disconnect(ConnectionState.PAUSE_DISCONNECT_REASON)
+      org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      val root = activity.findViewById<View>(R.id.main)
+      assertEquals(
+          "pause disconnect must not fire the reject sequence",
+          Haptics.constant(Haptics.Level.CLICK),
+          org.robolectric.Shadows.shadowOf(root).lastHapticFeedbackPerformed(),
+      )
+    } finally {
+      server.close()
+    }
+  }
+
+  /** Connects [sender] to [server] and waits until the state flips to Connected. */
+  private fun awaitControlConnection(sender: SenderService, server: TestTcpServer) {
+    sender.setTarget(TestTcpServer.HOST, server.port)
+    sender.send("")
+    val deadline = System.currentTimeMillis() + 5000
+    while (
+        sender.connectionState.value !is ConnectionState.Connected &&
+            System.currentTimeMillis() < deadline
+    ) {
+      org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+      Thread.sleep(10)
+    }
+    assertTrue(sender.connectionState.value is ConnectionState.Connected)
+  }
+
+  /** Connects [sender] to an ephemeral server (closed again) and waits for Connected. */
+  private fun awaitControlConnection(sender: SenderService) {
+    TestTcpServer().use { server -> awaitControlConnection(sender, server) }
+  }
+
+  /** Like [awaitControlConnection] but keeps the server open so the test can drive the drop. */
+  private fun openControlConnection(sender: SenderService): TestTcpServer {
+    val server = TestTcpServer()
+    awaitControlConnection(sender, server)
+    return server
   }
 
   /** Sets a configured video and triggers a reload (the common spinner-test setup). */
@@ -514,6 +581,13 @@ class MainActivityTest : RobolectricTestBase() {
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
     val intent = org.robolectric.Shadows.shadowOf(activity).nextStartedActivity
     assertEquals(SettingsActivity::class.java.name, intent?.component?.className)
+    // Every button vibrates (user report: the gear was the one that did not);
+    // one strong pulse, matching the magic buttons.
+    assertEquals(
+        "the gear must vibrate on click",
+        Haptics.constant(Haptics.Level.HEAVY),
+        org.robolectric.Shadows.shadowOf(btnSettings).lastHapticFeedbackPerformed(),
+    )
   }
 
   @Test
@@ -524,6 +598,12 @@ class MainActivityTest : RobolectricTestBase() {
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
     val intent = org.robolectric.Shadows.shadowOf(activity).nextStartedActivity
     assertEquals(RobotSettingsActivity::class.java.name, intent?.component?.className)
+    // The chip is a HUD button too — it must vibrate like the gear and magic buttons.
+    assertEquals(
+        "the target chip must vibrate on click",
+        Haptics.constant(Haptics.Level.HEAVY),
+        org.robolectric.Shadows.shadowOf(chip).lastHapticFeedbackPerformed(),
+    )
   }
 
   @Test

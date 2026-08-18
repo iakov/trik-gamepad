@@ -10,6 +10,7 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.util.concurrent.PausedExecutorService
 import org.robolectric.annotation.LooperMode
 import org.robolectric.annotation.LooperMode.Mode.PAUSED
@@ -186,5 +187,50 @@ class SquareTouchPadLayoutTest : RobolectricTestBase() {
     pad.dispatchTouchEvent(eventAt(100f, 100f, MotionEvent.ACTION_DOWN))
     pad.dispatchTouchEvent(eventAt(120f, 120f, MotionEvent.ACTION_CANCEL))
     assertTrue("expected commands to be queued", mExecutor.runAll() >= 2)
+  }
+
+  @Test
+  fun touchDownShouldPerformTick() {
+    pad.dispatchTouchEvent(eventAt(100f, 100f, MotionEvent.ACTION_DOWN))
+    // User design: ONE light tick when a thumb lands — the "every interaction is noticeable"
+    // anchor. Fails if the down tick is removed or the constant changes.
+    assertEquals(
+        "pad-down must fire the light TICK",
+        Haptics.constant(Haptics.Level.TICK),
+        shadowOf(pad).lastHapticFeedbackPerformed(),
+    )
+  }
+
+  @Test
+  fun touchUpShouldPerformClick() {
+    pad.dispatchTouchEvent(eventAt(100f, 100f, MotionEvent.ACTION_DOWN))
+    pad.dispatchTouchEvent(eventAt(120f, 120f, MotionEvent.ACTION_UP))
+    // User design: ONE CLICK on pad release (stronger than the down tick) — nothing on move.
+    assertEquals(
+        "pad-up must fire the CLICK",
+        Haptics.constant(Haptics.Level.CLICK),
+        shadowOf(pad).lastHapticFeedbackPerformed(),
+    )
+  }
+
+  @Test
+  fun touchCancelShouldNotPerformHaptic() {
+    pad.dispatchTouchEvent(eventAt(100f, 100f, MotionEvent.ACTION_CANCEL))
+    // ACTION_CANCEL is an interruption, not a deliberate release — no tick.
+    assertEquals("cancel must not vibrate", -1, shadowOf(pad).lastHapticFeedbackPerformed())
+  }
+
+  @Test
+  fun touchMoveShouldNotPerformHaptic() {
+    pad.dispatchTouchEvent(eventAt(190f, 10f, MotionEvent.ACTION_MOVE))
+    // The per-move VIRTUAL_KEY feedback was the "queued after finger lift" noise.
+    assertEquals("move must not vibrate", -1, shadowOf(pad).lastHapticFeedbackPerformed())
+  }
+
+  @Test
+  fun sendShouldNotPerformHaptic() {
+    pad.send("up")
+    // Haptics are tied to the touch gesture (pad-down/up), not to command sends.
+    assertEquals("send must not vibrate", -1, shadowOf(pad).lastHapticFeedbackPerformed())
   }
 }

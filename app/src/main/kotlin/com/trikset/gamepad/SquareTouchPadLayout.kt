@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.util.AttributeSet
-import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
 import android.widget.RelativeLayout
@@ -49,10 +48,6 @@ class SquareTouchPadLayout : RelativeLayout {
     paint.style = Paint.Style.STROKE
     paint.alpha = OPAQUE_ALPHA
     setOnTouchListener(TouchPadListener())
-    setOnClickListener {
-      // Respect the system haptics setting: no FLAG_IGNORE_GLOBAL_SETTING.
-      performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-    }
     setWillNotDraw(false)
     isHapticFeedbackEnabled = true
   }
@@ -226,8 +221,6 @@ class SquareTouchPadLayout : RelativeLayout {
     val currentSender = sender
     if (currentSender != null) {
       currentSender.send("$padName $command")
-      // Respect the system haptics setting: no FLAG_IGNORE_GLOBAL_SETTING.
-      performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
     }
   }
 
@@ -245,32 +238,52 @@ class SquareTouchPadLayout : RelativeLayout {
     }
 
     return when (event.action) {
-      MotionEvent.ACTION_UP,
+      MotionEvent.ACTION_UP -> {
+        parent?.requestDisallowInterceptTouchEvent(false)
+        send("up")
+        performClick()
+        // User design: one CLICK on release — the acknowledgement is stronger than the down tick
+        // so a full press reads as a deliberate gesture. ACTION_CANCEL must NOT vibrate.
+        haptic(Haptics.Level.CLICK)
+        true
+      }
       MotionEvent.ACTION_CANCEL -> {
         parent?.requestDisallowInterceptTouchEvent(false)
         send("up")
         performClick()
         true
       }
-      MotionEvent.ACTION_DOWN,
+      MotionEvent.ACTION_DOWN -> {
+        parent?.requestDisallowInterceptTouchEvent(true)
+        performClick()
+        sendCoordinate(event)
+        // One light tick when a thumb lands: the "every interaction is noticeable" anchor. It is a
+        // discrete per-touch event, NOT per-move feedback (the old per-move buzz was the C24
+        // "queued after finger lift" noise).
+        haptic(Haptics.Level.TICK)
+        true
+      }
       MotionEvent.ACTION_MOVE -> {
         parent?.requestDisallowInterceptTouchEvent(true)
         performClick()
-        val x = max(0f, min(event.x, maxX))
-        val y = max(0f, min(event.y, maxY))
-        setAbsXY(x, y)
-
-        val command = touchPadController.nextCoordinates(x, y, maxX, maxY)
-        if (command != null) {
-          send(String.format(Locale.ROOT, "%d %d", command.x, command.y))
-        }
-
+        sendCoordinate(event)
         true
       }
       else -> {
         AppLog.e(TAG, "Unknown touch event: $event")
         true
       }
+    }
+  }
+
+  private fun sendCoordinate(event: MotionEvent) {
+    val x = max(0f, min(event.x, maxX))
+    val y = max(0f, min(event.y, maxY))
+    setAbsXY(x, y)
+
+    val command = touchPadController.nextCoordinates(x, y, maxX, maxY)
+    if (command != null) {
+      send(String.format(Locale.ROOT, "%d %d", command.x, command.y))
     }
   }
 

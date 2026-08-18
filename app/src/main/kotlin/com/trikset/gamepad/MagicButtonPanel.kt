@@ -3,7 +3,6 @@ package com.trikset.gamepad
 import android.content.Context
 import android.graphics.Typeface
 import android.view.Gravity
-import android.view.HapticFeedbackConstants
 import android.view.ViewGroup
 import android.widget.Button
 import androidx.core.content.ContextCompat
@@ -68,9 +67,9 @@ class MagicButtonPanel(
       btn.setBackgroundResource(R.drawable.hud_button_circle)
       btn.setOnClickListener {
         send("btn $name down")
-        // Respect the system haptics setting: no FLAG_IGNORE_GLOBAL_SETTING. KEYBOARD_TAP is the
-        // light tick for a plain tap (LONG_PRESS felt heavy).
-        btn.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+        // One strong pulse per tap (LONG_PRESS -> EFFECT_HEAVY_CLICK), user-chosen "one strong
+        // for button". Respects the system haptics setting (no FLAG_IGNORE_GLOBAL_SETTING).
+        btn.haptic(Haptics.Level.HEAVY)
       }
       container.addView(btn)
     }
