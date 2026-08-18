@@ -959,3 +959,67 @@ instrumented API 36).
   still booted). Root cause not pinned; the AGENTS.md emulator-launch rule was
   updated to verify liveness independently and never treat a hung wrapper as a
   failed launch.
+
+## Campaign 24 — on-device performance analysis + GPU-backed MJPEG render + haptics (2026-08-17/18)
+
+Scope (user-driven): (1) host **DummyRobotServer** (pure Kotlin in the test
+source set — TCP 4444 log-only + MJPEG 8080 via the reused
+`SyntheticMjpegServer`) for on-device smoke + profiling over Wi-Fi; (2)
+measured-before profiling of `releaseDebug` on the phone (60 s simpleperf
+callgraph + gfxinfo + meminfo); (3) **fix-all-local** — **A.5** MJPEG
+render-loop de-spin + GPU-backed render, **A.6** haptics (user design: one
+light tick on pad-up, every button incl. the gear); (4) emulator re-measure,
+then real-device re-measure. Retrospective + new simpleperf workflow:
+MEMORY.md "Campaign 24 retrospective" + "Device performance profiling".
+Decision: DECISIONS.md "[2026-08-18] A.5 GPU-backed MJPEG rendering".
+**Code + tests + gates done; COMMIT/PUSH PENDING (user: no commit/push).**
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ~1 h 15 m (08-17 evening: profiling + A.5/A.6 + gates + emulator measure) + ~10 m (08-18 device re-measure) — uncommitted so far |
+
+- **DummyRobotServer.kt** (new, test source set) + `runDummyRobotServer`/
+  `writeDummyServerClasspath` gradle tasks; the detached launcher runs
+  `java -cp <test classpath>` via `scripts/run_bounded.py`.
+- **A.5 measured deltas** (releaseDebug, 60 s, synthetic 50 fps
+  MJPEG): total samples **510 421 → 145 588 (−71%)**; render-thread spin
+  (`access$getRunning$p`/`access$getSurfaceDone$p`, 36%) and Skia lowp software
+  raster (`gather_8888`/`store_565`, ~29%) **gone**; gfxinfo **High input
+  latency 1222 → 2**, frames 2689 → 3970 (~66 fps), janky 0.05%, p99 8 ms;
+  meminfo Graphics 68 → 99 MB (GL 28 → 58 MB — the GPU texture trade-off).
+  Architecture: plain `View` drawing the decoded frame in `onDraw` on the HWUI
+  canvas (`TextureView.onDraw` is final); render thread blocks on the socket
+  read + 5 ms idle after a dropped frame.
+- **A.6 haptics**: pad fires one light `KEYBOARD_TAP` on ACTION_UP only (no
+  per-move, no queued-after-lift); every button incl. the settings gear.
+- **Follow-ups (→ `.PLAN.md`)**: main-thread socket-I/O (~30% of samples);
+  `inSampleSize` decode to display size (cuts texture upload + the Graphics
+  bump); real-robot re-verify (synthetic source only); emulator gfxinfo is
+  software-GPU-bound — frame timing is real-device-only.
+
+## Campaign 25 — scenario-driven video retry + decision governance (2026-08-18)
+
+Scope (user-driven, interactive design re-discussion): (1) establish the
+**scenario contract** (DESIGN.md "Scenarios & use-cases", S1–S14) as the top
+of the design — decisions may never violate a scenario; (2) **type-tag every
+DECISIONS.md entry** (`design-clarifying` / `problem-avoiding`); (3) re-design
+the video retry: **Option B** removes the control gate (`shouldReloadVideo` =
+`videoUrl != null && !isPlaying`), fixing the reported "video frozen during
+Connecting" and making video-from-a-different-IP / spectator / competition
+setups recover (S4/S6/S7/S14); (4) URL-gated spinner (simplest). Governance
+rule: design sits above decisions; auto mode sticks to the agreed contract,
+re-design happens interactively.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ~50 m docs (C25) + per-feature commits + full gate (code features: C24 perf, haptics, video retry) |
+
+- **Design/docs**: DESIGN.md contract section (S1–S14 + P1–P6 + empty-value
+  semantics); DECISIONS.md typing convention + type on all 64 entries + new
+  "[2026-08-18] Scenario-driven video retry" entry + superseded banners
+  (Campaign 8, Campaign 10 spinner part, Campaign 12 gate-relaxation part);
+  MEMORY/TESTING/architecture/AGENTS updated.
+- **Code (per-feature commits)**: C24 perf (GPU-backed render), haptics schema,
+  then the video-retry Option B gate + spinner + tests (red-first). Pending
+  follow-up from C24 stays: main-thread socket-I/O, `inSampleSize`,
+  real-robot re-verify.

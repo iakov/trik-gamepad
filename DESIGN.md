@@ -11,10 +11,75 @@ you touch that surface, never restate its rationale in AGENTS.md.
 Rationale for the decisions themselves (problem → alternatives → why) lives in
 `DECISIONS.md` "Campaign 15" and its execution record in `MEMORY.md`.
 
+## Scenarios & use-cases (the contract)
+
+The product is a **gamepad for a robot over Wi-Fi**, optionally with an FPV video
+feed. The scenarios below are the contract every product decision must satisfy.
+A decision that breaks a scenario is a design regression — re-design, never
+silently patch around it. Decisions in `DECISIONS.md` cite scenario IDs.
+
+### Core scenarios (the typical setups)
+
+| ID | Scenario | Required behavior |
+|----|----------|-------------------|
+| **S1** | Default WAP: phone on the robot's own access point, robot in range and alive | video streams; control works |
+| **S2** | Default WAP: robot moves out of range (keepalive drops), then returns; user taps to reconnect | reconnect on tap; video recovers on the reconnect edge; no hammering while the WAP is gone |
+| **S3** | Classroom hotspot: one robot, video host == robot host | control state is a valid reachability hint, never a hard gate |
+| **S4** | Classroom hotspot: **video from a different IP** than the control robot (separate camera / copy feature) | video is fully decoupled from control: never touch a playing stream; self-heal a dead stream regardless of control state |
+| **S5** | Video-only (empty host, e.g. competition FPV, remote control prohibited) | video always self-heals; no control affordances shown |
+| **S6** | Two controllers / two robots (drive robot A, watch robot B's camera) | video independent of control (same as S4) |
+
+### Extended scenarios (confirmed additions)
+
+| ID | Scenario | Required behavior |
+|----|----------|-------------------|
+| **S7** | Same-host watch-only (spectator phone; competition with host set but control off) | video still recovers — a dead stream must not stay frozen just because control never connects |
+| **S8** | Hostname vs IP mismatch (`trik-01` vs `192.168.1.5`) | the app treats a string mismatch as "different target" → video recovers (safe direction) |
+| **S9** | Robot reboot / services restart (video boots before/after control) | video recovers at the first reconnect edge; never stays frozen |
+| **S10** | Half-open control (keepalive not yet expired) | video recovery is allowed; a failed reload is cheap and bounded |
+| **S11** | User re-hosts control while an old video URL persists | old camera may recover; nothing is frozen |
+| **S12** | Multiple gamepads, one robot (classroom) | fully independent per phone; no cross-coupling |
+| **S13** | WAP ↔ cellular transition (user-managed phone setting; robot WAP has no internet) | both control and video sockets route over the Wi-Fi AP whenever one exists |
+| **S14** | Robot up, control port blocked/off, video port open | video still recovers (competition edge) |
+
+### Derived principles (P1–P6)
+
+- **P1 — Video is independent of control.** A different-host video stream is
+  never gated on the control connection (S4/S6/S11/S8).
+- **P2 — `isPlaying` is the authority.** A playing stream is never touched;
+  a dead/stalled stream (`isPlaying == false`) is the only "needs recovery"
+  signal (all scenarios). Stall detection is inherent: the raw-socket HTTP
+  client sets a 5 s `SO_TIMEOUT`, so a silent stall surfaces as a stream error.
+- **P3 — Video-only is first-class.** Empty host = control disabled; video
+  always self-heals (S5).
+- **P4 — Control state is a hint, not a truth.** Same-host control state may
+  influence *when* to retry, but never permanently blocks video recovery (S2/
+  S3/S9).
+- **P5 — Reconnect is immediate, never ticked.** A control-reconnect edge
+  reloads video right away (S2/S3/S9/S13).
+- **P6 — Recovery is bounded.** The retry tick is fixed (5 s); every failed
+  reload closes its socket, so a dead robot costs one cheap failed TCP connect
+  per tick, never a leak (the 30 s-restart disease was a socket leak, not
+  hammering).
+
+### Empty-value semantics
+
+An **empty value is a deliberate "disabled" state**, not a missing one:
+
+- empty robot host → control disabled (video-only, S5);
+- empty video URI → video disabled (control-only).
+
+"Empty for disabled" is documented here; the Settings rows show the current
+value with the existing empty-state label (the video URI shows "No stream URI
+set"; a blank host is a valid video-only configuration).
+
+______________________________________________________________________
+
 ## Section index
 
 | Section | Applies to |
 |---------|------------|
+| Scenarios & use-cases | every product decision (the contract) |
 | Defaults are as useful as possible | any new preference/field |
 | Every setting shows its current value | preference summaries |
 | Ellipsis on dialog rows | preference titles |
@@ -29,6 +94,7 @@ Rationale for the decisions themselves (problem → alternatives → why) lives 
 | Localization | strings, locales, translations |
 | WCAG | contrast + touch-target regression tests |
 | Connection & video state UX | status pill, reconnect badge |
+| Haptics | pads, magic buttons, settings gear |
 
 ______________________________________________________________________
 
@@ -47,7 +113,10 @@ verbosity → `Info · …`, seekbars → `12 · Smaller = more sensitive…`, t
 URI → the URI, host/port/keepalive → the stored value. Static "hint" summaries
 only remain where the row itself is an *action* (e.g. "Reset video URI"), never
 a value. The seekbar fallback is the XML default, not a fabricated 0, so a
-fresh install shows the real value.
+fresh install shows the real value. An **empty** value is a deliberate
+"disabled" state (see "Scenarios & use-cases — Empty-value semantics"), not a
+missing one: the video-URI row then shows "No stream URI set", and a blank host
+is a valid video-only configuration.
 
 ## Ellipsis on dialog rows
 
@@ -202,11 +271,19 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
 
 - The status pill shows the *target* while connecting: `Connecting to host:port:` (and announces it). `Disconnected` shows `Tap to connect:`; a
   blank host (video-only mode) hides the pill entirely.
-- The loading spinner is shown for both first load and reconnect, but a reload
-  of a stream that **was playing** additionally shows a `Video reconnecting:`
-  badge, so the user can tell a reconnect apart from the first load. Stall
-  detection ("no video signal") was deliberately **not** added: a robot with
-  video disabled legitimately keeps the spinner cycling (see DECISIONS.md).
+- **Video recovery is control-independent (scenarios S3/S4/S5/S6/S7/S14).** A
+  dead stream reloads whenever a URL is configured, the view is not playing and
+  the activity is resumed — the control connection never gates the video. This
+  is the scenario contract: video from a different IP, a spectator phone, a
+  competition with control off, and an idle gamepad after a robot reboot all
+  recover. The control-`Connected` edge reloads immediately as a bonus (a pad
+  touch reconnects control → instant video, not a ≤5 s tick wait).
+- The loading spinner is shown whenever a stream URL is configured and a load is
+  in flight (first load and reconnect), but a reload of a stream that **was
+  playing** additionally shows a `Video reconnecting:` badge, so the user can
+  tell a reconnect apart from the first load. Stall detection ("no video
+  signal") was deliberately **not** added: a robot with video disabled
+  legitimately keeps the spinner cycling (see DECISIONS.md).
 
 ## Two-layer HUD layout & the error pill
 
@@ -238,3 +315,39 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
   gear ⚙ and magic-button defaults render from `res/font/symbols_mono.ttf`
   (a cmap-verified DejaVuSansMono Nerd Font subset) so they render identically
   on every device; anything else a user types falls back to the system font.
+
+## Haptics
+
+- **Haptic feedback is deliberate and sparse** (user-corrected in C24: the old
+  pad fired per-move feedback that kept coming after the finger lifted — "very
+  annoying and laggy"). Never continuous: wheel/slider drags and pad moves do
+  not vibrate.
+- **Generic constants only.** The schema maps to the legacy trio
+  `KEYBOARD_TAP` (light) / `VIRTUAL_KEY` (medium) / `LONG_PRESS` (strong —
+  resolves to `EFFECT_HEAVY_CLICK`, the strongest effect the S25 advertises).
+  The newer API-30 constants (`CONTEXT_CLICK`/`CONFIRM`/`REJECT`) are avoided:
+  their device mapping is less predictable, and the whole app must behave the
+  same on every API level and OEM HAL (no SDK branching in `Haptics.constant`).
+- **Event → level:**
+  - Pad thumb **down** → light `TICK` (one discrete tick per touch — the
+    "every interaction is noticeable" anchor; it is NOT per-move feedback).
+  - Pad **release** → medium `CLICK`.
+  - Pad **move / cancel** → nothing (C24 noise; cancel is an interruption).
+  - Magic buttons, settings gear, target chip → **one strong `HEAVY` pulse**
+    (user-chosen "one strong for button"; the gear was the missing haptic,
+    reported by the user).
+  - Control **connected** → one medium `CLICK` (edge-triggered, not per
+    re-emission).
+  - Unexpected **disconnected** → **two strong `HEAVY` pulses with 200 ms
+    between their starts** (user-chosen "2 strong is enough for disconnect").
+    The gap keeps the pulses distinct instead of letting the vibrator coalesce
+    them. App-pause disconnects never alert.
+- All haptics **respect the system haptics setting** (`performHapticFeedback`
+  without `FLAG_IGNORE_GLOBAL_SETTING`), and need **no VIBRATE permission** —
+  `performHapticFeedback` runs through the system's `vibrateWithoutPermissionCheck`
+  path (only the direct `Vibrator.vibrate` entry enforces VIBRATE). Using
+  `Vibrator.vibrate` is rejected: it would both require the permission and
+  bypass the system toggle. Asserted in Robolectric via
+  `shadowOf(view).lastHapticFeedbackPerformed()` against
+  `Haptics.constant(level)` (the semantic level, not a raw constant — the unit
+  suite runs under SDK 23 where the older fallback would otherwise fire).

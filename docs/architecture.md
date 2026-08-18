@@ -52,8 +52,9 @@ constants in `SettingsFragment`.
   `VideoStreamErrorNotifier` (throttled failure notice), `RobotPresetStore`,
   `WheelController`, `SystemUiController`, `MainActivitySettingsController`.
 - `com.trikset.gamepad.mjpeg` — the MJPEG player (vendored origin, renamed
-  from `com.demo.mjpeg` in Phase 5): `MjpegView` (SurfaceView + render
-  thread), `MjpegInputStream` (frame parser), `MjpegFrameRenderer` (decoding
+  from `com.demo.mjpeg` in Phase 5): `MjpegView` (plain View; render thread
+  decodes + `postInvalidate`, `onDraw` presents on the HWUI canvas),
+  `MjpegInputStream` (frame parser), `MjpegFrameRenderer` (decoding
   - center-crop cover + FPS overlay).
 - `com.trikset.gamepad.diagnostics` — user-facing diagnostics (Campaign 14):
   `AppLog` (logcat + ring buffer) + `LogRingBuffer`, `DiagLevel`, `DiagnosticsReport`,
@@ -115,31 +116,50 @@ timer. The timeout is configurable via `SK_KEEPALIVE`.
 RawSocketHttpStream (http; bypasses NSC) / HttpURLConnection (https fallback)
   5 s connect/read timeouts
   -> MjpegInputStream   parses the multipart stream into JPEG frames
-  -> MjpegFrameRenderer decodes a frame, computes the center-crop Rect, draws
-  -> MjpegView          SurfaceView; its render thread owns the loop + lockCanvas
+  -> MjpegFrameRenderer decodes a frame, computes the center-crop Rect,
+                        records decode-side FPS (recordFrame)
+  -> MjpegView          plain View; render thread decodes + postInvalidate,
+                        onDraw presents on the HWUI (GPU) canvas
 ```
 
 - **`VideoStreamLoader`** (AsyncTask successor) opens the HTTP stream off the
   main thread and hands it to `MjpegView`; it reports open success/failure via
   an `onResult` callback (a failed open is no longer silent). Executor + main
   handler are injectable for deterministic tests.
-- **`MjpegView.MjpegRenderThread`** loops `readMjpegFrame()`; on `IOException`
+- **`MjpegView.MjpegRenderThread`** (de-spun, C24) loops `readMjpegFrame()`,
+  blocking on the socket read; a `null` frame (buffer-full drop or EOF
+  recovery) triggers a 5 ms idle sleep instead of a poll spin. On `IOException`
   it stops and fires `OnStreamErrorListener`; on the first decoded frame of each
   playback cycle it fires `OnFirstFrameListener` (the loading indicator hides
-  here — fired on decode, not canvas draw).
+  here — fired on decode, not canvas draw). Per decoded frame it calls
+  `renderer.recordFrame()` and `postInvalidate()` — presentation happens in
+  `onDraw` on the next HWUI pass.
+- **GPU presentation (C24)**: `MjpegView` is a plain `View` (NOT a SurfaceView
+  — `lockCanvas()` is a software canvas; not a TextureView — `onDraw` there is
+  final). `onDraw` draws `renderer.lastDestRect` + the current bitmap on the
+  hardware canvas, so the center-crop scale is done by the GPU (HWUI uploads the
+  reused bitmap and scales it). The activity lifecycle drives
+  `startPlayback()`/`stopPlayback()` (a plain view has no surface-destroyed
+  signal). Measured on-device: −71% CPU samples, gfxinfo High input latency
+  1222 → 2; trade-off: Graphics 68 → 99 MB (GL texture upload). Decision +
+  rationale: `DECISIONS.md` "[2026-08-18] A.5 GPU-backed MJPEG rendering".
 - **Reconnect-on-error** (no forced periodic restart): `MainActivity` registers
   the listener in `onResume`; it marshals to the main thread and calls
   `restartVideoStream()`, which re-runs `VideoStreamLoader`. See `DECISIONS.md`
   "MJPEG: reconnect-on-error" for the rationale.
-- **Bounded retry (Campaign 8)** — `VideoRetryController`: while the activity is
-  resumed ∧ control `connectionState is Connected` (the keepalive proxy) ∧ a
-  video is configured ∧ `!view.isPlaying`, reloads the stream on a 5 s tick,
-  and immediately on the control-`Connected` edge. Gated on the control
-  connection so a dead robot is never hammered; idle recovery is bounded by user
-  interaction. Decision + rationale: `DECISIONS.md` "Campaign 8 — bounded,
-  control-gated video retry". **Loading indicator:** a centered spinner
-  (`@+id/videoLoading`) shows while loading/reconnecting and stays up while the
-  robot's video is disabled (no frame ever decodes).
+- **Bounded retry (scenario-driven, Option B)** — `VideoRetryController`: while
+  the activity is resumed ∧ a video is configured ∧ `!view.isPlaying`, reloads
+  the stream on a 5 s tick, and immediately on the control-`Connected` edge
+  (instant-reconnect sugar). The **control connection never gates the video** —
+  the gate is `videoUrl != null && !isPlaying` alone, so video from a different
+  IP (S4), a spectator phone (S7) and an idle gamepad after a robot reboot all
+  recover. A failed reload is a cheap TCP connect that closes its socket, so a
+  dead robot costs one attempt per tick (no hammering, no leak). Spinner
+  (`@+id/videoLoading`) is URL-gated: it shows whenever a URL is configured and
+  a load is in flight, and stays up while the robot's video is disabled (no
+  frame ever decodes). Decision + rationale + scenario contract:
+  `DECISIONS.md` "[2026-08-18] Scenario-driven video retry" and `DESIGN.md`
+  "Scenarios & use-cases".
 - Default URI is `http://<host>:8080/?action=stream`; changing the host
   preference rewrites `SK_VIDEO_URI` to match. Cleartext HTTP is handled by the
   raw-socket client (Campaign 5), which bypasses Network Security Config, so the
@@ -148,8 +168,8 @@ RawSocketHttpStream (http; bypasses NSC) / HttpURLConnection (https fallback)
 
 `MjpegFrameRenderer` is deliberately separate from the view so the decode /
 center-crop / FPS logic is testable under Robolectric (inject a decoder + plain
-`Canvas`); the SurfaceView render-thread plumbing itself stays ~0 % covered
-and is excluded from the coverage gates.
+`Canvas`); the render thread itself stays ~0 % covered and is excluded from the
+coverage gates.
 
 ## Settings
 
