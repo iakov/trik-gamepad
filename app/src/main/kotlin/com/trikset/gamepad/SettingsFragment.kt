@@ -66,6 +66,25 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     fun magicSymbolKey(buttonNumber: Int): String = "magicSymbol$buttonNumber"
 
+    fun effectiveVideoUri(prefs: SharedPreferences): String = effectiveVideoUri(prefs, null)
+
+    /**
+     * The effective video-stream URI: the stored value, else the URI derived from the configured
+     * host (`http://<host>:8080/?action=stream`). Empty = video disabled. Shared by the settings
+     * row (shows what will actually be used) and [MainActivitySettingsController] (uses it) so the
+     * two can never disagree — an "unset" field must not read as "no stream" while the app streams
+     * the derived default. [hostOverride] carries a freshly edited host value that is not yet
+     * persisted (the change listener fires before prefs are saved).
+     */
+    fun effectiveVideoUri(prefs: SharedPreferences, hostOverride: String?): String {
+      val host =
+          hostOverride
+              ?: prefs.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS)
+              ?: DEFAULT_HOST_ADDRESS
+      val defaultUri = if (host.isBlank()) "" else "http://$host:8080/?action=stream"
+      return prefs.getString(SK_VIDEO_URI, defaultUri) ?: defaultUri
+    }
+
     /** Builds a fragment for the app settings (pref_app.xml) or robot settings (pref_robot.xml). */
     fun newInstance(preferenceXml: Int): SettingsFragment =
         SettingsFragment().apply {
@@ -254,22 +273,25 @@ class SettingsFragment : PreferenceFragmentCompat() {
       preference.summary = prefs.getString(preferenceKey, "").orEmpty()
       preference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
         pref.summary = value.toString()
+        // The video-URI row derives its default from the host: a host change must refresh it
+        // (the row shows the effective value, not just the stored one). The change listener fires
+        // before the value is persisted, so pass the new host explicitly.
+        if (preferenceKey == SK_HOST_ADDRESS) {
+          refreshVideoUriSummary(hostOverride = value.toString())
+        }
         true
       }
     }
 
-    // Video URI: current value, or an empty-state label when unset.
+    refreshVideoUriSummary()
+
+    // The video-URI row's own change must also reflect the typed value immediately (the shared
+    // helper reads prefs, which are only persisted after this listener returns true).
     val videoUri = findPreference<Preference>(SK_VIDEO_URI)
-    if (videoUri != null) {
-      videoUri.summary =
-          prefs.getString(SK_VIDEO_URI, "").orEmpty().ifEmpty {
-            getString(R.string.video_uri_summary_empty)
-          }
-      videoUri.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
-        pref.summary =
-            (value as? String).orEmpty().ifEmpty { getString(R.string.video_uri_summary_empty) }
-        true
-      }
+    videoUri?.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
+      pref.summary =
+          (value as? String).orEmpty().ifEmpty { getString(R.string.video_uri_summary_empty) }
+      true
     }
 
     // SeekBars: "<current value> · <description>" (every value-bearing setting shows its value).
@@ -291,6 +313,22 @@ class SettingsFragment : PreferenceFragmentCompat() {
         true
       }
     }
+  }
+
+  /**
+   * Shows the *effective* video-URI value on the row: the stored URI, else the one derived from the
+   * host (`http://<host>:8080/?action=stream`), else the empty-state label when video is genuinely
+   * disabled. The row must never say "No stream URI set" while the app streams the host-derived
+   * default (DESIGN.md "Every setting shows its current value"). [hostOverride] carries a freshly
+   * edited host value that is not yet persisted (the change listener fires before prefs are saved).
+   */
+  private fun refreshVideoUriSummary(hostOverride: String? = null) {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
+    val videoUri = findPreference<Preference>(SK_VIDEO_URI) ?: return
+    videoUri.summary =
+        SettingsFragment.effectiveVideoUri(prefs, hostOverride).ifEmpty {
+          getString(R.string.video_uri_summary_empty)
+        }
   }
 
   /** "Button symbols…": dialog to edit the 5 glyphs; summary = the resolved glyphs joined. */

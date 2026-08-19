@@ -115,13 +115,51 @@ class RobotSettingsActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun videoUriSummaryShouldShowEmptyStateLabelWhenUnset() {
+  fun videoUriSummaryShouldShowEmptyStateLabelWhenExplicitlyEmpty() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_VIDEO_URI, "").commit()
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "").commit()
+    // Rebuild so the summary reflects the (empty) prefs at setup time.
+    val rebuilt = buildFragment()
+    val videoUri = rebuilt.findPreference<Preference>(SettingsFragment.SK_VIDEO_URI)
+    assertNotNull(videoUri)
+    // An explicitly-empty URI (with no host to derive from) is a genuine "video disabled" state.
+    assertEquals("No stream URI set", videoUri!!.summary)
+  }
+
+  @Test
+  fun videoUriSummaryShouldShowDerivedUrlWhenUnsetButHostConfigured() {
+    // An unset URI with a configured host: the app streams the host-derived default, so the row
+    // must show that URL (never "No stream URI set" while the app actually streams).
     val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
     prefs.edit().remove(SettingsFragment.SK_VIDEO_URI).commit()
-    val videoUri = fragment.findPreference<Preference>(SettingsFragment.SK_VIDEO_URI)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
+    val rebuilt = buildFragment()
+    val videoUri = rebuilt.findPreference<Preference>(SettingsFragment.SK_VIDEO_URI)
     assertNotNull(videoUri)
-    videoUri!!.onPreferenceChangeListener!!.onPreferenceChange(videoUri, "")
-    assertEquals("No stream URI set", videoUri.summary)
+    assertEquals("http://10.0.0.9:8080/?action=stream", videoUri!!.summary)
+  }
+
+  @Test
+  fun videoUriSummaryShouldRefreshOnHostChange() {
+    // The derived video-URI summary follows the host: editing the host updates the row.
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().remove(SettingsFragment.SK_VIDEO_URI).commit()
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
+    val rebuilt = buildFragment()
+    val host = rebuilt.findPreference<Preference>(SettingsFragment.SK_HOST_ADDRESS)
+    assertNotNull(host)
+    host!!.onPreferenceChangeListener!!.onPreferenceChange(host, "10.0.0.7")
+
+    val videoUri = rebuilt.findPreference<Preference>(SettingsFragment.SK_VIDEO_URI)
+    assertNotNull(videoUri)
+    assertEquals("http://10.0.0.7:8080/?action=stream", videoUri!!.summary)
+  }
+
+  /** Builds a fresh [RobotSettingsActivity] + fragment (prefs are read at setup). */
+  private fun buildFragment(): SettingsFragment {
+    val rebuilt = Robolectric.buildActivity(RobotSettingsActivity::class.java).setup().get()
+    return rebuilt.supportFragmentManager.findFragmentById(android.R.id.content) as SettingsFragment
   }
 
   private fun presetRows(): List<Preference> {

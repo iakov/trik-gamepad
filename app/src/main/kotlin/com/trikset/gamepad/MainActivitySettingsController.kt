@@ -105,11 +105,10 @@ class MainActivitySettingsController(
 
     // Empty host = video-only device: the URI default cannot be derived from the host, and the
     // malformed "http://:8080/..." would toast "Illegal video stream URL" on every register.
-    // An empty default -> setVideoUrl(null) -> the placeholder prompts the user to configure one.
-    val defaultVideoUri = if (addr.isBlank()) "" else "http://$addr:8080/?action=stream"
-    val videoStreamURI =
-        sharedPreferences.getString(SettingsFragment.SK_VIDEO_URI, defaultVideoUri)
-            ?: defaultVideoUri
+    // An empty effective URI -> setVideoUrl(null) -> the placeholder prompts the user to configure
+    // one. The shared helper mirrors the settings row exactly (both show/use the effective value,
+    // so an unset field never reads as "no stream" while the app streams the host-derived default).
+    val videoStreamURI = SettingsFragment.effectiveVideoUri(sharedPreferences)
 
     // The top-left chip shows the robot target: the host when set; else the video stream's host
     // when a stream is configured (video-only mode); else a filler so the chip stays readable

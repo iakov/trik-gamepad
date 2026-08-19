@@ -187,6 +187,33 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
   }
 
   @Test
+  fun onPreferenceChangedWithUnsetVideoUriShouldDeriveFromHost() {
+    // No URI stored: the effective URI is derived from the host (the settings row shows the same
+    // derived URL — they share SettingsFragment.effectiveVideoUri).
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9")
+    assertEquals("http://10.0.0.9:8080/?action=stream", ui.url.toString())
+  }
+
+  @Test
+  fun effectiveVideoUriShouldMatchControllerDerivation() {
+    // The settings-row helper and the runtime controller must never disagree: same derivation,
+    // same empty-vs-derived semantics.
+    setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9")
+    assertEquals(
+        "derived URL must match the runtime value",
+        ui.url.toString(),
+        SettingsFragment.effectiveVideoUri(prefs),
+    )
+    setPref(SettingsFragment.SK_VIDEO_URI, "")
+    assertNull("explicitly-empty URI must disable video", ui.url)
+    assertEquals(
+        "explicitly-empty URI must also empty the helper",
+        "",
+        SettingsFragment.effectiveVideoUri(prefs),
+    )
+  }
+
+  @Test
   fun registerShouldApplyDefaultPreferences() {
     controller.register()
     try {

@@ -69,6 +69,14 @@ An **empty value is a deliberate "disabled" state**, not a missing one:
 - empty robot host → control disabled (video-only, S5);
 - empty video URI → video disabled (control-only).
 
+Two distinct "no stored URI" cases exist and are both shown truthfully: an
+**unset** URI means the app streams the value derived from the robot host
+(`http://<host>:8080/?action=stream` — the "Defaults are as useful as possible"
+behavior), and the row shows that derived URL; an **explicitly-empty** URI
+means video is disabled, and the row shows "No stream URI set". The row never
+shows "No stream URI set" while the app actually streams (see "Every setting
+shows its current value").
+
 "Empty for disabled" is documented here; the Settings rows show the current
 value with the existing empty-state label (the video URI shows "No stream URI
 set"; a blank host is a valid video-only configuration).
@@ -110,13 +118,22 @@ instead of an empty row.
 
 A value-bearing setting always shows its current value in its summary:
 verbosity → `Info · …`, seekbars → `12 · Smaller = more sensitive…`, the video
-URI → the URI, host/port/keepalive → the stored value. Static "hint" summaries
-only remain where the row itself is an *action* (e.g. "Reset video URI"), never
-a value. The seekbar fallback is the XML default, not a fabricated 0, so a
-fresh install shows the real value. An **empty** value is a deliberate
-"disabled" state (see "Scenarios & use-cases — Empty-value semantics"), not a
-missing one: the video-URI row then shows "No stream URI set", and a blank host
-is a valid video-only configuration.
+URI → the **effective** URI, host/port/keepalive → the stored value. Static
+"hint" summaries only remain where the row itself is an *action* (e.g. "Reset
+video URI"), never a value. The seekbar fallback is the XML default, not a
+fabricated 0, so a fresh install shows the real value. An **empty** value is a
+deliberate "disabled" state (see "Scenarios & use-cases — Empty-value
+semantics"), not a missing one: the video-URI row then shows "No stream URI
+set", and a blank host is a valid video-only configuration.
+
+The video-URI row shows the **effective** value — the stored URI, else the one
+derived from the robot host (`http://<host>:8080/?action=stream`) — never a
+raw prefs read. A fresh install with the default host set therefore shows the
+derived URL (the app *does* stream it), not a misleading "No stream URI set";
+the label appears only when video is genuinely disabled (blank host and no URI,
+or an explicitly-empty URI). The row and the runtime share one helper
+(`SettingsFragment.effectiveVideoUri`) so they can never disagree; a host edit
+refreshes the row too (the derived value follows the host).
 
 ## Ellipsis on dialog rows
 
