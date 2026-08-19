@@ -324,7 +324,8 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
   networks with `ShadowNetwork.newInstance(id)` and assert binding via
   `shadowOf(network).isSocketBound(socket)`. When the code under test needs to
   *choose* a network, inject a provider seam (e.g. `WifiSocketBinder`'s
-  `wifiNetworkProvider: () -> Network?`) instead of faking capabilities.
+  `wifiNetworkProvider: () -> Network?` or `WifiConnectionOpener`'s
+  `networkOpen`/`defaultOpen`) instead of faking capabilities.
 - **Verify overload API levels against the OLDEST_SDK variant, not
   compileSdk.** `ConnectivityManager.registerNetworkCallback(request, cb, Handler)` is API 26+ — the 2-arg form is API 21+. Under the OLDEST_SDK (23)
   Robolectric config the 3-arg form throws `NoSuchMethodError` at runtime
@@ -560,7 +561,7 @@ testable-through-adjacent test where a real robot/device is required):
 | S10 half-open control | `VideoRetryControllerTest` (reload allowed on `!isPlaying` alone) |
 | S11 re-host, old video URL | same control-agnostic gate tests (an old URL keeps retrying) |
 | S12 multiple gamepads | no shared state: each `SenderService`/`VideoRetryController` is per-activity (unit tests run independent instances) |
-| S13 WAP ↔ cellular routing | `SocketBinderTest` (bind/fallback seams) + `RawSocketHttpStreamTest` (video socket binds) |
+| S13 WAP ↔ cellular routing | `SocketBinderTest` (bind/fallback seams) + `RawSocketHttpStreamTest` (video socket binds) + `WifiConnectionOpenerTest` + `HttpsVideoStreamTest` (https routed over the Wi-Fi network, trust-all TLS) |
 | S14 control off, video open | `deadStreamShouldSelfHealWithControlPermanentlyDisconnected` e2e (video recovers without control `Connected`) |
 
 The video-retry scenarios were consolidated in 2026-08-18 (Option B): the gate

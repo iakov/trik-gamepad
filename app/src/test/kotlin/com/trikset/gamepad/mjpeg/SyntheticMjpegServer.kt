@@ -105,7 +105,7 @@ class SyntheticMjpegServer(
   private fun writeResponseHeaders(out: OutputStream) {
     val headers =
         ("HTTP/1.1 200 OK\r\n" +
-                "Content-Type: multipart/x-mixed-replace; boundary=--trikgamepad\r\n" +
+                "Content-Type: multipart/x-mixed-replace; boundary=$BOUNDARY\r\n" +
                 "Cache-Control: no-cache\r\n" +
                 "Connection: close\r\n" +
                 "\r\n")
@@ -113,17 +113,24 @@ class SyntheticMjpegServer(
     out.write(headers)
   }
 
-  private fun writeFrame(out: OutputStream, jpeg: ByteArray) {
-    val boundary = "--trikgamepad\r\n".toByteArray(Charsets.US_ASCII)
-    val contentLength =
-        "Content-Type: image/jpeg\r\nContent-Length: ${jpeg.size}\r\n\r\n"
-            .toByteArray(Charsets.US_ASCII)
-    out.write(boundary)
-    out.write(contentLength)
-    out.write(jpeg)
-  }
-
   companion object {
+    const val BOUNDARY = "--trikgamepad"
+    const val CONTENT_TYPE = "multipart/x-mixed-replace; boundary=$BOUNDARY"
+
+    /**
+     * Writes one MJPEG frame (boundary + headers + JPEG) to [out]; shared by the http/https
+     * servers.
+     */
+    fun writeFrame(out: OutputStream, jpeg: ByteArray) {
+      val boundary = "$BOUNDARY\r\n".toByteArray(Charsets.US_ASCII)
+      val contentLength =
+          "Content-Type: image/jpeg\r\nContent-Length: ${jpeg.size}\r\n\r\n"
+              .toByteArray(Charsets.US_ASCII)
+      out.write(boundary)
+      out.write(contentLength)
+      out.write(jpeg)
+    }
+
     /** Loads one committed CC0 cat fixture (a "640x480"-style size token) from the classpath. */
     fun catFrameImage(size: String): ByteArray {
       val path = "/mjpeg/vintage_cat_9405680_${size}.jpg"

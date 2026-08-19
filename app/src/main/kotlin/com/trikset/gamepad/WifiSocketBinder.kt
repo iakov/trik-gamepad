@@ -1,10 +1,7 @@
 package com.trikset.gamepad
 
 import android.content.Context
-import android.net.ConnectivityManager
 import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import com.trikset.gamepad.diagnostics.AppLog
 import java.io.IOException
 import java.net.Socket
@@ -17,10 +14,9 @@ import java.net.Socket
  * Requires `ACCESS_NETWORK_STATE`.
  *
  * The Wi-Fi lookup is injected as [wifiNetworkProvider] so tests can supply a fixed [Network] (or
- * null) instead of faking `ConnectivityManager` capabilities. The default provider tracks Wi-Fi
- * availability via a [ConnectivityManager.NetworkCallback] registered with
- * [ConnectivityManager.registerNetworkCallback] — the non-deprecated flow (`allNetworks()` is
- * deprecated since API 33 and is deliberately not used).
+ * null) instead of faking `ConnectivityManager` capabilities; the production provider is
+ * [WifiNetworkTracker] (the non-deprecated callback flow — `allNetworks()` is deprecated since API
+ * 33 and is deliberately not used).
  */
 class WifiSocketBinder(
     context: Context,
@@ -38,39 +34,6 @@ class WifiSocketBinder(
       }
     }
     return socket
-  }
-
-  /**
-   * Tracks the currently available `TRANSPORT_WIFI` network by registering a
-   * [ConnectivityManager.NetworkCallback] once at construction (the callback is posted to the
-   * calling thread's looper, the main thread at every call site). A connect that happens before the
-   * first [ConnectivityManager.NetworkCallback.onAvailable] falls back to the default network; the
-   * next reconnect then binds to Wi-Fi.
-   */
-  private class WifiNetworkTracker(context: Context) {
-    private val connectivityManager =
-        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-
-    @Volatile private var wifiNetwork: Network? = null
-
-    init {
-      val request =
-          NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_WIFI).build()
-      connectivityManager.registerNetworkCallback(
-          request,
-          object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-              wifiNetwork = network
-            }
-
-            override fun onLost(network: Network) {
-              if (wifiNetwork == network) wifiNetwork = null
-            }
-          },
-      )
-    }
-
-    fun current(): Network? = wifiNetwork
   }
 
   private companion object {

@@ -39,7 +39,7 @@ touch one.
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-15] Idiomatic Kotlin pass (Java→Kotlin leftovers) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render | [2026-08-18] Scenario-driven video retry — control gate removed (Option B) |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render | [2026-08-19] https video binds to the Wi-Fi network (Network.openConnection + trust-all TLS) |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
 | UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-18] Haptic schema: generic legacy constants, strong pulses, no VIBRATE |
@@ -812,6 +812,64 @@ ______________________________________________________________________
 
 ## Architecture
 
+### [2026-08-19] https video binds to the Wi-Fi network (Network.openConnection + trust-all TLS)
+
+- **Type:** design-clarifying (completes S13 for the https path — A.2 only
+  bound sockets, leaving the https fallback on the default network).
+
+- **Problem:** A.2 bound control and raw-socket video sockets to the robot
+  Wi-Fi AP, but the https video branch of `VideoStreamLoader` still used
+  `url.openConnection()` — that opens on the system *default* network, which on
+  a phone with cellular data enabled is cellular while the robot AP is the
+  connected Wi-Fi. An https camera URL therefore violated S13 (route over the
+  Wi-Fi AP whenever one exists). The robot's camera is also typically a
+  self-signed TLS endpoint, which a stock `HttpsURLConnection` rejects.
+
+- **Alternatives considered:** (a) wrap the default-network
+  `HttpsURLConnection` socket in TLS manually via `SSLSocketFactory` +
+  `Network.bindSocket` (more code, duplicates the https protocol handling);
+  (b) route only http and declare https out of scope (rejected — the user asked
+  for bullet-proof https support); (c) trust policy strict system-CA (rejected
+  by user 2026-08-19: option 1 trust-all for now, TOFU maybe later).
+
+- **Chosen solution:** `Network.openConnection(URL)` (API 21+, minSdk-23-safe,
+  verified in the android-23 stub) bound to the tracked Wi-Fi network,
+  mirroring `SocketBinder` for sockets:
+
+  - New `ConnectionOpener` fun interface (`open(url): URLConnection` +
+    `identity`), mirroring `SocketBinder`.
+  - `WifiConnectionOpener(context, wifiNetworkProvider = WifiNetworkTracker(context)::current, networkOpen, defaultOpen)` — Wi-Fi present →
+    `network.openConnection(url)`, else / on `IOException` → `url.openConnection()`.
+    `WifiNetworkTracker` was extracted from `WifiSocketBinder` to a top-level
+    class shared by both binders.
+  - For https the connection gets a trust-all `SSLSocketFactory` +
+    allow-all `HostnameVerifier`, isolated in `WifiConnectionOpener`'s companion
+    so the policy can be swapped later (user decision 2026-08-19: trust-all now,
+    TOFU later). Lint suppression: `TrustAllX509TrustManager` +
+    `AllowAllHostnameVerifier` in `app/lint.xml` with rationale (the robot
+    camera is a self-signed private endpoint, not a general-purpose TLS site).
+  - `VideoStreamLoader` takes a `connectionOpener` (default
+    `WifiConnectionOpener(view.context)`); the http raw-socket branch is
+    unchanged (it must stay raw to bypass the NSC cleartext whitelist).
+
+- **Why:** same rationale as A.2 — the robot AP has no internet, so the system
+  keeps cellular default; routing the https connection over the tracked Wi-Fi
+  network preserves S13. `Network.openConnection` keeps the standard
+  `HttpsURLConnection` protocol handling (redirects, TLS, timeouts), so the
+  feature is a routing/trust change only. The seams (`wifiNetworkProvider`,
+  `networkOpen`, `defaultOpen`) unit-test the decision deterministically —
+  Robolectric's `ShadowNetwork` shadows only `bindSocket`, not
+  `openConnection`, so the real call is a thin framework-facing line (same
+  category as the documented uncovered `bindSocket` catch in A.2).
+
+- **Out of scope / consequences:** trust-all applies to the *video* https
+  connection only (control stays plain TCP; no other https surface exists).
+  The trust policy is deliberately isolated for a later TOFU swap. On-robot
+  verification (cellular + robot Wi-Fi with an https camera) remains a manual
+  user step. Coverage: `WifiConnectionOpenerTest` (5 seam/routing tests,
+  mutation-checked red) + `HttpsVideoStreamTest` (end-to-end frames over a
+  self-signed local `HttpsServer`, mutation-checked red).
+
 ### [2026-08-18] Scenario-driven video retry — control gate removed (Option B)
 
 - **Type:** design-clarifying (restates the DESIGN.md scenario contract; see
@@ -932,7 +990,10 @@ ______________________________________________________________________
     (present in android-23.jar → minSdk-23-safe, verified by javap) inside a
     catch → default-network fallback. Applied at both `Socket()` sites
     (`SenderService.connectToTRIK`, `RawSocketHttpStream.open`); the https path
-    stays on `HttpURLConnection` (default network — it cannot be bound).
+    stays on `HttpURLConnection` (default network — it cannot be bound) —
+    superseded 2026-08-19 by "[2026-08-19] https video binds to the Wi-Fi
+    network": the https video branch now routes via `WifiConnectionOpener`
+    (`Network.openConnection` on the tracked Wi-Fi network + trust-all TLS).
     Manifest gains `ACCESS_NETWORK_STATE`. When no Wi-Fi network exists, fall
     back to the default network (user decision — preserves hotspot/cellular
     setups).

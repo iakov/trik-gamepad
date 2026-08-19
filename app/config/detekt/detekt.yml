@@ -56,6 +56,15 @@ complexity:
     # the jscpd duplication gate. Raised from the 600-line default to 800.
     threshold: 800
 
+empty-blocks:
+  EmptyFunctionBlock:
+    active: true
+    # X509TrustManager/URLConnection overrides whose empty body IS the contract:
+    # the accept-all trust policy (WifiConnectionOpener) and a fake connection
+    # (WifiConnectionOpenerTest). Forcing a statement in would break the
+    # "do nothing" semantics, so overridden empty functions are allowed.
+    ignoreOverridden: true
+
 style:
   ReturnCount:
     # Faithful Java→Kotlin ports of parser/network code legitimately use

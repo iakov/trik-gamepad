@@ -35,6 +35,27 @@
     <issue id="ClickableViewAccessibility" severity="ignore">
         <ignore path="src/main/kotlin/com/trikset/gamepad/SquareTouchPadLayout.kt" />
     </issue>
+    <!-- WifiConnectionOpener trust-alls the https video connection so the robot's
+         self-signed camera endpoint works out of the box. User decision 2026-08-19:
+         trust-all for now, TOFU possibly later — the policy is isolated in
+         WifiConnectionOpener's companion so it can be swapped. The trust-all applies
+         to the video https URL only (control stays plain TCP); the robot camera is a
+         private single-purpose endpoint, not a general TLS site. -->
+    <issue id="TrustAllX509TrustManager" severity="ignore">
+        <ignore path="src/main/kotlin/com/trikset/gamepad/WifiConnectionOpener.kt" />
+    </issue>
+    <!-- CustomX509TrustManager: the trust-all manager is implemented as a custom
+         X509TrustManager; the override is deliberately empty (accept-any) — same
+         rationale as TrustAllX509TrustManager above (user decision 2026-08-19,
+         isolated in WifiConnectionOpener for a later TOFU swap). -->
+    <issue id="CustomX509TrustManager" severity="ignore">
+        <ignore path="src/main/kotlin/com/trikset/gamepad/WifiConnectionOpener.kt" />
+    </issue>
+    <!-- Same rationale as TrustAllX509TrustManager above: the self-signed camera has
+         no DNS entry matching its cert, so the hostname check must also be relaxed. -->
+    <issue id="AllowAllHostnameVerifier" severity="ignore">
+        <ignore path="src/main/kotlin/com/trikset/gamepad/WifiConnectionOpener.kt" />
+    </issue>
     <!-- MainActivity's reflected members (processSensor, setSystemUiVisibility,
          recreateMagicButtons, createPad, mVideo, mVideoURL, ...) must keep their
          exact private names for the Java MainActivityTest reflection helpers,

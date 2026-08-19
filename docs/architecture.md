@@ -113,7 +113,7 @@ timer. The timeout is configurable via `SK_KEEPALIVE`.
 ## MJPEG video pipeline
 
 ```
-RawSocketHttpStream (http; bypasses NSC) / HttpURLConnection (https fallback)
+RawSocketHttpStream (http; bypasses NSC) / WifiConnectionOpener (https; bound to the Wi-Fi network, trust-all TLS for the robot's self-signed camera)
   5 s connect/read timeouts
   -> MjpegInputStream   parses the multipart stream into JPEG frames
   -> MjpegFrameRenderer decodes a frame, computes the center-crop Rect,

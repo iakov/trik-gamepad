@@ -22,6 +22,7 @@ constructor(
     private val executor: Executor = Executors.newSingleThreadExecutor(),
     private val mainHandler: Handler = Handler(Looper.getMainLooper()),
     private val socketBinder: SocketBinder = WifiSocketBinder(view.context),
+    private val connectionOpener: ConnectionOpener = WifiConnectionOpener(view.context),
 ) {
 
   /**
@@ -51,7 +52,9 @@ constructor(
           if (url.protocol.equals("http", ignoreCase = true)) {
             RawSocketHttpStream.open(url, socketBinder)
           } else {
-            val connection = url.openConnection() as HttpURLConnection
+            // Non-http (e.g. https) streams go through the connection opener, which prefers
+            // the Wi-Fi network (S13) and trust-alls the robot's self-signed camera endpoint.
+            val connection = connectionOpener.open(url) as HttpURLConnection
             connection.connectTimeout = CONNECT_TIMEOUT_MS
             connection.readTimeout = READ_TIMEOUT_MS
             connection.inputStream

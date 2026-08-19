@@ -1,8 +1,8 @@
 package com.trikset.gamepad
 
 import com.trikset.gamepad.mjpeg.HttpRequestHead
-import com.trikset.gamepad.mjpeg.MjpegInputStream
 import com.trikset.gamepad.mjpeg.SyntheticMjpegServer
+import com.trikset.gamepad.mjpeg.assertDecodedFramesMatchSeeded
 import java.io.IOException
 import java.net.ServerSocket
 import java.net.URL
@@ -36,20 +36,7 @@ class RawSocketHttpStreamTest : RobolectricTestBase() {
       val url = URL("http://127.0.0.1:$port/?action=stream")
       val stream = RawSocketHttpStream.open(url)
       try {
-        val parser = MjpegInputStream(stream)
-        val decoded = mutableListOf<ByteArray>()
-        val deadline = System.currentTimeMillis() + 15000
-        while (decoded.size < 2 && System.currentTimeMillis() < deadline) {
-          val frame = parser.readMjpegFrame() ?: continue
-          decoded.add(frame.readBytes())
-          frame.close()
-        }
-        assertTrue(
-            "expected >=2 frames from the raw-socket client, got ${decoded.size}",
-            decoded.size >= 2,
-        )
-        val byteMatch = decoded.any { bytes -> seededFrames.any { it.contentEquals(bytes) } }
-        assertTrue("expected a frame byte-identical to a seeded JPEG", byteMatch)
+        assertDecodedFramesMatchSeeded(stream, seededFrames)
       } finally {
         stream.close()
       }

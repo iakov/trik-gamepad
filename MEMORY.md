@@ -1367,8 +1367,11 @@ the targets before removal (write-target-first rule).
 opens a `Socket` for plain-HTTP MJPEG, parses the response head and hands the
 body to `MjpegInputStream`, bypassing NSC so non-`192.168.77.1` hosts work.
 Handles Content-Length, chunked (with the chunk-data CRLF), and until-close.
-`VideoStreamLoader.openStream` uses it for `http`; `https` keeps
-`HttpURLConnection`.
+`VideoStreamLoader.openStream` uses it for `http`; `https` now routes through
+`WifiConnectionOpener` (`Network.openConnection` over the tracked Wi-Fi
+network, with trust-all TLS for the robot's self-signed camera; E3,
+2026-08-19 — before it was plain `HttpURLConnection` on the default
+network).
 
 **Biggest find: the coverage gate was silently under-measuring.** Under AGP 9's
 built-in Kotlin the class output moved to

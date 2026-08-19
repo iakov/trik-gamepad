@@ -39,7 +39,7 @@ silently patch around it. Decisions in `DECISIONS.md` cite scenario IDs.
 | **S10** | Half-open control (keepalive not yet expired) | video recovery is allowed; a failed reload is cheap and bounded |
 | **S11** | User re-hosts control while an old video URL persists | old camera may recover; nothing is frozen |
 | **S12** | Multiple gamepads, one robot (classroom) | fully independent per phone; no cross-coupling |
-| **S13** | WAP ↔ cellular transition (user-managed phone setting; robot WAP has no internet) | both control and video sockets route over the Wi-Fi AP whenever one exists |
+| **S13** | WAP ↔ cellular transition (user-managed phone setting; robot WAP has no internet) | both control and video sockets/connections (http raw socket and https) route over the Wi-Fi AP whenever one exists |
 | **S14** | Robot up, control port blocked/off, video port open | video still recovers (competition edge) |
 
 ### Derived principles (P1–P6)
