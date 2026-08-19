@@ -1023,3 +1023,52 @@ re-design happens interactively.
   then the video-retry Option B gate + spinner + tests (red-first). Pending
   follow-up from C24 stays: main-thread socket-I/O, `inSampleSize`,
   real-robot re-verify.
+
+## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
+
+Futures the user wants tracked as candidate campaigns; each needs a design pass
+(interactive) before it becomes a scoped campaign. None is started.
+
+### UDP control transport (in addition to TCP)
+
+The robot will soon support UDP control alongside TCP; keepalive already exists
+(`MEMORY.md` "App protocol"), so a UDP path would reuse the keepalive loop.
+App-side implications to think through when scoping:
+
+- Command frame format over UDP (newline-terminated like TCP today? per-message
+  sizing, since UDP has no stream boundaries), and whether UDP replaces TCP or
+  is a selectable setting (`SenderService` currently owns a single TCP socket +
+  `keepaliveTimeout`).
+- Loss/ordering: UDP drops and reorders — pad/button commands are idempotent
+  enough, but `wheel <angle>` needs a policy (send latest state? monotonic
+  sequence numbers?).
+- The half-open story differs: TCP half-open is the current disconnect trap
+  (`MEMORY.md` "App protocol"); UDP is connectionless, so "connected" must be
+  inferred from keepalive liveness instead of a socket state.
+- Wi-Fi binding (A2, `WifiSocketBinder`) applies to `DatagramSocket` too
+  (`Network.bindSocket` supports it) — a UDP path must keep S13.
+
+### Additional video-streaming formats (SBC-typical)
+
+The robot is Linux-based and can serve typical single-board-computer stream
+formats; pick a small set that is easy to support on Android. Candidates (to
+narrow down in the design pass, not a commitment):
+
+- **RTSP (H.264/H.265)** — `MediaPlayer`/ExoPlayer handle it; the obvious
+  SBC/robot-camera standard.
+- **HLS (.m3u8)** — also `MediaPlayer`-native, trivial from ffmpeg on the SBC.
+- **MPEG-TS over UDP / plain H.264-over-HTTP** — also `MediaPlayer`-friendly.
+
+Design question for the pass: keep MJPEG as the baseline (TRIK-native) and add
+a player abstraction over `MjpegView` vs `MediaPlayer`, so the retry/self-heal
+controller (`VideoRetryController`) drives whichever sink is active.
+
+### SBC as a separate video source (video IP ≠ control IP)
+
+Sometimes a single-board computer accompanies the TRIK controller for video
+streaming / algorithms, so the video source IP can differ from the control IP.
+This is **already the designed contract** (`DESIGN.md` S4/S6: video is fully
+decoupled from control; different-host video self-heals — shipped in Campaign
+25's Option B retry), so no design change is needed; the SBC case is just a
+concrete instance. Note it so future format work (above) never re-couples
+video to the control host.
