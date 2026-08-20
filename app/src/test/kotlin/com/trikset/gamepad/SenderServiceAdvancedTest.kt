@@ -1,6 +1,8 @@
 package com.trikset.gamepad
 
 import android.os.Looper.getMainLooper
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -213,5 +215,40 @@ class SenderServiceAdvancedTest : RobolectricTestBase() {
     client.keepaliveTimeout = 12345
     assertEquals(12345, client.keepaliveTimeout)
     client.keepaliveTimeout = before
+  }
+
+  @Test
+  fun postCommandSendsOnTheExecutorThreadNeverTheMainThread() {
+    // The C24 perf finding: the TCP error-check flushed the PrintWriter (a socket write) on the
+    // MAIN thread. The send + error-check must stay on the executor thread. A real (not paused)
+    // executor is required here — PausedExecutorService.runAll() runs on the test thread, which IS
+    // the main thread under Robolectric, so it cannot prove thread affinity.
+    val sendThreadNames = java.util.concurrent.CopyOnWriteArrayList<String>()
+    val mainThread = Thread.currentThread()
+    val transport =
+        object : CommandTransport {
+          override fun open(host: String, port: Int) {}
+
+          override fun send(command: String): Boolean {
+            sendThreadNames.add(Thread.currentThread().name)
+            return true
+          }
+
+          override fun close() {}
+        }
+    val realExecutor = Executors.newSingleThreadExecutor()
+    val client = SenderService(executor = realExecutor, transportFactory = { transport })
+
+    client.setTarget("localhost", 1)
+    client.send("pad 1 0 0")
+    realExecutor.shutdown()
+    assertTrue(realExecutor.awaitTermination(5, TimeUnit.SECONDS))
+
+    assertTrue(sendThreadNames.isNotEmpty())
+    assertTrue(
+        "transport.send() must never run on the main thread (was: ${sendThreadNames.joinToString()})",
+        sendThreadNames.none { it == mainThread.name },
+    )
+    client.disconnect("done")
   }
 }

@@ -4,11 +4,6 @@ import android.os.Handler
 import android.os.Looper
 import com.trikset.gamepad.diagnostics.AppLog
 import java.io.IOException
-import java.io.OutputStreamWriter
-import java.io.PrintWriter
-import java.net.InetSocketAddress
-import java.net.Socket
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -17,8 +12,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * Maintains one TCP connection to the robot and sends newline-terminated plain-text commands (`pad
- * 1 x y`, `btn N down`, `wheel <angle>`, `keepalive <ms>`).
+ * Maintains the control channel to the robot and sends newline-terminated plain-text commands (`pad
+ * 1 x y`, `btn N down`, `wheel <angle>`, `keepalive <ms>`). The transport ([CommandTransport], a
+ * persistent TCP connection today via [TcpTransport]) is injected via [transportFactory] so the
+ * protocol is independent of the socket.
  *
  * All network/keepalive collaborators are injected via the constructor (defaults preserved) so
  * tests substitute a
@@ -34,7 +31,7 @@ class SenderService(
         Executors.newSingleThreadScheduledExecutor { runnable ->
           Thread(runnable, "SenderServiceKeepAlive").apply { isDaemon = true }
         },
-    private val socketBinder: SocketBinder = SocketBinder.identity,
+    private val transportFactory: () -> CommandTransport = { TcpTransport() },
 ) {
 
   fun interface OnEventListener<ArgT> {
@@ -56,7 +53,7 @@ class SenderService(
   internal val mainHandler = Handler(Looper.getMainLooper())
   internal var showTextCallback: OnEventListener<String>? = null
   internal var onDisconnectedListener: OnEventListener<String>? = null
-  internal var out: PrintWriter? = null
+  internal var transport: CommandTransport? = null
   var hostAddr: String? = null
     private set
 
@@ -89,33 +86,16 @@ class SenderService(
     }
   }
 
-  // socket is closed from PrintWriter.close()
-  @Suppress("TooGenericExceptionCaught") // keep the Java recovery cleanup around the PrintWriter
+  // socket is closed from CommandTransport.close()
   internal fun connectToTRIK() {
     synchronized(syncFlag) {
       try {
         AppLog.i(TCP_TAG, "Connecting to $hostAddr:$hostPort")
-        val socket = socketBinder.bind(Socket())
-        socket.connect(InetSocketAddress(hostAddr, hostPort), TIMEOUT)
-        socket.tcpNoDelay = true
-        socket.keepAlive = true
-        socket.setSoLinger(true, 0)
-        socket.trafficClass = TRAFFIC_CLASS // high priority, no-delay
-        socket.oobInline = true
-        socket.shutdownInput()
-        val osw = OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8)
+        val transport = transportFactory()
+        transport.open(hostAddr.orEmpty(), hostPort)
+        this.transport = transport
         keepAliveTimer.restart()
-        try {
-          out = PrintWriter(osw, true)
-          _connectionState.value = ConnectionState.Connected
-        } catch (e: Exception) {
-          AppLog.e(TCP_TAG, "GetStream: Error", e)
-          socket.close()
-          osw.close()
-          // Failed to finish the handshake: leave the state machine at Disconnected, not stuck at
-          // Connecting (a later connect attempt retries cleanly).
-          _connectionState.value = ConnectionState.Disconnected("")
-        }
+        _connectionState.value = ConnectionState.Connected
       } catch (e: IOException) {
         AppLog.e(TCP_TAG, "Connect: Error", e)
         // A refused/unresolvable target must not leave the pill stuck at "Connecting…".
@@ -128,32 +108,33 @@ class SenderService(
 
   internal fun onConnectionFinished() {
     showTextCallback?.onEvent(
-        "Connection to $hostAddr:$hostPort" + if (out != null) " established." else " error."
+        "Connection to $hostAddr:$hostPort" + if (transport != null) " established." else " error."
     )
     connectTask = null
   }
 
   internal fun postCommand(command: String) {
     executor.execute {
+      var sendFailed = false
       synchronized(syncFlag) {
-        out?.println(command)
-      }
-      mainHandler.post {
-        val out = out
-        if (out == null || out.checkError()) {
-          AppLog.e(TCP_TAG, "NotSent: $command")
-          disconnect("Send failed.")
+        val transport = transport
+        if (transport == null || !transport.send(command)) {
+          sendFailed = true
         }
+      }
+      if (sendFailed) {
+        AppLog.e(TCP_TAG, "NotSent: $command")
+        mainHandler.post { disconnect("Send failed.") }
       }
     }
   }
 
   fun disconnect(reason: String) {
     keepAliveTimer.stop()
-    val out = out
-    if (out != null) {
-      out.close()
-      this.out = null
+    val transport = transport
+    if (transport != null) {
+      transport.close()
+      this.transport = null
       AppLog.i(TCP_TAG, "Disconnected.")
       onDisconnectedListener?.onEvent(reason)
       _connectionState.value = ConnectionState.Disconnected(reason)
@@ -161,7 +142,7 @@ class SenderService(
   }
 
   fun send(command: String) {
-    if (out == null) {
+    if (transport == null) {
       connectAsync() // synchronized on the same object as postCommand
     }
     AppLog.d(TCP_TAG, "Sending '$command'")
@@ -170,12 +151,12 @@ class SenderService(
   }
 
   /**
-   * Establishes the TCP connection without sending a command (the "tap to connect" entry point).
-   * No-ops when no target is configured (a blank host is a valid video-only configuration — there
-   * is nothing to connect to).
+   * Establishes the connection without sending a command (the "tap to connect" entry point). No-ops
+   * when no target is configured (a blank host is a valid video-only configuration — there is
+   * nothing to connect to).
    */
   fun connect() {
-    if (out == null && !hostAddr.isNullOrBlank()) {
+    if (transport == null && !hostAddr.isNullOrBlank()) {
       connectAsync()
     }
   }
@@ -191,9 +172,7 @@ class SenderService(
   companion object {
     const val DEFAULT_KEEPALIVE = 5000
     const val MINIMAL_KEEPALIVE = 1000
-    const val TIMEOUT = 5000
 
-    private const val TRAFFIC_CLASS = 0x0F
     private const val TCP_TAG = "TCP"
   }
 }

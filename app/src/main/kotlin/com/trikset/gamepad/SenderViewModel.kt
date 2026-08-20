@@ -15,7 +15,10 @@ import kotlinx.coroutines.flow.StateFlow
  */
 class SenderViewModel(application: Application) : AndroidViewModel(application) {
 
-  var sender: SenderService = SenderService(socketBinder = WifiSocketBinder(application))
+  var sender: SenderService =
+      SenderService(
+          transportFactory = { TcpTransport(socketBinder = WifiSocketBinder(application)) }
+      )
     internal set
 
   val connectionState: StateFlow<ConnectionState> = sender.connectionState

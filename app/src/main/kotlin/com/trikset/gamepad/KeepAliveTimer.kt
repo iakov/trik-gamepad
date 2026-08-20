@@ -35,8 +35,8 @@ internal class KeepAliveTimer(
   }
 
   private fun tick() {
-    val out = sender.out
-    if (out != null) {
+    val transport = sender.transport
+    if (transport != null) {
       val command = "keepalive ${sender.keepaliveTimeout}"
       AppLog.i(TCP_TAG, "Sending $command message")
       sender.postCommand(command)
