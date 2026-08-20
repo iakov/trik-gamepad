@@ -452,8 +452,8 @@ restate their findings here only when a checklist entry needs an anchor.
 **Process**
 
 1. What was the biggest process win this campaign (worth repeating)?
-1. What was the committability constraint — would each commit compile against
-   HEAD's design?
+1. What kept each commit self-contained (compilable against HEAD's design +
+   gate-green)?
 1. What could have been lost, and what kept it safe (uncommitted work,
    crash-safety near-miss)?
 1. Elapsed vs Estimated — recorded in the ROADMAP header table?
@@ -504,7 +504,10 @@ restate their findings here only when a checklist entry needs an anchor.
    useful part into another question) if a useful part remains, otherwise
    **drop it from this checklist**. Update the *last revised* stamp.
 
-*Last revised: 2026-08-18 (C24 retrospective: added the user-correction question per user request; all other questions kept)*
+*Last revised: 2026-08-20 (C26 retrospective: rephrased Process Q2 to "What
+kept each commit self-contained (compilable against HEAD's design +
+gate-green)?"; all other questions kept). See the C26 retrospective's checklist
+review.*
 
 ### [2026-08-06] Quality-gate implementation quirks (checkstyle/SpotBugs/JaCoCo)
 
@@ -3302,3 +3305,146 @@ profiling → fix-all-local: MJPEG render-loop de-spin + GPU render
 - Checklist stamp: *Last revised: 2026-08-18 (checklist reviewed in the C24
   retrospective — added the user-correction question per user request; all other
   questions kept).*
+
+### [2026-08-20] Campaign 26 retrospective — E2 settings video-URI row, E3 https-over-Wi-Fi video, push-prep audit
+
+**Scope:** E2 (settings row shows the effective video URI, `c8852da`), E3
+(https video routes over the robot Wi-Fi + trust-all TLS, `1a0223f`), ROADMAP
+dreams (`387bdd8`), and the push-prep device-identifier audit that rewrote the
+unpushed history and force-pushed (`ce7365e` base → `a8ebdf0` scrub commit,
+`20e0085..a8ebdf0`). Pushed 2026-08-20 to `origin/feat/global-refresh` (fork
+branch, `--force-with-lease`).
+
+**Process**
+
+- **Biggest process win:** the red-first + mutation-checked loop for E3 — the
+  trust-all tests were written first, went red, went green, and a mutation
+  check (removing the trust-all factory) made BOTH the unit and the end-to-end
+  https tests go red again. The e2e test talks to a real local self-signed
+  `HttpsServer`, so it proves the feature over the wire, not against a mock.
+  Second win: the push-prep audit caught the identifiers before they hit
+  GitHub.
+- **Committability constraint:** E2 and E3 each landed as one self-contained
+  gate-green commit; the new `connectionOpener` constructor param has a
+  default, so all existing `VideoStreamLoader(...)` call sites compiled
+  unchanged.
+- **What could have been lost:** the device serial and model code
+  sat in the OLDEST unpushed commit (`2c02f64`) — a plain push
+  would have published them. The audit kept them out of GitHub entirely (the
+  serial was never on the remote). `.PLAN.md` session-saves carried the state
+  across the session.
+- **Elapsed vs Estimated:** ROADMAP Campaign 26 header — Estimated `—`, Actual
+  ≈08-19 daytime (E2+E3) + ~1 h 08-20 (push-prep audit + scrub + push).
+
+**Learning**
+
+- **New facts worth saving:**
+  - `javaClass` inside an `apply { }` block binds to the **receiver**, not the
+    enclosing class: `KeyStore.getInstance(...).apply { ... }` resolves
+    `javaClass` to `KeyStore` → bootstrap loader → test-classpath resource
+    missed ("missing test keystore"). Use an explicit class literal
+    (`HttpsMjpegServer::class.java`).
+  - detekt 1.23.8 `EmptyFunctionBlock` lives under the **`empty-blocks`**
+    ruleset (NOT `style`/`empty`), property **`ignoreOverridden`** (NOT
+    `ignoreOverriddenFunction`) — verified in the `detekt-rules-empty` jar.
+  - Android lint fires **three** checks for the trust-all pattern:
+    `TrustAllX509TrustManager`, `CustomX509TrustManager` AND
+    `AllowAllHostnameVerifier` — lint reports them one at a time (the
+    documented "one at a time" trap; 3rd check this session).
+  - `com.sun.net.httpserver.HttpsServer` (jdk.httpserver module) + a committed
+    throwaway self-signed PKCS12 (CN=localhost, password `changeit`) gives a
+    real end-to-end https test with no external network access.
+- **Wrong assumption the gate caught:** I first blamed the "missing test
+  keystore" on stale incremental resource state; the probe test PASSED because
+  it used an explicit class literal — the contradiction meant re-auditing the
+  code path (the apply-receiver bug), not the environment. When a probe
+  contradicts a failure, the failing code path is the suspect, not the tooling.
+- **Generalize:**
+  - **The device-identifier guardrail needs a verification hook** — this is
+    the SECOND violation (1st: 2026-08-15, `fb6cfa2`). Documentation alone
+    does not prevent it; the pre-push scan is now a step (AGENTS.md). Gaps
+    escalate: 1st document → 2nd automate (manual scan step now, pre-commit
+    hook candidate later).
+  - **Verify static-analysis rule placement against executable sources** —
+    two wrong guesses on detekt's rule location before reading the jar; same
+    shape as the existing "verify toolchain names against executable sources"
+    rule.
+
+**Signal**
+
+- **Frequency-scan:** "Deprecated Gradle features … incompatible with Gradle
+  10" still in EVERY build (the known pending `.PLAN.md` "Gradle-10-era bump" —
+  kept open, NOT wrongly re-marked resolved). "configuration cache cannot be
+  reused because environment variable 'PATH' has changed" = 1 hit in gate.log —
+  the env-var invalidation between gate.py's separate gradle invocations,
+  benign (later steps report "Reusing configuration cache."). No new systemic
+  repeated diagnostic.
+- **Rule deviations / missing rules captured:**
+  - Missing rule: device identifiers were verified only at push-prep, not at
+    commit — they sat in committed docs for a session; AGENTS.md now has a
+    pre-push scan step (manual).
+  - Deviation: detekt config was guessed from memory instead of the bundled
+    default config — two failed detekt runs before reading the jar; the
+    "verify first" rule now covers static-analysis placement.
+- **When/why the user corrected me:**
+  1. "go auto locally" after I asked to implement while plan mode blocked edits
+     — the plan was ready and the user had to toggle the mode; present the plan
+     crisply and don't stall on the mode.
+  1. E3 Q1/Q2 answers (trust-all now/TOFU later; simple `Network.openConnection`)
+     — asking the trust-policy question up front was right; it isolated the
+     policy for a later swap.
+  1. Push-prep Q1/Q2 answers (leave published history + scrub commit on top;
+     scrub serial + SM-code, keep bare `S25`) — the audit questions were the
+     right granularity.
+
+**Drift**
+
+- **Per-doc audit:** AGENTS.md gained the pre-push identifier scan + the
+  mdformat reflow-trap extensions; DECISIONS.md gained the 2026-08-20 scrub
+  entry + index row; MEMORY.md gains this retrospective; TESTING.md gained the
+  apply-receiver / HttpsServer / detekt-rule facts; ROADMAP gained Campaign 26;
+  DESIGN.md untouched (S13 was clarified during E3). Historical "https keeps
+  HttpURLConnection" lines in ROADMAP/MEMORY stay as dated campaign records
+  (verified acceptable — they describe what Campaign 5 did at the time).
+- **Stale comments fixed:** the duplicated http-branch comment in
+  `VideoStreamLoader.openStream` (removed during E3).
+- **Lesson storage:** all in best-scoped docs; machine-local paths stay out of
+  repo docs.
+
+**Value**
+
+- **Measurable profit:** https video now routes over the robot Wi-Fi (S13
+  complete) and works with self-signed cameras; the settings row shows the
+  effective URI; 9 commits pushed with ZERO device identifiers in the pushed
+  history — the serial never reached GitHub. Worth-it: yes.
+- **Deferred (→ `.PLAN.md`):** on-robot https verification (cellular + Wi-Fi,
+  https camera) — manual user step; TOFU trust policy (possible future swap,
+  isolated in `WifiConnectionOpener`); published-history model-code residue
+  (in `20e0085`'s blob, per user decision not to rewrite published history);
+  main-thread socket-I/O; `inSampleSize` decode; real-robot re-verify;
+  Gradle-10-era bump (ReportingExtension.file deprecation).
+- **Next automation candidates:** (1) a device-identifier pre-commit hook
+  (gaps-escalate step 3 — revisit when the manual scan next slips); (2) verify
+  static-analysis rule placement against the bundled default config on
+  toolchain bumps.
+- **What I should have asked earlier:** nothing blocking — the push-prep audit
+  was user-requested and caught what a plain push would have leaked; the
+  elapsed figure for the ROADMAP header was asked rather than guessed.
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added:** none — the existing questions covered this campaign.
+- **Most useless question this campaign:** Process Q2 ("would each commit
+  compile against HEAD's design?"). *Why useful when added:* it was coined when
+  feature/test commits interleaved and a test referencing not-yet-committed
+  views/strings could not compile standalone (hit 2026-08-14, HudThemeTest).
+  *Why useless now:* this campaign's per-commit gate-green discipline made it
+  trivially "yes" every time, and the trap it guards is now also covered by
+  the "Before planning isolated commits, verify each new test compiles against
+  HEAD's design" guardrail. *How to envelop its useful part:* fold the intent
+  into a rephrased question that asks what *kept* each commit self-contained,
+  so a future regression surfaces without a dedicated compile question.
+- **Checklist itself:** Process Q2 rephrased to "What kept each commit
+  self-contained (compilable against HEAD's design + gate-green)?"; all other
+  questions kept. Stamp: *Last revised: 2026-08-20 (C26 retrospective:
+  rephrased Process Q2; all other questions kept).*

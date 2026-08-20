@@ -1024,6 +1024,47 @@ re-design happens interactively.
   follow-up from C24 stays: main-thread socket-I/O, `inSampleSize`,
   real-robot re-verify.
 
+## Campaign 26 — E2 settings video-URI row + E3 https-over-Wi-Fi video + push-prep audit (2026-08-19/20)
+
+Scope (user-driven): (1) **E2** — fresh-install settings inconsistency (the
+video-URI row showed "No stream URI set" while the app streamed the
+host-derived default); (2) **E3** — https video bypassed the robot Wi-Fi
+(default network) and rejected the robot's self-signed camera; (3) record the
+user-suggested futures (UDP control, extra video formats, SBC video source);
+(4) push-prep device-identifier audit + history scrub.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ≈08-19 daytime (E2+E3) + ~1 h 08-20 (push-prep audit + scrub + push) |
+
+- **E2** (`c8852da`): shared `effectiveVideoUri` between the settings row and
+  `MainActivitySettingsController`; unset = derived default, explicitly-empty
+  = disabled; host-change refresh. Red-first tests in
+  `RobotSettingsActivityTest` + `MainActivitySettingsControllerTest`.
+  On-device verified via `dumpsys activity top` view bounds (uiautomator dump
+  is broken device-wide on the phone).
+- **E3** (`1a0223f`): `ConnectionOpener` fun interface + `WifiConnectionOpener`
+  (`Network.openConnection` on the tracked Wi-Fi network; fallback; trust-all
+  TLS isolated in the companion for a later TOFU swap); `WifiNetworkTracker`
+  extracted from `WifiSocketBinder` (shared by both binders);
+  `VideoStreamLoader.connectionOpener` param. Red-first + mutation-checked:
+  `WifiConnectionOpenerTest` (5) + `HttpsVideoStreamTest` (end-to-end frames
+  over a self-signed local `HttpsServer`, committed throwaway keystore).
+  DECISIONS.md entry + DESIGN.md S13 clarified. On-robot verification
+  (cellular + Wi-Fi, https camera) is a manual user step.
+- **Dreams** (`387bdd8`): UDP control transport, extra video formats
+  (RTSP/HLS/MPEG-TS candidates), SBC as a separate video source (already the
+  designed S4/S6 contract — note only). See the Dreams section below.
+- **Push-prep audit** (`ce7365e`..`a8ebdf0`): the unpushed commits carried a
+  a device serial and a model code; amended the oldest
+  unpushed commit + rebased so pushed history is clean, plus a scrub commit
+  for the carried published line; `--force-with-lease` to the fork branch.
+  Guardrail violation #2 → AGENTS.md pre-push scan step + DECISIONS.md
+  "[2026-08-20] Device-identifier scrub on push-prep". Published history not
+  rewritten (user decision); the `20e0085` blob still carries one model reference.
+- **Retrospective** — MEMORY.md "Campaign 26 retrospective" (checklist format;
+  rephrased Process Q2).
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass
@@ -1072,3 +1113,59 @@ decoupled from control; different-host video self-heals — shipped in Campaign
 25's Option B retry), so no design change is needed; the SBC case is just a
 concrete instance. Note it so future format work (above) never re-couples
 video to the control host.
+
+### Robot-initiated telemetry HUD + telemetry screen
+
+The robot drives its own telemetry UI (extends the gamepad to *show* robot
+data): it sends a **data-structure description** (which fields exist, their
+order, the var name, the UI label, the expected data type, the string format),
+then streams **named values** for those fields, and the app renders them in two
+surfaces:
+
+- **HUD overlay** — a small-font readout over the video (the robot picks the
+  default field set; the user can override per field);
+- **Telemetry screen** — a separate full screen (settings-like, textual)
+  showing **all** fields refreshing: var name, data type, description, current
+  value, plus a per-field "show on HUD" toggle that overrides the robot's
+  default.
+
+Not all vars are useful in the HUD, hence the separate screen is the
+comprehensive view and the HUD is the curated subset. The wire format is open
+(likely JSON) and the transport is undecided — both are first-order design
+questions. **Recorded 2026-08-20 (user-suggested); no design work yet —
+refine interactively next time.**
+
+Design questions to resolve before scoping:
+
+- **Transport:** same TCP control socket (interleaved with commands +
+  keepalive) or a separate stream/channel? If separate, how is it routed (a
+  new socket must keep S13 Wi-Fi binding)? Does telemetry require the control
+  connection to be up, or can it be video-only/spectator?
+- **Format & framing:** JSON lines over TCP? A distinct prefix/line shape so
+  the existing plain-text protocol parser tolerates unknown telemetry lines
+  (backward compatible)? Is the description versioned/schematized?
+- **Lifecycle:** when is the description sent (once at connect, per
+  reconnect, on change)? What if the app opens mid-stream (misses the
+  description)? Does the app persist the last schema + values across restarts,
+  or is telemetry session-only?
+- **Types & formats:** which data types (int/float/string/bool/enum?) and
+  string formats (printf-style? units? decimal places?) must the description
+  support? Are labels robot-localized (the app does not translate robot text)?
+- **Update rate & rendering:** how fast do values arrive; throttle to
+  delta-cell updates (never a full re-render per packet)? Batching?
+- **HUD overlay placement:** the video is center-cropped and the HUD already
+  hosts pads, magic buttons, the status pill and the error pill — where does
+  the readout go, when is it shown (video playing? toggled?), and how does it
+  avoid collision (existing "bringToFront / overlay eats taps" and alpha traps
+  apply)?
+- **Telemetry screen UX:** entry point (gear → telemetry row?), settings-like
+  layout, and whether the per-field "show on HUD" override is persisted
+  (`SharedPreferences`, the app's setting convention) or session-only.
+- **Degradation & bounds:** malformed description, unknown var, description
+  without values, values without description — control + video must keep
+  working (P2/P4-style self-healing); cap the field count / layout bounds so a
+  misbehaving robot cannot break the UI.
+- **Empty-video case:** the telemetry screen and the HUD readout should work
+  with no video stream (the overlay simply has no video under it).
+- **i18n:** UI chrome (screen title, "Show on HUD" label) follows the 5-locale
+  convention; robot-sent labels are opaque text, not translated.

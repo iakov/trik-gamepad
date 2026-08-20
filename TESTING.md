@@ -332,6 +332,28 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
   (hit 2026-08-17, C23). Some overloads are newer than their base method;
   confirm against the minSdk stub jar (`javap` on the platform android.jar).
   (`Network.bindSocket(Socket)` is minSdk-23-safe, verified in android-23.)
+- **`javaClass` inside `apply { }` binds to the receiver, not the enclosing
+  class.** `KeyStore.getInstance(...).apply { javaClass.getResourceAsStream(...) }`
+  resolves `javaClass` to `KeyStore`, so the resource is looked up via the
+  bootstrap loader and a test-classpath file is missed ("missing test
+  keystore", hit 2026-08-19). Use an explicit class literal
+  (`HttpsMjpegServer::class.java`) inside `apply` blocks. Diagnose resource
+  misses with a probe that prints `getResource(...)` URLs — if the probe passes
+  while the code path fails, the difference (receiver-bound `javaClass` vs
+  explicit literal) is the root cause, not stale build state.
+- **Self-signed `https` integration tests need no network.** `com.sun.net.httpserver.HttpsServer`
+  (JDK `jdk.httpserver` module) + a committed throwaway self-signed PKCS12
+  (`app/src/test/resources/https/trik-https-test.p12`, CN=localhost, password
+  `changeit`) serve real MJPEG frames over TLS; the client's trust-all path is
+  proven end-to-end (`HttpsVideoStreamTest`, mutation-checked red when the
+  trust-all is removed).
+- **Verify static-analysis rule placement against executable sources before
+  configuring.** detekt 1.23.8's `EmptyFunctionBlock` lives under the
+  `empty-blocks` ruleset (not `style`/`empty`) with property `ignoreOverridden`
+  (not `ignoreOverriddenFunction`) — two wrong guesses cost two failed runs.
+  The bundled `default-detekt-config.yml` inside the `detekt-core`/
+  `detekt-rules-*` jars is the source of truth (same discipline as verifying
+  toolchain names against build files).
 
 ### WCAG & accessibility regression tests
 

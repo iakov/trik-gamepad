@@ -43,7 +43,7 @@ touch one.
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
 | UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-18] Haptic schema: generic legacy constants, strong pulses, no VIBRATE |
-| Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-15] Device identifiers never enter repo content |
+| Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-20] Device-identifier scrub on push-prep |
 | Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-17] Emulator launch: run_bounded-wrapped detached Start-Process |
 
 ______________________________________________________________________
@@ -1968,6 +1968,45 @@ ______________________________________________________________________
   irreversible once pushed (this repo verified: 521 commits contain none).
 
 - **Out of scope:** sanitizing vendor device logs or upstream data.
+
+### [2026-08-20] Device-identifier scrub on push-prep
+
+- **Type:** problem-avoiding (enforces the 2026-08-15 guardrail; prevents a
+  private identifier from reaching a published remote).
+
+- **Problem:** the guardrail existed since 2026-08-15, yet a physical device's
+  serial and model code got committed into docs during
+  the E2/E3 campaign (introduced by the oldest unpushed commit). A push-prep
+  audit found them; a plain push would have published them — the second
+  violation of the rule.
+
+- **Alternatives considered:** (a) leave them (leaks into published history);
+  (b) rewrite ALL branch history including already-published commits (heavy,
+  rewrites ~80 published commits + force-push); (c) rewrite only the unpushed
+  commits so the pushed history is clean + a scrub commit on top for the
+  carried published line (chosen); (d) scrub bare `S25` references too
+  (rejected by user 2026-08-20 — only serial + model-code-shaped strings are
+  identifying).
+
+- **Chosen solution:** (1) amend the introducing unpushed commit
+  (`2c02f64` → `ce7365e`) to scrub the serial + model, then rebase the 7 newer
+  unpushed commits on top — the pushed branch contains zero device
+  identifiers in its entire history; (2) a separate scrub commit (`a8ebdf0`)
+  removes the one carried model reference that came from already-published history;
+  (3) push with `--force-with-lease` to the fork branch. Published history is
+  NOT rewritten (user decision): the `20e0085` blob still carries one
+  model reference; the tip is clean.
+
+- **Why:** the guardrail is absolute (an exact-person/device identifier is
+  private data); unpushed commits are freely rewritable, so the pushed
+  history could be made clean at zero cost to anyone else; rewriting published
+  history is heavy and was explicitly not wanted by the user.
+
+- **Out of scope / consequences:** the 2026-08-15 decision's "pre-commit
+  sweep" was not enforced mechanically — this entry records the resulting
+  AGENTS.md pre-push scan step (manual, gaps-escalate step 2; a pre-commit
+  hook is a future candidate). Bare `S25` stays in the haptics records per
+  user decision.
 
 ### [2026-08-14] HUD error pill replaces the Material Snackbar
 
