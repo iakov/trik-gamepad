@@ -285,10 +285,13 @@ tasks.register('runDummyRobotServer', JavaExec) {
 // because ANY detached long-lived child (plain `java` included, not just a
 // Gradle daemon) inherits the caller's output-pipe handle and EOF never comes.
 def dummyServerClasspath = files { tasks.named('testDebugUnitTest').get().classpath }
+// Capture the repo-root path at configuration time: referencing layout/projectDir from the
+// execution-time closure breaks the configuration cache.
+def repoRootDir = layout.projectDirectory.asFile.parentFile
 tasks.register('writeDummyServerClasspath') {
     dependsOn 'compileDebugUnitTestKotlin'
     doLast {
-        new File(projectDir.parentFile, '.tmp/dummy_server_cp.txt').text = dummyServerClasspath.asPath
+        new File(repoRootDir, '.tmp/dummy_server_cp.txt').text = dummyServerClasspath.asPath
     }
 }
 
