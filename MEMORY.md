@@ -491,6 +491,10 @@ restate their findings here only when a checklist entry needs an anchor.
    missing in each doc?
 1. Stale code comments / docs API references?
 1. Was every lesson stored in the best-scoped doc?
+1. **Scripts review** — any reusable `.tmp/` ad-hoc script used twice or
+   encoding a guardrail? Promote it to `scripts/` (doc header, `--help`,
+   params) in a `chore:` commit; drop one-offs; record the outcome. (User
+   request 2026-08-20: a retrospective always includes scripts improvement.)
 
 **Value**
 
@@ -3463,8 +3467,11 @@ branch, `--force-with-lease`).
 `WifiDatagramBinder`) with robot-keepalive liveness; (2) DESIGN.md "Gamepad
 protocol (source of truth)" + DummyRobotServer reference implementation; (3)
 main-thread socket-I/O fix + MJPEG decode downsampling; (4) device-identifier
-pre-commit hook + gate/CI step; (5) A.3 release smoke on emulator-5554.
-Commits `eaaa5f2`..`6a26a50` on `feat/global-refresh` (unpushed as of writing).
+pre-commit hook + gate/CI step; (5) A.3 release smoke on emulator-5554; (6)
+scripts-folder polish (promoted `png_census`/`jacoco_report`/`ci_failures`/
+`ui_dump_parse`/`strip_bom`). Commits `eaaa5f2`..`a971c7b` on
+`feat/global-refresh`, **pushed; CI run `32411432135` green** (after one red
+run from a flake — see Learning).
 
 **Process**
 
@@ -3485,7 +3492,7 @@ Commits `eaaa5f2`..`6a26a50` on `feat/global-refresh` (unpushed as of writing).
   — the gate step had to switch to `git ls-files` to scan committed content
   only, a near-miss that would have made the gate unusable.
 - **Elapsed vs Estimated:** ROADMAP Campaign 27 header — Estimated `—`, Actual
-  ≈5 h 40 m (2026-08-20).
+  ≈8 h 45 m (2026-08-20, ~14:10→22:55 incl. the push + CI flake-fix cycle).
 
 **Learning**
 
@@ -3509,6 +3516,18 @@ Commits `eaaa5f2`..`6a26a50` on `feat/global-refresh` (unpushed as of writing).
   targeted changes. The 0-size-display infinite loop was caught by the
   full-suite test run (VideoStreamSelfHealingTest + MjpegViewTest), not by the
   renderer's own tests — a reminder to run the full suite, not the class.
+- **CI caught a local-passing flake (`b475379`):** `udpResendsLastPadAndWheelStateOnKeepaliveTick`
+  failed on CI at a bare `messageCount() > beforeResend` assert — the three
+  `awaitReceived` calls before it return true from the *original* sends, then
+  `messageCount()` is read before the resent datagrams arrive on the server's
+  own receive thread. It passed locally (twice) and failed only under CI load.
+  Fix: added `TestUdpServer.awaitCount()` and asserted `awaitCount(beforeResend + 3)` /
+  `awaitCount(beforeResend + 1)` (bounded poll, never a bare count assert).
+  Lesson reinforced: a *bounded await* is required for any server-received
+  content — the same rule as TESTING.md "Why awaits are required"; a count
+  assert after `runAll()` is the same trap in different clothes. Also: the
+  real CI run is the authoritative flake detector — always push and check, a
+  green local suite is not proof.
 - **Generalized:** a *gate-visible* coverage dip from new app code is the same
   lesson as "budget the coverage pass with the code" (AGENTS.md) — new app
   classes always dip the ratio; write the coverage tests with the feature.
@@ -3528,6 +3547,9 @@ Commits `eaaa5f2`..`6a26a50` on `feat/global-refresh` (unpushed as of writing).
   instructions ("keep DummyRobotServer as the reference implementation",
   "update .PLAN.md now, crash is highly likely", "save all unsaved before
   crash") were honoured as given and each became a captured rule/record.
+  Post-push, the user asked for a full retrospective **with scripts
+  improvement** — promoting the reusable `.tmp/` ad-hoc scripts is now a named
+  retrospective step (see scripts-review below).
 
 **Drift**
 
@@ -3536,6 +3558,21 @@ Commits `eaaa5f2`..`6a26a50` on `feat/global-refresh` (unpushed as of writing).
   reduced to pointers (source of truth moved to DESIGN.md); DECISIONS entries
   updated; ROADMAP C27 + Dreams updated; TESTING.md unchanged (no new
   per-class traps). `.PLAN.md` trimmed of completed work.
+- **Scripts review (the user-requested retrospective step):** promoted the
+  reusable `.tmp/` ad-hoc scripts into `scripts/` — `png_census.py` +
+  `jacoco_report.py` (mid-campaign, used for the coverage-gate + screenshot
+  proofs), then `ci_failures.py` (CI triage, replaces the hand-rolled
+  `--jq`-free `gh run view` wrapper), `ui_dump_parse.py` (uiautomator dump →
+  readable rows + tap bounds, merges the old `parse_ui`/`uidump`/`dump_ui`
+  clones), `strip_bom.py` (UTF-8 BOM recovery, the C24 trap). Each got a doc
+  header, `--help`, params (no hardcoded serials/paths), and a `scripts/README.md`
+  inventory. Dropped as one-offs: the campaign-specific census/`pad_*`/`pill_*`
+  pixel probes (covered by the parametrized `png_census`), `tag_decisions.py`
+  (one-off DECISIONS retag), the various `enc_*`/`fix_*` encoding fixers
+  (`strip_bom` covers the BOM case), and the emulator `dump_*` clones
+  (`ui_dump_parse` + `adb` covers them). Rule note: when a `.tmp/` script is
+  used twice or encodes a guardrail, promote it in the next `chore:` commit —
+  never let a reusable script rot in `.tmp/`.
 - **Stale comments:** the renderer's `inSampleSize` comment updated with the
   "first frame + pre-layout decode at 1" rule; the jscpd comment in
   SenderServiceUdpTest's helper added.
@@ -3558,12 +3595,16 @@ Commits `eaaa5f2`..`6a26a50` on `feat/global-refresh` (unpushed as of writing).
   bump.
 - **Next automation candidates:** (1) gate the pre-commit hooks themselves
   (the `SM-XXXXXX`-placeholder-safety of the identifier regex has no test —
-  a small self-check would make the regex changes safer); (2) a `run_bounded`
-  wrapper for the emulator boot-wait already exists — extend to a reusable
-  `wait_boot` script.
+  a small self-check would make the regex changes safer); (2) a reusable
+  `wait_boot` script (the emulator boot-wait pattern is hand-rolled in each
+  `.tmp/wait_boot.ps1`); (3) fold the CI flake lesson into TESTING.md (a
+  "count asserts after runAll() are the same trap as bare awaits" line).
 - **What I should have asked earlier:** nothing blocking — the emulator-only
   A.3 smoke (phone disconnected) was accepted; the coverage+scripts work was
-  auto-scope per "go full auto".
+  auto-scope per "go full auto". The CI flake would have been caught by
+  pushing earlier, but the per-commit gate-green discipline made the push
+  batch-clean and the flake surfaced exactly where CI is supposed to catch
+  it.
 
 **Checklist review (final step — do NOT skip)**
 
@@ -3579,4 +3620,6 @@ Commits `eaaa5f2`..`6a26a50` on `feat/global-refresh` (unpushed as of writing).
 - **Checklist itself:** Learning Q2 rephrased into a pointer — "did the gate
   catch a rule violation that Signal Q2 should record?"; all other questions
   kept. Stamp: *Last revised: 2026-08-20 (C27 retrospective: folded Learning Q2
-  into Signal Q2; all other questions kept).*
+  into Signal Q2; added a scripts-review item to Drift — "promote reusable
+  `.tmp/` scripts in a chore commit" — per the user's post-push retrospective
+  request; all other questions kept).*
