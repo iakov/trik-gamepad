@@ -99,10 +99,12 @@ class SenderServiceUdpTest : RobolectricTestBase() {
       client!!.resendLastState()
       mExecutor.runAll()
       shadowOf(getMainLooper()).idle()
+      // Bounded poll, never a bare count assert: the resent datagrams arrive on the server's own
+      // receive thread (TESTING.md "Why awaits are required"). All three states must be re-sent.
+      assertTrue("state must be re-sent", server.awaitCount(beforeResend + 3))
       assertTrue(server.awaitReceived("pad 1 40 60"))
       assertTrue(server.awaitReceived("pad 2 up"))
       assertTrue(server.awaitReceived("wheel 35"))
-      assertTrue("state must be re-sent", server.messageCount() > beforeResend)
     }
   }
 
@@ -223,7 +225,9 @@ class SenderServiceUdpTest : RobolectricTestBase() {
       client!!.resendLastState()
       mExecutor.runAll()
       shadowOf(getMainLooper()).idle()
-      assertTrue(server.awaitReceived("pad 1 40 60"))
+      // Exactly one datagram re-sent (pad1); pad2/wheel never existed. Bounded poll: the resend
+      // arrives on the server's receive thread.
+      assertTrue("pad1 must be re-sent", server.awaitCount(beforeResend + 1))
       assertEquals(
           "only pad1 must be re-sent (pad2/wheel never existed)",
           beforeResend + 1,

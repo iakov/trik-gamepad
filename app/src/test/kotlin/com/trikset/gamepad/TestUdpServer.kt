@@ -61,6 +61,16 @@ class TestUdpServer : AutoCloseable {
 
   fun messageCount(): Int = messages.size
 
+  /** Bounded poll for the message count to reach at least [count] (the resend asserts). */
+  fun awaitCount(count: Int, timeoutMs: Long = 5_000): Boolean {
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (System.currentTimeMillis() < deadline) {
+      if (messages.size >= count) return true
+      Thread.sleep(20)
+    }
+    return messages.size >= count
+  }
+
   /** Bounded poll for [fragment] to appear among the received datagrams. */
   fun awaitReceived(fragment: String, timeoutMs: Long = 5_000): Boolean {
     val deadline = System.currentTimeMillis() + timeoutMs
