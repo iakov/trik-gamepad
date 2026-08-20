@@ -39,11 +39,11 @@ touch one.
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-15] Idiomatic Kotlin pass (Java→Kotlin leftovers) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render | [2026-08-19] https video binds to the Wi-Fi network (Network.openConnection + trust-all TLS) |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render | [2026-08-20] UDP control transport + robot keepalive liveness |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
 | UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-18] Haptic schema: generic legacy constants, strong pulses, no VIBRATE |
-| Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-20] Device-identifier scrub on push-prep |
+| Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-20] Device-identifier pre-commit hook + gate step |
 | Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-17] Emulator launch: run_bounded-wrapped detached Start-Process |
 
 ______________________________________________________________________
@@ -2175,3 +2175,75 @@ ______________________________________________________________________
   Java-isms); the AS Inspect Code report (one-off, not gateable — the detekt
   rules are the CI mirror); rewriting parser/network port-fidelity relaxations
   already documented in `detekt.yml`.
+
+### [2026-08-20] UDP control transport + robot keepalive liveness
+
+- **Type:** design-clarifying (extends the gamepad protocol, DESIGN.md now the
+  source of truth; touches S1/S2/S13).
+
+- **Problem:** the robot will soon support UDP control alongside the existing
+  TCP stream. UDP is connectionless — "connected" cannot come from a socket
+  state, and a dead link must still be detected. The protocol also had no
+  single documented truth (architecture.md + MEMORY.md both described the wire
+  but drifted).
+
+- **Alternatives considered:** (a) replace TCP with UDP (rejected — TCP stays
+  the default; UDP is a selectable `SK_TRANSPORT` setting so an old robot
+  works unchanged); (b) infer liveness only from the app's own keepalive sends
+  (rejected — sends prove the app→robot path, not robot liveness); (c) make
+  the robot reply with ACKs/seq numbers (deferred to a dream — the robot does
+  not implement them yet); (d) robot MAY send an optional `keepalive <ms>` and
+  the app treats ANY received control message as liveness (chosen).
+
+- **Chosen solution:** UDP transport with one newline-terminated command per
+  datagram; optimistic Connected on first send; per-keepalive-tick re-send of
+  the last pad/wheel state (buttons are edges, not re-sent); robot-keepalive
+  liveness — any received message resets the clock, `keepalive <ms>` sets the
+  expected interval (`-1`/absent = disabled), `ms + 2000` gap → disconnect.
+  App keepalives stay additive. Protocol contract: DESIGN.md "Gamepad protocol
+  (source of truth)"; DummyRobotServer is the reference implementation for
+  third-party clients. Additive rule: robots that ignore unknown lines / never
+  reply work exactly as before. TCP stays write-only (read path deferred).
+  Verified (2026-08-20): no robot→app control channel exists today (input
+  half-closed in all implementations, upstream Xamarin write-only), so the
+  liveness rules are purely additive.
+
+- **Why:** UDP is a cheap, robot-supported control path; the liveness rules
+  reuse the existing keepalive loop and are backward-compatible (a robot that
+  never replies just disables the check); a single protocol source of truth
+  prevents the architecture/MEMORY drift that motivated this entry.
+
+- **Out of scope / consequences:** TCP robot keepalive (read path) deferred;
+  robustness tiers (keepalive ACK → button ACK → sequence numbers) recorded as
+  dreams in ROADMAP/DESIGN, not a contract; on-robot UDP verification pending
+  a real robot. Coverage gate was restored after the new classes (branch
+  0.843 → 0.854).
+
+### [2026-08-20] Device-identifier pre-commit hook + gate step
+
+- **Type:** problem-avoiding (automates the 2026-08-20 push-prep scan's
+  commit-time sweep — the decision's recorded "future candidate").
+
+- **Problem:** the identifier guardrail was violated twice; the push-prep scan
+  is manual (gaps-escalate step 2) and only covers the diff being pushed.
+
+- **Alternatives considered:** (a) keep it manual (rejected — already slipped
+  twice); (b) a pre-commit hook only (catches the working tree but not the
+  committed diff); (c) hook + gate + CI step (chosen).
+
+- **Chosen solution:** `scripts/check_device_identifiers.py` detects IMEI
+  (`\b\d{15}\b`), Samsung `SM-<letter><digits>` model codes, and the observed
+  serial shape (`RFCX`-prefixed); the `SM-XXXXXX` docs placeholder is
+  deliberately not matched. Runs as a pre-commit hook (staged files), a
+  gate.py step and a CI step (git-tracked files only — `git ls-files`, so
+  gitignored session scratch that legitimately holds a serial is never gated).
+  The push-prep scan remains the final gate for the committed diff.
+
+- **Why:** a pre-commit hook was the 2026-08-20 entry's named next step; the
+  gate/CI mirror makes the rule machine-enforced everywhere it can be without
+  scanning commits-in-flight.
+
+- **Out of scope / consequences:** scanning committed history (the push-prep
+  `git diff` scan covers it); the regex set is additive (a new real serial
+  shape extends it); a self-test of the regex (e.g. placeholder safety) is a
+  future automation candidate (retrospective).

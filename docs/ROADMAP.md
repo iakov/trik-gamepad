@@ -1065,29 +1065,96 @@ user-suggested futures (UDP control, extra video formats, SBC video source);
 - **Retrospective** — MEMORY.md "Campaign 26 retrospective" (checklist format;
   rephrased Process Q2).
 
+## Campaign 27 — UDP control transport + robot keepalive + protocol source of truth (2026-08-20)
+
+Scope (user-driven, auto mode): (1) **UDP control transport** (optional, next
+to TCP) with **robot keepalive** liveness processing; (2) the **gamepad
+protocol becomes a DESIGN.md source of truth** with DummyRobotServer as the
+reference implementation; (3) **A.3 release smoke** (TCP + UDP + MJPEG on the
+emulator); (4) main-thread socket-I/O cleanup + MJPEG **decode downsampling**
+(perf); (5) **device-identifier pre-commit hook + gate step** (the
+2026-08-20 decision's "future candidate"); (6) scripts folder polish.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ~5 h 40 m (2026-08-20) |
+
+- **Main-thread I/O fix** (`eaaa5f2`): `CommandTransport` + `TcpTransport`
+  extracted; the send + `checkError()` runs on the executor thread, the
+  failure decision is posted to the main thread. Guard test
+  `postCommandSendsOnTheExecutorThreadNeverTheMainThread` (real executor).
+  Emulator simpleperf re-measure: main thread **4.52%** (idle/wait symbols
+  only) vs the C24 "main ~30% socket I/O".
+- **UDP control transport** (`3b81bd7`): `TransportMode` (`tcp`/`udp`, global
+  `SK_TRANSPORT` pref in the robot screen's Network category),
+  `UdpTransport` (one newline-terminated command per datagram; optimistic
+  Connected on first send; per-keepalive-tick resend of the last pad/wheel —
+  buttons are edges and are NOT re-sent), `WifiDatagramBinder`
+  (`Network.bindSocket(DatagramSocket)` for S13), and the **robot-keepalive
+  liveness**: any received control message resets the clock; `keepalive <ms>`
+  sets the expected interval (`-1`/absent = disabled); `ms + 2000` gap →
+  disconnect. Protocol decision (user, 2026-08-20): robot MAY send optional
+  keepalive; the app's own keepalives stay additive. TCP read path deferred
+  (write-only stays). Verified today there is **no** robot→app channel. Tests:
+  `SenderServiceUdpTest` (11), `WifiDatagramBinderTest` (3),
+  `UdpTransportTest` (4), `SenderViewModelTest` UDP factory branch; coverage
+  gate restored (branch 0.843 → 0.854).
+- **Protocol source of truth** (`ce9a942`): new DESIGN.md section "Gamepad
+  protocol (source of truth)" — wire format, command matrix (when/why), TCP
+  write-only + UDP optimistic lifecycles, robot→app receive rules, additive
+  rule, reference implementation. architecture.md "TCP command protocol" and
+  MEMORY.md "App protocol" reduced to pointers; AGENTS.md index + trigger
+  updated. DummyRobotServer (already gained `DummyRobotUdpServer` in the UDP
+  commit) is the reference implementation and must mirror the section.
+- **MJPEG decode downsampling** (`bf7b08a`): `inSampleSize` set from the
+  previous frame's source size so a camera larger than the display is not
+  decoded at full size every frame (first frame and pre-layout decode at 1).
+  Red-first tests `extractFrameDownsamplesToTheDisplaySizeFromThePreviousFrame`
+  - `extractFrameSkipsDownsamplingWhenTheFrameFitsTheDisplay`; mutation-checked
+    (the detekt ComplexCondition + the 0-size-display infinite-loop guard were
+    caught by the gate).
+- **Device-identifier hook** (`6a26a50`): `scripts/check_device_identifiers.py`
+  (IMEI `\b\d{15}\b`, Samsung `SM-<letter><digits>` model codes, the observed
+  `RFCX`-prefixed serial shape; the `SM-XXXXXX` docs placeholder is not
+  matched) as a pre-commit hook + gate.py step + CI step. The push-prep scan
+  stays the final gate for the committed diff. DECISIONS entry updated.
+- **A.3 release smoke** (verified on `emulator-5554`, no code change): built +
+  installed `app-releaseDebug.apk`, host DummyRobotServer on `10.0.2.2:4444`,
+  verified TCP (`TCP< pad 1 up`, `TCP< keepalive 1000`) and UDP
+  (`UDP< pad 1 -6 -3`, `UDP< keepalive 1000`) command flow, MJPEG streaming
+  (server frames climbing, live pixel-census between two captures, chip
+  "control Connected"). Proof: `.tmp/_ui_260820-2153.png` (pixel-census
+  verified).
+- **Retrospective** — MEMORY.md "Campaign 27 retrospective" + DECISIONS.md
+  entries.
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass
-(interactive) before it becomes a scoped campaign. None is started.
+(interactive) before it becomes a scoped campaign. The UDP control transport
+was **partially built in Campaign 27** (basic UDP + robot keepalive liveness);
+the robustness tiers below are the remaining dream.
 
 ### UDP control transport (in addition to TCP)
 
-The robot will soon support UDP control alongside TCP; keepalive already exists
-(`MEMORY.md` "App protocol"), so a UDP path would reuse the keepalive loop.
-App-side implications to think through when scoping:
+The robot will soon support UDP control alongside TCP. Campaign 27 shipped the
+baseline: one newline-terminated command per datagram, optimistic Connected,
+per-keepalive-tick pad/wheel re-send, and the robot-keepalive liveness rule
+(any received message resets the clock; `keepalive <ms>` sets the interval;
+`ms + 2000` gap → disconnect) — see DESIGN.md "Gamepad protocol (source of
+truth)". Still open (the dream):
 
-- Command frame format over UDP (newline-terminated like TCP today? per-message
-  sizing, since UDP has no stream boundaries), and whether UDP replaces TCP or
-  is a selectable setting (`SenderService` currently owns a single TCP socket +
-  `keepaliveTimeout`).
-- Loss/ordering: UDP drops and reorders — pad/button commands are idempotent
-  enough, but `wheel <angle>` needs a policy (send latest state? monotonic
-  sequence numbers?).
-- The half-open story differs: TCP half-open is the current disconnect trap
-  (`MEMORY.md` "App protocol"); UDP is connectionless, so "connected" must be
-  inferred from keepalive liveness instead of a socket state.
-- Wi-Fi binding (A2, `WifiSocketBinder`) applies to `DatagramSocket` too
-  (`Network.bindSocket` supports it) — a UDP path must keep S13.
+- **Command frame format** — resolved in C27 (newline-terminated, one command
+  per datagram; a selectable `SK_TRANSPORT` setting, not a replacement).
+- **Loss/ordering robustness tiers:** UDP drops and reorders — pad/button
+  commands are idempotent, but the per-keepalive-tick resend only converges
+  the *latest state*, it does not ack. Future tiers: keepalive ACK → button
+  ACK → monotonic sequence numbers. Deferred (documented in DESIGN.md; not a
+  contract yet).
+- **The half-open story** — resolved in C27: UDP "connected" is optimistic on
+  first send; liveness is the robot-keepalive clock, not a socket state.
+- **Wi-Fi binding** — resolved in C27: `WifiDatagramBinder` applies
+  `Network.bindSocket(DatagramSocket)` (S13).
 
 ### Additional video-streaming formats (SBC-typical)
 

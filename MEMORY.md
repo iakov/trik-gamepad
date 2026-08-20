@@ -467,7 +467,9 @@ restate their findings here only when a checklist entry needs an anchor.
 **Learning**
 
 1. What new facts are worth saving (tooling / Robolectric / test-design)?
-1. What wrong assumption did the compiler / CI / gate catch?
+1. Did the gate catch a rule violation that Signal Q2 ("rule deviations /
+   missing rules") should record — i.e., a wrong assumption that surfaced as a
+   red gate/test, not a new fact?
 1. What looks similar to a previous lesson → generalize into one rule?
 
 **Signal**
@@ -3454,3 +3456,127 @@ branch, `--force-with-lease`).
   self-contained (compilable against HEAD's design + gate-green)?"; all other
   questions kept. Stamp: *Last revised: 2026-08-20 (C26 retrospective:
   rephrased Process Q2; all other questions kept).*
+
+### [2026-08-20] Campaign 27 retrospective — UDP control transport + robot keepalive + protocol source of truth
+
+**Scope:** (1) UDP control transport (`TransportMode`, `UdpTransport`,
+`WifiDatagramBinder`) with robot-keepalive liveness; (2) DESIGN.md "Gamepad
+protocol (source of truth)" + DummyRobotServer reference implementation; (3)
+main-thread socket-I/O fix + MJPEG decode downsampling; (4) device-identifier
+pre-commit hook + gate/CI step; (5) A.3 release smoke on emulator-5554.
+Commits `eaaa5f2`..`6a26a50` on `feat/global-refresh` (unpushed as of writing).
+
+**Process**
+
+- **Biggest process win:** the WIP-commit-then-fix discipline — the UDP feature
+  landed as one big commit marked "WIP — coverage pending", the jacoco dip was
+  closed with targeted coverage tests, and jscpd clones (the repeated test
+  setup blocks) were extracted into helpers. The gate ran on the amended
+  commit, not on a pile of untested work. Second win: red-first for the
+  `inSampleSize` decode caught two real edge cases the gate then enforced
+  (detekt `ComplexCondition`, and the infinite-loop with a 0-size display).
+- **What kept commits self-contained:** each commit was gate-green before the
+  next; the protocol docs commit referenced DummyRobotServer code that had
+  already landed in the UDP commit.
+- **What could have been lost:** nothing this campaign — the tree was committed
+  cheaply at every checkpoint (crash-safety request honoured mid-campaign), and
+  `.PLAN.md` held the full state. The identifier-hook commit's own scan caught
+  `.PLAN.md`/`.tmp` session files (gitignored, legitimately holding a serial)
+  — the gate step had to switch to `git ls-files` to scan committed content
+  only, a near-miss that would have made the gate unusable.
+- **Elapsed vs Estimated:** ROADMAP Campaign 27 header — Estimated `—`, Actual
+  ≈5 h 40 m (2026-08-20).
+
+**Learning**
+
+- **New facts worth saving:**
+  - `inSampleSize` decode: power-of-2, decode size must stay ≥ the display (a
+    crop, never an upscale); guard the 0-size display (view not laid out) or
+    the loop never terminates; detekt `ComplexCondition` caps a 4-condition
+    `if` (split the guard).
+  - jscpd flags repeated **test setup blocks** (the gate had never run green on
+    the WIP UDP commit): extract `udpConnected`/`tcpConnected` helpers instead
+    of cloning the 6-line setup per test.
+  - The device-identifier gate must scan **git-tracked files only** —
+    `git ls-files`, not a working-tree walk — or gitignored session scratch
+    (`.PLAN.md`, `.tmp/`) that legitimately holds a serial fails the gate.
+  - Robolectric's `ShadowNetwork.bindSocket` only records the socket in a set
+    (never throws) — the WifiDatagramBinder bind-failure branch is not
+    reachable under Robolectric; the branch gate is unaffected (that branch is
+    not a branch, it's a catch).
+- **What the gate caught:** detekt `ComplexCondition` (4-condition guard) and
+  the jacoco branch dip (0.843 vs 0.85) after the UDP commit; both fixed with
+  targeted changes. The 0-size-display infinite loop was caught by the
+  full-suite test run (VideoStreamSelfHealingTest + MjpegViewTest), not by the
+  renderer's own tests — a reminder to run the full suite, not the class.
+- **Generalized:** a *gate-visible* coverage dip from new app code is the same
+  lesson as "budget the coverage pass with the code" (AGENTS.md) — new app
+  classes always dip the ratio; write the coverage tests with the feature.
+
+**Signal**
+
+- **Frequency-scan:** the gate logs show no new repeated diagnostics beyond the
+  known Gradle-10-era `ReportingExtension.file` deprecation (still present,
+  still tracked in `.PLAN.md` as pending). The jacoco verification failure was
+  a one-off from the new classes.
+- **Rule deviations / missing rules:** the "scan git-tracked files only" trap
+  for the identifier gate was captured into the script + gate comment; the
+  "WIP commit → targeted coverage fix → amend" pattern is worth a rule note
+  (committing a gate-red WIP is safe when the gate is re-run before the commit
+  is final and the tree is committed at every checkpoint).
+- **User corrections:** none this campaign — the user's mid-campaign
+  instructions ("keep DummyRobotServer as the reference implementation",
+  "update .PLAN.md now, crash is highly likely", "save all unsaved before
+  crash") were honoured as given and each became a captured rule/record.
+
+**Drift**
+
+- **Per-doc audit:** AGENTS.md gained the protocol pointer + memory-index row
+  and the identifier-hook note; architecture.md + MEMORY.md "App protocol"
+  reduced to pointers (source of truth moved to DESIGN.md); DECISIONS entries
+  updated; ROADMAP C27 + Dreams updated; TESTING.md unchanged (no new
+  per-class traps). `.PLAN.md` trimmed of completed work.
+- **Stale comments:** the renderer's `inSampleSize` comment updated with the
+  "first frame + pre-layout decode at 1" rule; the jscpd comment in
+  SenderServiceUdpTest's helper added.
+- **Best-scoped doc:** protocol rules → DESIGN.md (product contract);
+  identifier automation → DECISIONS + AGENTS hooks; quirks (ShadowNetwork,
+  git-ls-files) → this retrospective + MEMORY.md "App protocol"/script docs.
+
+**Value**
+
+- **Measurable profit:** UDP control transport works end-to-end (release APK:
+  `UDP< pad 1 -6 -3`, keepalive at 1 s, MJPEG live) alongside TCP; main thread
+  socket I/O gone (4.52% idle-only profile vs C24 ~30%); MJPEG decode
+  downsampled to the display; device identifiers now fail at commit time, the
+  gate, and CI. Coverage gate restored to green.
+- **Deferred (→ `.PLAN.md`):** UDP robustness tiers (keepalive ACK → button
+  ACK → seq numbers — documented as dreams in DESIGN.md/ROADMAP); TCP read
+  path (robot keepalive over TCP stays deferred); on-robot verification of UDP
+  (needs a real TRIK robot); A.3 real-phone release smoke / Wi-Fi pass (phone
+  disconnected — emulator-only this campaign); real-robot re-verify; Gradle-10
+  bump.
+- **Next automation candidates:** (1) gate the pre-commit hooks themselves
+  (the `SM-XXXXXX`-placeholder-safety of the identifier regex has no test —
+  a small self-check would make the regex changes safer); (2) a `run_bounded`
+  wrapper for the emulator boot-wait already exists — extend to a reusable
+  `wait_boot` script.
+- **What I should have asked earlier:** nothing blocking — the emulator-only
+  A.3 smoke (phone disconnected) was accepted; the coverage+scripts work was
+  auto-scope per "go full auto".
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added:** none — the existing questions covered this campaign.
+- **Most useless question this campaign:** Learning Q2 ("what wrong assumption
+  did the compiler / CI / gate catch?") — *why useful when added:* it anchors
+  the gate-as-teacher value. *Why useless now:* the C27 catches (ComplexCondition,
+  jscpd clones, 0-size loop) were all *rule violations the gate enforced*,
+  already covered by Process Q1/Signal Q2; the question produced no distinct
+  insight this campaign. *How to envelop its useful part:* fold it into Signal
+  Q2 ("what rule deviations / missing rules surfaced") so gate-caught lessons
+  land there once.
+- **Checklist itself:** Learning Q2 rephrased into a pointer — "did the gate
+  catch a rule violation that Signal Q2 should record?"; all other questions
+  kept. Stamp: *Last revised: 2026-08-20 (C27 retrospective: folded Learning Q2
+  into Signal Q2; all other questions kept).*
