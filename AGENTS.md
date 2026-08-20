@@ -87,7 +87,10 @@ Improvement roadmap: `docs/ROADMAP.md`.
   `scripts/run_bounded.py` (process-tree timeout), `scripts/png_census.py`
   (pixel-census/diff of screenshots — the AGENTS.md pixel-census guardrail's
   tool), `scripts/jacoco_report.py` (JaCoCo totals + uncovered lines when the
-  coverage gate fails), `scripts/check_device_identifiers.py` (pre-commit).
+  coverage gate fails), `scripts/ci_failures.py` (which job/step went red in a
+  `gh run`), `scripts/ui_dump_parse.py` (readable uiautomator dump + tap
+  bounds), `scripts/check_device_identifiers.py` (pre-commit),
+  `scripts/strip_bom.py` (UTF-8 BOM recovery after a PowerShell rewrite).
   Every campaign retrospective reviews the scripts (promote/drop/improve).
 
 ### Sources of truth (scripts — reference, never restate)

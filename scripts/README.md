@@ -44,6 +44,9 @@ the same command works on Windows and POSIX, and CI invokes them the same way.
 | `build_symbol_font.py` | Regenerate the bundled HUD symbol font (DejaVuSansMono Nerd Font subset) | when the glyph set changes |
 | `png_census.py` | **Pixel-census / pixel-diff** of UI screenshots (pure Python PNG decode; no PIL) — verify "the look changed" or "video is live" by pixels, not eyeballing | any UI screenshot proof (AGENTS.md pixel-census guardrail) |
 | `jacoco_report.py` | Summarize the JaCoCo report — global counters + per-class missed branches (`totals`) and exact uncovered lines (`lines`) | when the coverage gate fails or a feature adds app classes |
+| `ci_failures.py` | Which job/step failed in a `gh run`? (avoids the PowerShell `--jq` quoting trap) | the "check CI" loop after every push |
+| `ui_dump_parse.py` | Print a uiautomator dump as readable rows (id/class/desc/text/bounds) with a `--filter` | reading the view tree + deriving tap bounds-centre |
+| `strip_bom.py` | Remove a UTF-8 BOM from files (PS rewrites drop BOMs — hit C24) | after a PowerShell `Set-Content`/`Out-File` rewrite touched sources |
 
 ## New-script workflow
 
