@@ -125,8 +125,11 @@ configurations, update this section and the referenced config files.
   serial-shaped strings, `SM-XXXXXX`-style model codes and IMEIs, and require
   0 hits. If a leak is found in an unpushed commit, rewrite it (amend/rebase)
   so the pushed history is clean — never push a scrubbing commit over a leaked
-  one. Rationale: `DECISIONS.md` "[2026-08-20] Device-identifier scrub on
-  push-prep".
+  one. A commit-time pre-commit hook + the gate step
+  (`scripts/check_device_identifiers.py`) automate the same sweep over the
+  working tree; the push-prep scan covers the committed diff (commits already
+  made) and stays the final gate. Rationale: `DECISIONS.md` "[2026-08-20]
+  Device-identifier scrub on push-prep".
 - After pushing new commits, update the PR body (stale bodies mislead):
   `gh pr edit <N> --body-file .tmp/pr-body.md`; verify bodies with
   `gh pr view --json body` for mojibake. *Dormant during the current

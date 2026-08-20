@@ -2006,7 +2006,12 @@ ______________________________________________________________________
   sweep" was not enforced mechanically — this entry records the resulting
   AGENTS.md pre-push scan step (manual, gaps-escalate step 2; a pre-commit
   hook is a future candidate). Bare `S25` stays in the haptics records per
-  user decision.
+  user decision. **Follow-up (C27):** the future candidate shipped —
+  `scripts/check_device_identifiers.py` (IMEI `\b\d{15}\b`, Samsung
+  `SM-<letter><digits>` model codes, the observed `RFCX`-prefixed serial shape)
+  runs as a pre-commit hook and a gate.py/CI step over the whole tree; the
+  `SM-XXXXXX` docs placeholder is deliberately not matched. The push-prep scan
+  stays as the final gate for the committed diff.
 
 ### [2026-08-14] HUD error pill replaces the Material Snackbar
 

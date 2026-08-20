@@ -128,6 +128,38 @@ def run_check_translations() -> None:
         sys.exit(result.returncode)
 
 
+def run_check_device_identifiers() -> None:
+    print("==> check_device_identifiers (device-identifier gate)")
+    # Mirror of the pre-commit hook over the whole committed tree: any serial/
+    # model/IMEI in repo content fails the gate (AGENTS.md "Repo hygiene").
+    # Only git-tracked files are scanned (git ls-files) so gitignored session
+    # scratch (.tmp/, .PLAN.md — which may legitimately hold a serial during a
+    # test session) is never gated.
+    result = subprocess.run(
+        ["git", "ls-files", "-z"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=NON_GRADLE_TIMEOUT_S,
+    )
+    if result.returncode != 0:
+        print(f"FAILED: git ls-files (see {LOG})")
+        sys.exit(result.returncode)
+    files = [p for p in result.stdout.split("\0") if p]
+    result = subprocess.run(
+        [sys.executable, os.path.join(ROOT, "scripts", "check_device_identifiers.py"), *files],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=NON_GRADLE_TIMEOUT_S,
+    )
+    if result.stdout:
+        print(result.stdout.rstrip())
+    if result.returncode != 0:
+        print("FAILED: device identifier(s) found in repo content (see AGENTS.md 'Repo hygiene')")
+        sys.exit(result.returncode)
+
+
 def main() -> None:
     os.makedirs(LOG_DIR, exist_ok=True)
     with open(LOG, "w", encoding="utf-8"):
@@ -140,6 +172,7 @@ def main() -> None:
     run_jscpd()
     run_lizard_trend()
     run_check_translations()
+    run_check_device_identifiers()
     print("GATE PASSED - all steps green. Log: .tmp/gate.log")
 
 

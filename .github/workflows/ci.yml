@@ -67,6 +67,11 @@ jobs:
       - name: Translation sync guard
         run: python3 scripts/check_translations.py --sync
 
+      # Device-identifier gate (mirror of gate.py): a physical device's serial/
+      # model/IMEI must never reach repo content (AGENTS.md "Repo hygiene").
+      - name: Device-identifier gate
+        run: python3 scripts/check_device_identifiers.py $(git ls-files | grep -E '\.(kt|java|md|xml|yml|yaml|json|gradle|toml|py)$')
+
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v7

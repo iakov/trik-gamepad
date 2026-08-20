@@ -32,3 +32,11 @@ repos:
         entry: python scripts/check_xml_comments.py
         language: system
         files: \.xml$
+      # A device serial/model/IMEI must never enter repo content (AGENTS.md
+      # "Repo hygiene"; violated twice before, 2026-08-15 and 2026-08-20). The
+      # push-prep scan stays as the final gate; this hook catches it at commit.
+      - id: device-identifiers
+        name: no device identifiers
+        entry: python scripts/check_device_identifiers.py
+        language: system
+        files: \.(kt|java|md|xml|yml|yaml|json|gradle|toml)$
