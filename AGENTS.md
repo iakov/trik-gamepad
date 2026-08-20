@@ -79,6 +79,16 @@ Improvement roadmap: `docs/ROADMAP.md`.
   `pyproject.toml` declares the dev deps; `uv sync` (re)creates `.venv`
   (gitignored) + the committed `uv.lock`. Run tools as `uv run ...`
   (venv-agnostic — resolves `.venv/bin` on POSIX, `.venv/Scripts` on Windows).
+- **Reusable scripts live in `scripts/`** (agent/CI/dev-shared; see
+  `scripts/README.md` for the inventory + rules). Prefer reusing/improving an
+  existing script (extract a parameter, add `--help`) over writing a one-off
+  `.tmp/` clone; when a `.tmp/` ad-hoc script proves reusable, promote it to
+  `scripts/` in a `chore:` commit. Key reusable helpers beyond the gate:
+  `scripts/run_bounded.py` (process-tree timeout), `scripts/png_census.py`
+  (pixel-census/diff of screenshots — the AGENTS.md pixel-census guardrail's
+  tool), `scripts/jacoco_report.py` (JaCoCo totals + uncovered lines when the
+  coverage gate fails), `scripts/check_device_identifiers.py` (pre-commit).
+  Every campaign retrospective reviews the scripts (promote/drop/improve).
 
 ### Sources of truth (scripts — reference, never restate)
 
