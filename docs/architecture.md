@@ -63,15 +63,16 @@ constants in `SettingsFragment`.
 
 ## TCP command protocol (`SenderService`)
 
-One persistent TCP connection to the robot (default `192.168.77.1:4444`).
-Commands are newline-terminated plain text:
+**The wire format, the full command matrix, and the TCP/UDP connection
+lifecycles are the single source of truth in `DESIGN.md` "Gamepad protocol
+(source of truth)"** — this section is a pointer plus the implementation
+details that live here (sockets, timers, keys).
 
-| Source | Command |
-|--------|---------|
-| Touch pad | `pad<N> x y`, `pad<N> up` |
-| Magic button | `btn N down` |
-| Wheel | `wheel <angle>` (`-100..100`) |
-| Keepalive | `keepalive <ms>` |
+One persistent TCP connection to the robot (default `192.168.77.1:4444`).
+Commands are newline-terminated plain text (`pad 1 x y`, `pad 2 x y`,
+`pad N up`, `btn N down`, `wheel <angle>`, `keepalive <ms>` — see the DESIGN.md
+matrix for *when* each is sent); over UDP the same text is sent one command
+per datagram through the same `CommandTransport` contract.
 
 Connection setup: connect timeout 5 s, `tcpNoDelay`, `keepAlive`,
 `setSoLinger(true, 0)`, traffic class `0x0F`, input half-close. All network
@@ -86,6 +87,11 @@ and triggers `disconnect("Send failed.")`. `setTarget()` disconnects whenever
 the host or port changes (the preference listener calls it on every change).
 
 ### Keepalive
+
+The app-side keepalive timer and the robot-side liveness rules (any received
+message resets the clock; `keepalive <ms>` sets the expected interval; `-1` =
+disabled; `ms + 2000` gap → disconnect) are specified in `DESIGN.md` "Gamepad
+protocol (source of truth)".
 
 `DEFAULT_KEEPALIVE = 5000` ms, `MINIMAL_KEEPALIVE = 1000` ms. A
 `ScheduledExecutorService` (constructor-injected, daemon-thread default)

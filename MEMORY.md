@@ -290,26 +290,32 @@ timing on real hardware only.
 
 ## App protocol
 
+**The wire format, command matrix and TCP/UDP connection lifecycles are the
+single source of truth in `DESIGN.md` "Gamepad protocol (source of truth)".**
+This section is a pointer plus the quirks that live here.
+
 ### SenderService
 
 - One TCP connection to the robot, default `192.168.77.1:4444`; connect timeout
   `TIMEOUT = 5000` ms; `setTcpNoDelay(true)`, `setSoLinger(true,0)`,
   `setTrafficClass(0x0F)`. Connect and send run on a single-thread executor
   injected via the constructor (default `Executors.newSingleThreadExecutor()`;
-  tests substitute a Robolectric `PausedExecutorService`).
-- Commands are newline-terminated plain text: `pad 1 x y`, `pad 2 x y`,
-  `btn N down`, `wheel <angle>`, `keepalive <ms>`.
+  tests substitute a Robolectric `PausedExecutorService`). UDP is optional
+  (`SK_TRANSPORT`); the robot-side liveness rules live in the DESIGN.md section.
 - `send()` lazily connects (`connectAsync()` guarded by `syncFlag`); a failed
   send is detected via `out.checkError()` posted back to the main thread
   → `disconnect("Send failed.")`.
 - `setTarget()` disconnects when host/port changes.
+- Commands are newline-terminated plain text — see the DESIGN.md matrix.
 
 ### Keepalive
 
 `DEFAULT_KEEPALIVE = 5000` ms, `MINIMAL_KEEPALIVE = 1000` ms. The `KeepAliveTimer`
 (an injected `ScheduledExecutorService`, daemon-thread default) schedules every
 `keepaliveTimeout - 300` ms ("300 in order to compensate ping"), sending
-`keepalive <ms>`. Sending any command restarts the timer.
+`keepalive <ms>`. Sending any command restarts the timer. Over UDP the tick
+additionally re-sends the last pad/wheel state and runs the robot-liveness
+check (spec: DESIGN.md "Gamepad protocol (source of truth)").
 
 ### MJPEG video
 

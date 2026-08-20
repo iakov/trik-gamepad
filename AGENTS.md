@@ -302,7 +302,10 @@ Dev tooling (uv): `uv sync` (re)creates `.venv` from `pyproject.toml` +
 
 ## App protocol (quick reference)
 
-TCP protocol, keepalive, MJPEG reconnect, settings keys: MEMORY.md "App protocol".
+The wire format, command matrix and TCP/UDP lifecycles: DESIGN.md "Gamepad
+protocol (source of truth)" — the single truth for every byte to/from the
+robot; MEMORY.md "App protocol" holds pointers + quirks only. Protocol changes
+update `DummyRobotServer` (the reference implementation) in the same commit.
 
 ## Windows/PowerShell quirks
 
@@ -335,6 +338,7 @@ demand:
 | **UX/design decisions & conventions** | **DESIGN.md** (named sections: Defaults-as-useful, Every-setting-shows-its-value, Ellipsis-on-dialog-rows, Option-descriptions, Color-is-not-enough, Touch-targets, Magic-button-symbols, About-vs-Copy-report, System-theme, HUD-themes-Type-1, Robot-target-chip, Localization, WCAG, Connection-and-video-state) |
 | Layout, keystore path, versioning | MEMORY.md "Build & layout" |
 | Test suite structure, TCP test servers, emulator prerequisites | MEMORY.md "Testing" + TESTING.md |
+| Gamepad protocol (TCP/UDP, commands, liveness) | DESIGN.md "Gamepad protocol (source of truth)" |
 | SenderService protocol, keepalive, MJPEG | MEMORY.md "App protocol" |
 | CI (GitHub Actions), emulator prerequisites | MEMORY.md "CI quirks" |
 | Branch/PR and release workflows | MEMORY.md "Workflows" |

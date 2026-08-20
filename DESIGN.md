@@ -103,6 +103,7 @@ ______________________________________________________________________
 | WCAG | contrast + touch-target regression tests |
 | Connection & video state UX | status pill, reconnect badge |
 | Haptics | pads, magic buttons, settings gear |
+| Gamepad protocol (source of truth) | every protocol change, TCP and UDP |
 
 ______________________________________________________________________
 
@@ -373,3 +374,99 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
   `shadowOf(view).lastHapticFeedbackPerformed()` against
   `Haptics.constant(level)` (the semantic level, not a raw constant — the unit
   suite runs under SDK 23 where the older fallback would otherwise fire).
+
+## Gamepad protocol (source of truth)
+
+The control protocol is the **single truth for every byte sent to and received
+from the robot**. This section, not code, is the contract: `docs/architecture.md`
+"TCP command protocol" and `MEMORY.md "App protocol"` are pointers to it, and a
+code-vs-design mismatch is a bug. `DummyRobotServer` (test source set) is the
+**reference implementation** of both directions and is kept in sync with this
+section so third-party clients can validate against it.
+
+### Wire format
+
+- One **newline-terminated plain-text command** per unit. Over TCP that is one
+  line on the persistent stream (`\n`); over UDP it is **one command per
+  datagram** (the same text, verbatim — a robot that parses the TCP stream
+  parses UDP the same way).
+- Commands are ASCII; app→robot traffic is UTF-8-encoded plain text (ASCII is
+  a subset, so the wire stays byte-compatible).
+- Every command is a small set of space-separated tokens; there is no framing,
+  length prefix, or binary encoding.
+
+### Command matrix (app → robot)
+
+| Command | When | Why / notes |
+|---------|------|-------------|
+| `pad 1 x y` / `pad 2 x y` | pad movement beyond the sensitivity threshold | `x`,`y` are `-100..100` integers (y inverted). A pad stroke sends many of these. |
+| `pad 1 up` / `pad 2 up` | `ACTION_UP` / `ACTION_CANCEL` | one per touch, marks the pad released. |
+| `btn N down` | magic-button press | `N` is 1-based (`1..MAX_MAGIC_BUTTONS`, default 5). **Edge**: sent once per press, never repeated while held, and **never re-sent** by the UDP resend (a re-sent `down` would re-trigger the action). |
+| `wheel <angle>` | tilt change above the step hysteresis | `<angle>` is `-100..100`. Sent only when the angle actually changes. |
+| `keepalive <ms>` | every keepalive tick | `<ms>` is the app-side interval (`keepaliveTimeout - 300`; default 5000 → 4700). Any app→robot command also restarts the timer. |
+
+### Connection lifecycle
+
+- **TCP (default):** one persistent stream to `192.168.77.1:4444`
+  (`SK_HOST_ADDRESS`/`SK_HOST_PORT`). Connect timeout 5 s, `tcpNoDelay`,
+  `keepAlive`, `setSoLinger(true,0)`, traffic class `0x0F`, and the **input
+  half is shut down** — TCP control is *write-only*: the app never reads the
+  control socket, so a dead connection is detected via write errors
+  (`checkError()` → `disconnect("Send failed.")`), never by reading.
+- **UDP (optional, added in Campaign 27):** the same text protocol, one command
+  per datagram, to the same `host:port`. UDP is connectionless, so **"Connected"
+  is optimistic**: the pill shows Connected as soon as the first datagram is
+  sent (no reply is required or awaited). A send `IOException` (e.g. the
+  network is gone) drives the same `disconnect("Send failed.")` path as TCP.
+  Over UDP, per keepalive tick the **last pad/wheel state is re-sent** so a
+  dropped datagram converges within one keepalive period (buttons are edges and
+  are deliberately NOT re-sent — see the matrix).
+- **Transport selection** is a global `SK_TRANSPORT` preference (`tcp`/`udp`,
+  default `tcp`) in the robot screen's Network category; changing it disconnects
+  and the next command reconnects over the new transport. The transport is set
+  up through a `CommandTransport` interface so the protocol text is independent
+  of the socket.
+
+### Robot → app (received messages)
+
+Today the app is **write-only on the TCP control channel** (the input half is
+closed); over **UDP** the app runs an inbound receive loop and accepts optional
+robot messages:
+
+- **Any received control message resets the robot-liveness clock** (the robot
+  is alive; the app is not required to understand it).
+- `keepalive <ms>` announces the robot's **expected heartbeat interval** — the
+  robot will send *some* control message at least every `<ms>`. The app stores
+  it and, per keepalive tick, disconnects (`"Robot keepalive missed."`) when no
+  message arrived within `ms + 2000` (a fixed gap; `ROBOT_KEEPALIVE_GAP_MS`).
+- `keepalive -1` (or no announcement — the default `-1`) means **no
+  expectation**: liveness checks are no-ops (disabled / unlimited).
+- **Unknown lines are ignored** (the additive rule below).
+- The app keeps sending its **own** `keepalive <ms>` as before — the robot-side
+  liveness is *additive* to the app-side keepalive, never a replacement.
+
+### Additive-change rule
+
+Protocol changes are **additive and optional**: a robot that ignores messages
+it does not understand (and never replies) works exactly as before. Nothing
+new is required of an existing robot: TCP stays write-only, UDP works
+optimistically, and a robot that never sends a `keepalive` simply disables the
+robot-side liveness check. A client that receives an unknown line must ignore
+it, not error. (Robustness tiers — keepalive/button ACKs and sequence numbers —
+are a deferred dream, not part of this contract; see ROADMAP.)
+
+### Reference implementation
+
+`DummyRobotServer` (app test source set, started via
+`./gradlew runDummyRobotServer`) implements this section **in full**: a
+log-only TCP port, a log-only UDP port, and a steady MJPEG stream, on the app
+default ports 4444/8080. It is the integration target for the app's own smoke
+tests and for any third-party client; when this protocol changes, update
+`DummyRobotServer` in the same commit.
+
+### What belongs here
+
+This section is the truth for the *protocol*. The keepalive *timer*
+(`keepaliveTimeout - 300` compensation), the `SK_*` keys, and the socket tuning
+remain in `docs/architecture.md` / `MEMORY.md`. When in doubt, the protocol
+lives here and the implementation detail lives below it.
