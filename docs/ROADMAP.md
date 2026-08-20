@@ -1077,7 +1077,7 @@ emulator); (4) main-thread socket-I/O cleanup + MJPEG **decode downsampling**
 
 | Estimated | Actual |
 |-----------|--------|
-| — | ~8 h 5 m (2026-08-20, ~14:10→22:15 — includes earlier UDP implementation + this push session) |
+| — | ~8 h 45 m (2026-08-20, ~14:10→22:55 — includes earlier UDP implementation, the push, and the CI flake-fix cycle) |
 
 - **Main-thread I/O fix** (`eaaa5f2`): `CommandTransport` + `TcpTransport`
   extracted; the send + `checkError()` runs on the executor thread, the
