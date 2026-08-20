@@ -331,4 +331,16 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
         MainActivitySettingsController.readMagicButtonCount(prefs),
     )
   }
+
+  @Test
+  fun onPreferenceChangedWithUdpTransportSetsUdpMode() {
+    setPref(SettingsFragment.SK_TRANSPORT, "udp")
+    assertEquals(TransportMode.UDP, sender.transportMode)
+  }
+
+  @Test
+  fun onPreferenceChangedWithMissingTransportKeepsTcpDefault() {
+    controller.onPreferenceChanged(prefs)
+    assertEquals(TransportMode.TCP, sender.transportMode)
+  }
 }

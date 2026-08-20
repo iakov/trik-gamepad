@@ -128,6 +128,18 @@
     <string name="pref_gamepad_swap_off">Left stick drives the left pad</string>
     <string name="pref_category_network">Network</string>
     <string name="pref_keepalive_timeout">Keep-alive timeout, ms…</string>
+    <string name="pref_transport">Command transport…</string>
+    <string name="pref_transport_summary">%1$s · How the app sends control commands to the robot</string>
+    <string name="transport_label_tcp">TCP</string>
+    <string name="transport_label_udp">UDP</string>
+    <string-array name="transport_labels">
+        <item>@string/transport_label_tcp</item>
+        <item>@string/transport_label_udp</item>
+    </string-array>
+    <string-array name="transport_values">
+        <item>tcp</item>
+        <item>udp</item>
+    </string-array>
     <string name="pref_copy_robot_ip">Copy robot IP</string>
     <string name="pref_copy_robot_ip_summary">Copy the configured robot IP address</string>
     <string name="pref_category_presets">Robot presets</string>

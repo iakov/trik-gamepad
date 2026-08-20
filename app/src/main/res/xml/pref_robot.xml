@@ -49,6 +49,13 @@
             android:maxLines="1"
             android:singleLine="true"
             android:title="@string/pref_keepalive_timeout" />
+        <ListPreference
+            android:defaultValue="tcp"
+            android:entries="@array/transport_labels"
+            android:entryValues="@array/transport_values"
+            android:key="transport"
+            android:summary="@string/pref_transport_summary"
+            android:title="@string/pref_transport" />
         <Preference
             android:key="copyRobotIp"
             android:summary="@string/pref_copy_robot_ip_summary"

@@ -117,6 +117,10 @@
     <string name="pref_gamepad_swap_off">Der linke Stick steuert das linke Pad</string>
     <string name="pref_category_network">Netzwerk</string>
     <string name="pref_keepalive_timeout">Keep-alive-Timeout, ms…</string>
+    <string name="pref_transport">Befehlsübertragung…</string>
+    <string name="pref_transport_summary">%1$s · Wie die App Steuerbefehle an den Roboter sendet</string>
+    <string name="transport_label_tcp">TCP</string>
+    <string name="transport_label_udp">UDP</string>
     <string name="pref_copy_robot_ip">Roboter-IP kopieren</string>
     <string name="pref_copy_robot_ip_summary">Kopiert die konfigurierte Roboter-IP-Adresse</string>
     <string name="pref_category_presets">Roboter-Presets</string>

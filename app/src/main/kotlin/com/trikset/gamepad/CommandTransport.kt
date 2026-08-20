@@ -23,6 +23,13 @@ interface CommandTransport {
    */
   fun send(command: String): Boolean
 
+  /**
+   * Robot→app control messages (e.g. the robot's optional `keepalive <ms>`). TCP never invokes it
+   * (the control channel is write-only there); a UDP transport with an inbound receive loop reports
+   * every received line through it.
+   */
+  var onMessage: ((String) -> Unit)?
+
   /** Closes the transport and its underlying socket. */
   fun close()
 }

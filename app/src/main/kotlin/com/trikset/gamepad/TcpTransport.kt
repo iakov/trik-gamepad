@@ -21,6 +21,10 @@ class TcpTransport(
   private var writer: PrintWriter? = null
   private var socket: Socket? = null
 
+  // TCP control is write-only (input half-closed): the robot never replies on the control socket,
+  // so there are no inbound messages to report (the protocol doc: the app never reads it).
+  override var onMessage: ((String) -> Unit)? = null
+
   @Throws(IOException::class)
   override fun open(host: String, port: Int) {
     val socket = socketBinder.bind(Socket())

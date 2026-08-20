@@ -24,4 +24,22 @@ class SenderViewModelTest : RobolectricTestBase() {
         .invoke(viewModel)
     assertTrue(viewModel.connectionState.value is ConnectionState.Disconnected)
   }
+
+  @Test
+  fun udpModeFactoryBuildsAWifiBoundDatagramTransport() {
+    // The ViewModel's default sender carries the Wi-Fi-bound UDP factory (line 23); exercising a
+    // real UDP connect through it covers that branch. The bind falls back to the default network
+    // when no Wi-Fi transport exists (Robolectric), so a localhost server still receives.
+    TestUdpServer().use { server ->
+      val viewModel = SenderViewModel(RuntimeEnvironment.getApplication())
+      val sender = viewModel.sender
+      sender.transportMode = TransportMode.UDP
+      sender.setTarget(TestUdpServer.HOST, server.port)
+      sender.keepaliveTimeout = 10000000 // disable keepalive noise
+      sender.send("pad 1 0 0")
+      // The sender uses a real executor here (the ViewModel's default), so await on the server.
+      assertTrue("UDP command must reach the server", server.awaitReceived("pad 1 0 0"))
+      sender.disconnect("test done")
+    }
+  }
 }

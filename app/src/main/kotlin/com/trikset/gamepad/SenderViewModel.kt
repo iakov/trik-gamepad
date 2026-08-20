@@ -17,7 +17,12 @@ class SenderViewModel(application: Application) : AndroidViewModel(application) 
 
   var sender: SenderService =
       SenderService(
-          transportFactory = { TcpTransport(socketBinder = WifiSocketBinder(application)) }
+          transportFactory = { mode ->
+            when (mode) {
+              TransportMode.TCP -> TcpTransport(socketBinder = WifiSocketBinder(application))
+              TransportMode.UDP -> UdpTransport(datagramBinder = WifiDatagramBinder(application))
+            }
+          }
       )
     internal set
 

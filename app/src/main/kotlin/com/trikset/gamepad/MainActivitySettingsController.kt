@@ -91,6 +91,19 @@ class MainActivitySettingsController(
     }
     sender.setTarget(addr, portNumber)
 
+    // Command transport: the robot screen's Network category selects TCP or UDP (global setting;
+    // per-preset transport is deferred until the robot supports UDP). A change disconnects and the
+    // next command reconnects over the new transport.
+    val transportKey =
+        sharedPreferences.getString(SettingsFragment.SK_TRANSPORT, TRANSPORT_DEFAULT)
+            ?: TRANSPORT_DEFAULT
+    sender.transportMode =
+        if (transportKey.equals(TRANSPORT_UDP, ignoreCase = true)) {
+          TransportMode.UDP
+        } else {
+          TransportMode.TCP
+        }
+
     val defAlpha = PADS_ALPHA_DEFAULT
     // SeekBarPreference stores Int; legacy String values are still honored.
     val padsAlpha =
@@ -196,6 +209,8 @@ class MainActivitySettingsController(
     const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
     const val DEFAULT_HOST_PORT = "4444"
     const val DEFAULT_PORT = 4444
+    const val TRANSPORT_DEFAULT = "tcp"
+    const val TRANSPORT_UDP = "udp"
     const val PADS_ALPHA_DEFAULT = 100
     const val ALPHA_MAX = 255
     const val WHEEL_STEP_MIN = 1

@@ -119,6 +119,10 @@
     <string name="pref_gamepad_swap_off">Левый стик управляет левой площадкой</string>
     <string name="pref_category_network">Сеть</string>
     <string name="pref_keepalive_timeout">Таймаут keep-alive, мс…</string>
+    <string name="pref_transport">Транспорт команд…</string>
+    <string name="pref_transport_summary">%1$s · Как приложение отправляет команды роботу</string>
+    <string name="transport_label_tcp">TCP</string>
+    <string name="transport_label_udp">UDP</string>
     <string name="pref_copy_robot_ip">Скопировать IP робота</string>
     <string name="pref_copy_robot_ip_summary">Скопировать настроенный IP-адрес робота</string>
     <string name="pref_category_presets">Пресеты робота</string>

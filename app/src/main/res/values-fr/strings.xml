@@ -117,6 +117,10 @@
     <string name="pref_gamepad_swap_off">La manette gauche pilote le pavé gauche</string>
     <string name="pref_category_network">Réseau</string>
     <string name="pref_keepalive_timeout">Délai de keep-alive, ms…</string>
+    <string name="pref_transport">Transport des commandes…</string>
+    <string name="pref_transport_summary">%1$s · Comment l’appli envoie les commandes au robot</string>
+    <string name="transport_label_tcp">TCP</string>
+    <string name="transport_label_udp">UDP</string>
     <string name="pref_copy_robot_ip">Copier l’IP du robot</string>
     <string name="pref_copy_robot_ip_summary">Copie l’adresse IP configurée du robot</string>
     <string name="pref_category_presets">Préréglages du robot</string>

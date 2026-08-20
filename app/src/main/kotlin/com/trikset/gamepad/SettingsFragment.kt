@@ -26,6 +26,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
   companion object {
     const val SK_HOST_ADDRESS = "hostAddress"
     const val SK_HOST_PORT = "hostPort"
+    const val SK_TRANSPORT = "transport"
     const val SK_SHOW_PADS = "showPads"
     const val SK_VIDEO_URI = "videoURI"
     const val SK_WHEEL_STEP = "wheelSens"
@@ -285,6 +286,16 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     refreshVideoUriSummary()
 
+    // The transport ListPreference summary shows the current value ("Every setting shows its
+    // current value"); the entries/values arrays carry the labels and stored keys.
+    val transport = findPreference<ListPreference>(SK_TRANSPORT)
+    transport?.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
+      pref.summary = getString(R.string.pref_transport_summary, transportLabel(value))
+      true
+    }
+    transport?.summary =
+        getString(R.string.pref_transport_summary, transportLabel(transport?.value ?: "tcp"))
+
     // The video-URI row's own change must also reflect the typed value immediately (the shared
     // helper reads prefs, which are only persisted after this listener returns true).
     val videoUri = findPreference<Preference>(SK_VIDEO_URI)
@@ -467,6 +478,17 @@ class SettingsFragment : PreferenceFragmentCompat() {
           getString(R.string.diag_level_label_info)
         }
     return getString(R.string.diag_level_summary, label)
+  }
+
+  /** The human label for the stored transport key ("tcp"/"udp"); falls back to the TCP label. */
+  private fun transportLabel(value: Any?): String {
+    val entryIndex =
+        resources.getStringArray(R.array.transport_values).indexOfFirst { it == value.toString() }
+    return if (entryIndex >= 0) {
+      resources.getStringArray(R.array.transport_labels)[entryIndex]
+    } else {
+      getString(R.string.transport_label_tcp)
+    }
   }
 
   /**

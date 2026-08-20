@@ -40,6 +40,9 @@ internal class KeepAliveTimer(
       val command = "keepalive ${sender.keepaliveTimeout}"
       AppLog.i(TCP_TAG, "Sending $command message")
       sender.postCommand(command)
+      // UDP: converge dropped datagrams (last pad/wheel state) and enforce the robot heartbeat.
+      sender.resendLastState()
+      sender.checkRobotLiveness()
     } else {
       stop()
     }

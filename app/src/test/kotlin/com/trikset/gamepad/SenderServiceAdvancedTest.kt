@@ -234,10 +234,12 @@ class SenderServiceAdvancedTest : RobolectricTestBase() {
             return true
           }
 
+          override var onMessage: ((String) -> Unit)? = null
+
           override fun close() {}
         }
     val realExecutor = Executors.newSingleThreadExecutor()
-    val client = SenderService(executor = realExecutor, transportFactory = { transport })
+    val client = SenderService(executor = realExecutor, transportFactory = { _ -> transport })
 
     client.setTarget("localhost", 1)
     client.send("pad 1 0 0")
