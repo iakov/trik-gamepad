@@ -3135,7 +3135,7 @@ Follows the "Campaign retrospective checklist" (MEMORY.md above).
   red/green, 8 variants) with no coverage regression (96.7% line / 85.1%
   branch vs 0.95/0.85 gate).
 - **Deferred (`.PLAN.md`):** A.3 release smoke + DummyRobotServer (phone
-  SM-S9210 not attached); toolchain bumps; Play release; the launch-wrapper
+  not attached); toolchain bumps; Play release; the launch-wrapper
   hang root cause (pending; re-audit before the next emulator launch).
 - **Next automation candidate:** none surfaced this campaign.
 - **Should have asked earlier:** the seam-vs-fabricate question — asking it
