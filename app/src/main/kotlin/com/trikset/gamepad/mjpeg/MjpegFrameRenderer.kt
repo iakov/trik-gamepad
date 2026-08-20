@@ -34,6 +34,9 @@ class MjpegFrameRenderer(
   @Volatile private var bitmap: Bitmap? = null
   /** The most recent frame's destination rectangle, for the view's [android.view.View.onDraw]. */
   @Volatile var lastDestRect: Rect? = null
+  // Source size of the last decoded frame (pre-downsample), to derive the next frame's sample.
+  private var sourceFrameWidth = 0
+  private var sourceFrameHeight = 0
   private var frameCounter = 0
   private var startTimeMs = 0L
   @Volatile private var fpsString = ""
@@ -69,6 +72,10 @@ class MjpegFrameRenderer(
   fun extractFrame(frame: BoundedInputStream, dispWidth: Int, dispHeight: Int): Rect? {
     val opts =
         BitmapFactory.Options().apply {
+          // Decode at the smallest power-of-2 sample whose result still covers the display, so a
+          // camera larger than the screen is not fully decoded into memory every frame (the source
+          // size is known from the previous frame; the first frame decodes at full size).
+          inSampleSize = sampleSize(sourceFrameWidth, sourceFrameHeight, dispWidth, dispHeight)
           inBitmap = bitmap // reuse if possible
           inMutable = true
           inTempStorage = tempStorage
@@ -88,7 +95,30 @@ class MjpegFrameRenderer(
       AppLog.v(TAG, "Bitmap was not reused, recycled.")
     }
     bitmap = decoded
+    // Record the frame's source (pre-sample) size once, for the next frame's inSampleSize.
+    if (sourceFrameWidth == 0) {
+      sourceFrameWidth = decoded.width * opts.inSampleSize
+      sourceFrameHeight = decoded.height * opts.inSampleSize
+    }
     return destRect(decoded.width, decoded.height, dispWidth, dispHeight).also { lastDestRect = it }
+  }
+
+  /**
+   * The power-of-2 `inSampleSize` that still decodes a frame covering [dispWidth]x[dispHeight].
+   * Unknown source size (first frame) or a source no larger than the display → 1 (no sampling).
+   */
+  private fun sampleSize(srcWidth: Int, srcHeight: Int, dispWidth: Int, dispHeight: Int): Int {
+    // Unknown source (first frame) or unknown display (not yet laid out) -> no sampling.
+    if (srcWidth <= 0 || srcHeight <= 0) return 1
+    if (dispWidth <= 0 || dispHeight <= 0) return 1
+    var sample = 1
+    val halfW = srcWidth / 2
+    val halfH = srcHeight / 2
+    // The decoded size must stay >= the display (a crop, never an upscale).
+    while (halfW / sample >= dispWidth && halfH / sample >= dispHeight) {
+      sample *= 2
+    }
+    return sample
   }
 
   /**

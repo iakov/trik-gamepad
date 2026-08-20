@@ -168,4 +168,39 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
     val fps = renderer.drawFrame(Canvas(bitmap(320, 240)), dest!!, 320, Paint(), showFps = false)
     assertTrue("expected a computed fps string, got '$fps'", fps.isNotEmpty())
   }
+
+  @Test
+  fun extractFrameDownsamplesToTheDisplaySizeFromThePreviousFrame() {
+    // A "camera" sending 1000x2000 frames to a 320x240 display. The first frame
+    // decodes at full size (no prior size to sample from); the second decodes at
+    // a power-of-2 sample so the decoded bitmap is >= the display (2 -> 500x1000).
+    val seenSamples = mutableListOf<Int>()
+    val renderer =
+        MjpegFrameRenderer(
+            decoder = { _, opts ->
+              seenSamples.add(opts.inSampleSize)
+              val sample = opts.inSampleSize.coerceAtLeast(1)
+              bitmap(1000 / sample, 2000 / sample)
+            }
+        )
+    assertNotNull(renderer.extractFrame(emptyFrame(), 320, 240))
+    assertNotNull(renderer.extractFrame(emptyFrame(), 320, 240))
+    assertEquals("first full-res, then downsampled", listOf(1, 2), seenSamples)
+  }
+
+  @Test
+  fun extractFrameSkipsDownsamplingWhenTheFrameFitsTheDisplay() {
+    // 200x100 frame on a 320x240 display: no sampling is ever requested.
+    val seenSamples = mutableListOf<Int>()
+    val renderer =
+        MjpegFrameRenderer(
+            decoder = { _, opts ->
+              seenSamples.add(opts.inSampleSize)
+              bitmap(200, 100)
+            }
+        )
+    assertNotNull(renderer.extractFrame(emptyFrame(), 320, 240))
+    assertNotNull(renderer.extractFrame(emptyFrame(), 320, 240))
+    assertEquals("no downsampling for a small frame", listOf(1, 1), seenSamples)
+  }
 }
