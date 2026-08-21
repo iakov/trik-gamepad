@@ -1128,6 +1128,48 @@ emulator); (4) main-thread socket-I/O cleanup + MJPEG **decode downsampling**
 - **Retrospective** — MEMORY.md "Campaign 27 retrospective" + DECISIONS.md
   entries.
 
+## Campaign 28 — TCP robot keepalive read path + toolchain hygiene (2026-08-21)
+
+Scope (user-driven, auto mode): device-free continuation — no phone, no
+emulator. (1) **TCP robot keepalive read path** (the C27 "TCP stays
+write-only" deferral, closed): the input half stays open, a `TcpReceive`
+thread feeds the existing robot-liveness machinery over the default
+transport; (2) **toolchain hygiene** — root-caused the Gradle-10-era
+deprecations and added a **device-identifier selftest**.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ~2 h 45 m (2026-08-21) |
+
+- **TCP robot keepalive read path** (`65fb9f6`): `TcpTransport` no longer
+  calls `socket.shutdownInput()`; a `TcpReceive` thread reads optional robot
+  lines and reports them through the existing `CommandTransport.onMessage`,
+  which feeds the SAME `SenderService.onRobotMessage`/`checkRobotLiveness`
+  machinery as UDP (already transport-agnostic). Additive rule unchanged: a
+  robot that never sends anything simply never invokes the callback and
+  liveness stays disabled at `-1`. Dead-connection detection stays primarily
+  write-error-based. Red-first tests (3, plus a passing negative test) in
+  `SenderServiceUdpTest`: `tcpRobotKeepaliveSetsTheHeartbeatInterval`,
+  `tcpRobotMessageResetsTheLivenessClock`,
+  `tcpMissingRobotKeepaliveDisconnectsAfterIntervalPlusGap`,
+  `tcpUnknownRobotMessageIsIgnored` — confirmed failing on the old
+  `shutdownInput()` implementation, green after. `TestTcpServer` gained
+  `sendRobotMessage`; `RobolectricTestBase` gained the shared `runBounded`
+  poll helper. `DummyRobotServer` gained the optional `--tcp-keepalive <ms>`
+  flag (reference implementation of the read path). DESIGN.md "Gamepad
+  protocol", architecture.md, MEMORY.md "App protocol", CommandTransport KDoc,
+  and a new DECISIONS.md entry all updated in the same commit.
+- **Toolchain hygiene** (`bc6a1c4`): `--warning-mode all --no-configuration-cache -Dorg.gradle.deprecation.trace=true` traced the two
+  "incompatible with Gradle 10" deprecations to plugin internals — detekt
+  1.23.8's `DetektPlugin.apply` (`ReportingExtension.file`) and AGP-internal
+  `VariantDependenciesBuilder` (project-as-dependency-notation). Neither is
+  fixable from our build scripts; both remain until the toolchain bumps
+  (`.PLAN.md` updated with the precise trace). `check_device_identifiers.py`
+  gained `--selftest` (synthetic fixtures; self-scan skip so the tool's own
+  fixtures never trip the gate).
+- **Retrospective** — MEMORY.md "Campaign 28 retrospective" + DECISIONS.md
+  entry.
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass

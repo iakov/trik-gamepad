@@ -488,8 +488,9 @@ restate their findings here only when a checklist entry needs an anchor.
 **Drift**
 
 1. Per-doc scope audit (incl. AGENTS.md) — anything stale, misplaced, or
-   missing in each doc?
-1. Stale code comments / docs API references?
+   missing in each doc? (Includes stale code comments / docs API references —
+   folded in 2026-08-21, C28: a code change's comment staleness is caught in
+   the same per-doc pass, so the standalone question added nothing.)
 1. Was every lesson stored in the best-scoped doc?
 1. **Scripts review** — any reusable `.tmp/` ad-hoc script used twice or
    encoding a guardrail? Promote it to `scripts/` (doc header, `--help`,
@@ -3623,3 +3624,126 @@ run from a flake — see Learning).
   into Signal Q2; added a scripts-review item to Drift — "promote reusable
   `.tmp/` scripts in a chore commit" — per the user's post-push retrospective
   request; all other questions kept).*
+
+### [2026-08-21] Campaign 28 retrospective — TCP keepalive read path + toolchain hygiene
+
+**Scope (device-free, no phone/emulator):** (1) **TCP robot keepalive read
+path** — close the C27 "TCP stays write-only" deferral: the input half stays
+open, a `TcpReceive` thread feeds the existing robot-liveness machinery over
+the default transport; (2) **toolchain hygiene** — root-cause the two
+Gradle-10-era deprecations and add a device-identifier selftest. Commits
+`bc6a1c4` + `65fb9f6` on `feat/global-refresh`, **pushed; CI run
+`32477901815` in progress at retrospective time**.
+
+**Process**
+
+- **Biggest process win:** the push-prep identifier scan did its job — it
+  caught the selftest fixtures holding the **real phone serial/model** (the
+  actual device identifiers, not placeholders) in the un-pushed commit. The
+  history was rewritten
+  with serial-shaped synthetic fixtures **before** push — never a
+  scrub commit over a leaked one. This is exactly why the scan is a push-prep
+  step, not a hook-only one (the hook scanned the working tree and passed; the
+  committed-diff scan caught it). Second win: red-first for the TCP read path
+  proved the tests actually test the read path — they failed on the
+  `shutdownInput()` implementation and passed after.
+- **What kept commits self-contained:** two commits, each gate-green; the
+  script chore landed before the feat so the feat commit referenced a stable
+  script.
+- **What could have been lost:** the whole C28 plan (the host rebooted mid-way
+  — the crash-recovery re-verified state and `.PLAN.md`'s edits survived; the
+  git-committed script change had already landed). The `os`-import LSP error
+  from the pre-reboot edit was fixed on resume.
+- **Elapsed vs Estimated:** ROADMAP Campaign 28 header — Estimated `—`, Actual
+  ≈2 h 45 m (2026-08-21, incl. the crash + the fixture-rewrite cycle).
+
+**Learning**
+
+- **New facts worth saving:**
+  - The two Gradle-10-era deprecations are **plugin-internal**, not ours:
+    `ReportingExtension.file` comes from detekt 1.23.8's `DetektPlugin.apply`
+    (latest stable; only detekt 2.0.0 drops it), and project-as-dependency
+    notation comes from AGP-internal `VariantDependenciesBuilder` (test
+    components). Trace with `--warning-mode all --no-configuration-cache -Dorg.gradle.deprecation.trace=true` (the `-D` must precede the task name,
+    or it is parsed as a task). No build-script fix exists; re-mark resolved
+    only when the warning is gone from a build log.
+  - **The identifier selftest must use SYNTHETIC fixtures** — even in a
+    scanner's own test data, real device identifiers are a guardrail violation
+    (the 2026-08-21 near-miss). The script also self-skips its own path when
+    scanned so the fixtures never trip the gate.
+  - A **trailing-lambda helper's parameter order matters**: `runBounded { ... }` requires the lambda to be the LAST parameter (Kotlin trailing-lambda
+    syntax); putting `condition` first with a defaulted `timeoutMs` after made
+    the compiler bind the lambda to the `Long` (a "No value passed for
+    parameter 'condition'" compile error).
+- **What the gate caught:** jscpd flagged a 7-line clone (the repeated
+  "connect + await + send keepalive + poll interval" block) across the two new
+  TCP keepalive tests — extracted the `announceTcpRobotKeepalive` helper.
+  mdformat reflowed the DECISIONS entry's `+ any-message...` wrapped line into
+  a nested list item (the C26 trap, again) — rewrote the sentence to avoid a
+  wrapped line starting with `+`.
+- **CI:** no flake this campaign; the suite ran green locally (3-variant ×2).
+
+**Signal**
+
+- **Frequency-scan:** the deprecation log has the two known Gradle-10 items
+  (both now root-caused precisely in `.PLAN.md`); no new recurring
+  diagnostics.
+- **Rule deviations / missing rules:** the "synthetic fixtures in the
+  identifier selftest" near-miss is now an explicit comment in the script + a
+  record here; the "never push a scrub commit over a leaked one" rule was
+  followed (rewrote `bc6a1c4`). The push-prep scan pattern (scan the committed
+  diff, not the working tree) proved its value again.
+- **User corrections:** "create plan without device access" → the plan
+  excluded all phone/emulator work; "2 and 3" → the toolchain bundle + TCP read
+  path were both delivered; "go full auto" → executed without questions.
+
+**Drift**
+
+- **Per-doc audit:** DESIGN.md "Gamepad protocol" (TCP lifecycle + Robot→app
+  sections now cover the open input half), architecture.md (half-close line
+  updated), MEMORY.md "App protocol" (half-open quirk updated — write-error
+  detection unchanged), CommandTransport KDoc ("TCP never invokes it" → both
+  transports report), DECISIONS.md (new [2026-08-21] entry + index row),
+  ROADMAP C28 added, `.PLAN.md` trimmed/updated.
+- **Scripts review (standing Drift checklist item):** the `--selftest` mode was
+  added to an EXISTING script (`check_device_identifiers.py`), not a new
+  promote — the reusable-script rule held.
+- **Best-scoped doc:** protocol contract → DESIGN.md; the read-path decision →
+  DECISIONS.md; the half-open detection quirk → MEMORY.md; deprecation
+  root-cause trace → `.PLAN.md` (machine/agent-facing).
+
+**Value**
+
+- **Measurable profit:** the default (TCP) transport now supports the same
+  optional robot-liveness rule UDP had — a robot that announces `keepalive <ms>` over TCP gets a missed-heartbeat disconnect instead of silent write-error
+  detection; zero cost to existing robots (additive). Toolchain: the
+  Gradle-10 deprecations are precisely root-caused (was a vague pending line),
+  and the identifier regex now has a regression harness.
+- **Deferred (→ `.PLAN.md`):** on-robot TCP-keepalive verification (needs a
+  device — `runDummyRobotServer --tcp-keepalive 2000` is the harness);
+  on-robot UDP verification; real-phone release smoke; UDP robustness tiers
+  (dreams); toolchain bumps (AGP matrix-gated, detekt 2.0 when stable).
+- **Next automation candidates:** the C27 candidate (1) — gate the identifier
+  regex self-check — is now DONE (this campaign's `--selftest`). Still open:
+  the reusable `wait_boot` script (device-dependent to verify — deferred with
+  device access).
+- **What I should have asked earlier:** nothing blocking — the device-free
+  constraint and option choice (2 and 3) were user-specified up front.
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added:** none — this campaign exercised existing questions
+  well; the new learning (synthetic fixtures) is a comment+record, not a new
+  checklist question.
+- **Most useless question this campaign:** Drift Q2 ("stale code comments /
+  docs API references?") — *why useful when added:* it anchors the C17-era
+  stale-comment discipline. *Why useless now:* this campaign's comment fixes
+  (CommandTransport KDoc, the half-close line) were all forced by the code
+  change itself and captured by Drift Q1; the question produced no independent
+  find. *How to envelop its useful part:* fold into Drift Q1 ("per-doc scope
+  audit — anything stale, misplaced, or missing") so comment/doc staleness
+  review happens in the same pass.
+- **Checklist itself:** Drift Q2 folded into Drift Q1; all other questions
+  kept. Stamp: *Last revised: 2026-08-21 (C28 retrospective: folded Drift Q2
+  into Drift Q1 — comment/doc staleness now reviewed in the per-doc pass;
+  all other questions kept).*
