@@ -56,6 +56,13 @@
             android:key="transport"
             android:summary="@string/pref_transport_summary"
             android:title="@string/pref_transport" />
+        <EditTextPreference
+            android:dialogTitle="@string/pref_custom_message"
+            android:key="customMessage"
+            android:maxLines="1"
+            android:selectAllOnFocus="true"
+            android:singleLine="true"
+            android:title="@string/pref_custom_message" />
         <Preference
             android:key="copyRobotIp"
             android:summary="@string/pref_copy_robot_ip_summary"

@@ -33,7 +33,7 @@ Two layers:
 
 ```sh
 ./gradlew test                      # all unit-test variants (debug/release/releaseDebug)
-./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.senderServiceShouldSendSingleCommandCorrectly"   # single test
+./gradlew testDebugUnitTest --tests "com.trikset.gamepad2.SenderServiceTest.senderServiceShouldSendSingleCommandCorrectly"   # single test
 ./gradlew connectedDebugAndroidTest # instrumented; needs emulator/device
 ```
 

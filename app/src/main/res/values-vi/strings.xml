@@ -121,6 +121,7 @@
     <string name="pref_transport_summary">%1$s · Cách ứng dụng gửi lệnh điều khiển tới robot</string>
     <string name="transport_label_tcp">TCP</string>
     <string name="transport_label_udp">UDP</string>
+    <string name="pref_custom_message">Tin nhắn tùy chỉnh…</string>
     <string name="pref_copy_robot_ip">Sao chép IP robot</string>
     <string name="pref_copy_robot_ip_summary">Sao chép địa chỉ IP robot đã cấu hình</string>
     <string name="pref_category_presets">Mẫu robot</string>

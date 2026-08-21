@@ -13,7 +13,7 @@ Two sources, two subcommands:
            global COUNTER totals (INSTRUCTION/LINE/BRANCH/... + the ratio that
            the gate enforces) and, with --class-filters, the per-class missed
            branches/lines ordered by missed-branches desc.
-- lines:   read the source HTML (html/com.trikset.gamepad/Class.kt.html) and
+- lines:   read the source HTML (html/com.trikset.gamepad2/Class.kt.html) and
            print the not-covered source line numbers for the named classes —
            the exact lines a test must execute.
 
@@ -22,7 +22,7 @@ Usage (from repo root, uv venv):
       app/build/reports/jacoco/jacocoTestReport/jacocoTestReport.xml \
       --class UdpTransport --class SenderService
   uv run python scripts/jacoco_report.py lines \
-      app/build/reports/jacoco/jacocoTestReport/html/com.trikset.gamepad \
+      app/build/reports/jacoco/jacocoTestReport/html/com.trikset.gamepad2 \
       UdpTransport SenderService
 Exit code 0 on success; 1 when the XML/HTML is missing or unreadable.
 """

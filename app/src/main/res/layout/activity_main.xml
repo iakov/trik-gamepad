@@ -5,7 +5,7 @@
     android:layout_height="fill_parent"
     tools:context=".MainActivity">
 
-    <com.trikset.gamepad.mjpeg.MjpegView
+    <com.trikset.gamepad2.mjpeg.MjpegView
         android:id="@+id/video"
         android:layout_width="fill_parent"
         android:layout_height="fill_parent"
@@ -49,7 +49,7 @@
             android:layout_weight="1"
             android:gravity="center">
 
-            <com.trikset.gamepad.SquareTouchPadLayout
+            <com.trikset.gamepad2.SquareTouchPadLayout
                 android:id="@+id/leftPad"
                 android:layout_width="@dimen/hud_pad_size"
                 android:layout_height="@dimen/hud_pad_size"
@@ -63,7 +63,7 @@
                     android:importantForAccessibility="no"
                     android:src="@drawable/hud_pad_chrome"
                     android:tag="padChrome" />
-            </com.trikset.gamepad.SquareTouchPadLayout>
+            </com.trikset.gamepad2.SquareTouchPadLayout>
         </FrameLayout>
 
         <FrameLayout
@@ -72,7 +72,7 @@
             android:layout_weight="1"
             android:gravity="center">
 
-            <com.trikset.gamepad.SquareTouchPadLayout
+            <com.trikset.gamepad2.SquareTouchPadLayout
                 android:id="@+id/rightPad"
                 android:layout_width="@dimen/hud_pad_size"
                 android:layout_height="@dimen/hud_pad_size"
@@ -86,7 +86,7 @@
                     android:importantForAccessibility="no"
                     android:src="@drawable/hud_pad_chrome"
                     android:tag="padChrome" />
-            </com.trikset.gamepad.SquareTouchPadLayout>
+            </com.trikset.gamepad2.SquareTouchPadLayout>
         </FrameLayout>
     </LinearLayout>
 

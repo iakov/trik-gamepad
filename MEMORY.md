@@ -325,7 +325,7 @@ is the conformance signal) and accepts `custom <message>`.
 
 ### MJPEG video
 
-`com.trikset.gamepad.mjpeg` package (`MjpegView`, `MjpegInputStream`,
+`com.trikset.gamepad2.mjpeg` package (`MjpegView`, `MjpegInputStream`,
 `MjpegFrameRenderer`; renamed from `com.demo.mjpeg` in Phase 5). Default URI
 `http://<host>:8080/?action=stream`, rebuilt from `SK_VIDEO_URI`; the "Reset
 video URI to robot default" preference refills it after a host change (no
@@ -3794,7 +3794,7 @@ no feature code. Commits: `docs` (ROADMAP C29 + MEMORY C29) + `fix`
     `nc -z -w 2 <host> <port>` (toybox). TCP+UDP 4444 and TCP 8080 all opened
     from the phone with no firewall rule (the host's GPO policy store is empty;
     `New-NetFirewallRule` returns nothing usable).
-  - **Prefs injection on a debug-signed build:** `run-as com.trikset.gamepad`
+  - **Prefs injection on a debug-signed build:** `run-as com.trikset.gamepad2`
     works (`releaseDebug` is `debuggable true`); write the prefs XML via a
     pushed script (`run-as ... sh /data/local/tmp/install_prefs.sh`), never an
     inline `sh -c "cp ..."` (arg mangling).

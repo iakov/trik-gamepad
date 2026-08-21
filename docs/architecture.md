@@ -41,7 +41,7 @@ constants in `SettingsFragment`.
 
 ### Packages
 
-- `com.trikset.gamepad` — app logic: `MainActivity`, `SettingsActivity`,
+- `com.trikset.gamepad2` — app logic: `MainActivity`, `SettingsActivity`,
   `SettingsFragment`, `SenderService` (TCP) + its helpers `ConnectRunnable`,
   `KeepAliveTimer`, `ConnectionState`, `SenderViewModel`, `ConnectionFeedback` +
   `ConnectionIndicator` (status pill / gear-border color), `SquareTouchPadLayout`
@@ -51,12 +51,12 @@ constants in `SettingsFragment`.
   HTTP client), `VideoRetryController` (bounded retry),
   `VideoStreamErrorNotifier` (throttled failure notice), `RobotPresetStore`,
   `WheelController`, `SystemUiController`, `MainActivitySettingsController`.
-- `com.trikset.gamepad.mjpeg` — the MJPEG player (vendored origin, renamed
+- `com.trikset.gamepad2.mjpeg` — the MJPEG player (vendored origin, renamed
   from `com.demo.mjpeg` in Phase 5): `MjpegView` (plain View; render thread
   decodes + `postInvalidate`, `onDraw` presents on the HWUI canvas),
   `MjpegInputStream` (frame parser), `MjpegFrameRenderer` (decoding
   - center-crop cover + FPS overlay).
-- `com.trikset.gamepad.diagnostics` — user-facing diagnostics (Campaign 14):
+- `com.trikset.gamepad2.diagnostics` — user-facing diagnostics (Campaign 14):
   `AppLog` (logcat + ring buffer) + `LogRingBuffer`, `DiagLevel`, `DiagnosticsReport`,
   `ReportDiagnosticsWriter`/`ReportSharer`, `CrashLogStore`, `CrashHandler`,
   `CrashReportDialog`. `App` (Application) lives in the root package.
@@ -204,7 +204,7 @@ directly testable without reflection.
 Offline-first: all diagnostic data stays on-device until the user reviews and
 explicitly shares it — no new permissions, no proprietary SDKs, works on every
 store incl. F-Droid (rationale: DECISIONS.md). The pieces live in the
-`com.trikset.gamepad.diagnostics` package:
+`com.trikset.gamepad2.diagnostics` package:
 
 - **`AppLog`** — the single log channel. Every `d/i/w/e/v` call mirrors to
   logcat (gated by `Log.isLoggable`, preserving the old DEBUG-gated behavior)

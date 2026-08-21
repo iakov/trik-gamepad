@@ -8,8 +8,8 @@ plugins {
 }
 
 def abiCode = 0 // just for fun
-def appMajorVersion = 1 // single digit for each SDK/ABI
-def appMinorVersion = 41 // two digits for each major version
+def appMajorVersion = 2 // single digit for each SDK/ABI
+def appMinorVersion = 42 // two digits for each major version
 
 // The signing keystore deliberately lives OUTSIDE the repo workdir (one level
 // above the repo root, next to the checkout). It is gitignored via **/*.jks and
@@ -26,8 +26,8 @@ android {
     }
     compileSdk 36
     defaultConfig {
-        applicationId "com.trikset.gamepad"
-        minSdk 23
+        applicationId "com.trikset.gamepad22"
+        minSdk 21
         targetSdk 36
         maxSdk compileSdk
         versionCode (minSdk * 10000 + abiCode * 1000 +  appMajorVersion * 100  + appMinorVersion)
@@ -91,7 +91,7 @@ android {
         execution = 'ANDROIDX_TEST_ORCHESTRATOR'
     }
 
-    namespace = 'com.trikset.gamepad'
+    namespace = 'com.trikset.gamepad2'
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
@@ -276,7 +276,7 @@ tasks.register('runDummyRobotServer', JavaExec) {
     // Android unit-test dependencies (Robolectric, junit, commons-io) in one
     // collection; read lazily at execution time (config-cache safe).
     classpath = files { tasks.named('testDebugUnitTest').get().classpath }
-    mainClass = 'com.trikset.gamepad.DummyRobotServer'
+    mainClass = 'com.trikset.gamepad2.DummyRobotServer'
 }
 
 // One-shot: writes the unit-test runtime classpath to a file so the detached

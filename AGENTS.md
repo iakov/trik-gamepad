@@ -325,7 +325,7 @@ configurations, update this section and the referenced config files.
 ./gradlew assembleDebug                      # CI adds: -PpreDexEnable=false
 ./gradlew assembleDebugAndroidTest
 ./gradlew test                               # Robolectric unit tests, all 3 build types (no device)
-./gradlew testDebugUnitTest --tests "com.trikset.gamepad.SenderServiceTest.<method>"   # single test
+./gradlew testDebugUnitTest --tests "com.trikset.gamepad2.SenderServiceTest.<method>"   # single test
 ./gradlew connectedDebugAndroidTest          # needs emulator/device; add --no-configuration-cache (prereqs + flags: TESTING.md)
   uv run python scripts/gate.py                # THE canonical quality gate — steps + tooling live in
                                                # scripts/gate.py (CI mirror: ci.yml; jscpd config: .jscpd.json).

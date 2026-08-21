@@ -7,7 +7,7 @@
 Simple Android application that mimics a gamepad and is used to control TRIK
 robots.
 
-You can get it [here](https://play.google.com/store/apps/details?id=com.trikset.gamepad)
+You can get it [here](https://play.google.com/store/apps/details?id=com.trikset.gamepad2)
 
 ## For users
 

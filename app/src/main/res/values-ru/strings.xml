@@ -123,6 +123,7 @@
     <string name="pref_transport_summary">%1$s · Как приложение отправляет команды роботу</string>
     <string name="transport_label_tcp">TCP</string>
     <string name="transport_label_udp">UDP</string>
+    <string name="pref_custom_message">Пользовательское сообщение…</string>
     <string name="pref_copy_robot_ip">Скопировать IP робота</string>
     <string name="pref_copy_robot_ip_summary">Скопировать настроенный IP-адрес робота</string>
     <string name="pref_category_presets">Пресеты робота</string>
