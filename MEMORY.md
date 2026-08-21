@@ -3747,3 +3747,124 @@ Gradle-10-era deprecations and add a device-identifier selftest. Commits
   kept. Stamp: *Last revised: 2026-08-21 (C28 retrospective: folded Drift Q2
   into Drift Q1 — comment/doc staleness now reviewed in the per-doc pass;
   all other questions kept).*
+
+### [2026-08-21] Campaign 29 retrospective — on-phone smoke verification of the TCP keepalive read path
+
+**Scope (full auto, user):** verify C28's TCP robot-keepalive read path on a
+**real phone** over Wi-Fi against the host `DummyRobotServer` — TCP read path,
+UDP transport, MJPEG video, and the silent-robot baseline. Doc commits only;
+no feature code. Commits: `docs` (ROADMAP C29 + MEMORY C29) + `fix`
+(`ui_dump_parse.py` console-codec crash).
+
+**Process**
+
+- **Biggest process win:** the crash-save discipline (user directive) paid off
+  twice — the plan and the "server-launch hangs the tool" lesson were written
+  down before they were needed, and state re-verification (`git status`,
+  `adb devices`, `netstat`, the server log banner) was the first action each
+  turn. Second win: the on-device smoke used **structural** evidence only —
+  the app's own logcat (`Robot keepalive: 2000 ms`), the server log
+  (`TCP>/UDP<` lines with timestamps), and uiautomator contentDescriptions
+  (chip "control Connected, video streaming") — never screenshot eyeballing.
+  The one screenshot read attempt failed (no image input), which pushed the
+  verification to be fully structural + pixel-census; the census bands matched
+  the dark fixture's actual tones, so no black-screen false alarm.
+- **What kept this clean:** the `DummyRobotServer --tcp-keepalive 2000` harness
+  built in C28 was the oracle; `nc -z` (not the invalid mksh `/dev/tcp`) for
+  reachability; a `run-as` script-file pattern for pushing prefs (inline
+  `sh -c "cp ..."` mangled args — the established nested-quoting trap).
+- **What could have been lost:** the server relaunch while the old PID was
+  still holding port 4444 (had to `Stop-Process` the old keepalive server
+  first). The prefs-rewrite cycle (tcp→udp→tcp) is why the smoke could
+  restart; a `force-stop` + relaunch is the deterministic path.
+- **Elapsed vs Estimated:** ROADMAP Campaign 29 header — Estimated `—`, Actual
+  ≈1 h 10 m (2026-08-21).
+
+**Learning**
+
+- **New facts worth saving:**
+  - The **`ui_dump_parse.py` cp1251 crash** is fixed: `sys.stdout.reconfigure(errors="replace")` guarded by `isinstance(sys.stdout, io.TextIOWrapper)`
+    — magic-button symbols (U+2699) in contentDescriptions previously blew up
+    on single-byte console codecs (hit in this smoke; pyright needs the
+    `isinstance` narrow, a bare `hasattr` call errors).
+  - **Reachability on Android:** mksh has no `/dev/tcp` — use
+    `nc -z -w 2 <host> <port>` (toybox). TCP+UDP 4444 and TCP 8080 all opened
+    from the phone with no firewall rule (the host's GPO policy store is empty;
+    `New-NetFirewallRule` returns nothing usable).
+  - **Prefs injection on a debug-signed build:** `run-as com.trikset.gamepad`
+    works (`releaseDebug` is `debuggable true`); write the prefs XML via a
+    pushed script (`run-as ... sh /data/local/tmp/install_prefs.sh`), never an
+    inline `sh -c "cp ..."` (arg mangling).
+- **What the gate caught:** nothing (docs + a Python script); the gate ran
+  green. The `ui_dump_parse.py` fix is not covered by a unit test (no Python
+  test harness for scripts) — verified by running it against the dumps.
+- **CI:** no flake; only docs/fix commits this campaign.
+
+**Signal**
+
+- **Frequency-scan:** the server-launch wrapper hang recurred **twice**
+  (keepalive relaunch + silent relaunch): both times the wrapper timed out at
+  the tool level yet the server was healthy on `netstat` — the established
+  "hung launch wrapper ≠ failed launch; verify liveness independently" rule
+  held, and the `.tmp/launch_dummy*.ps1` pattern (`.tmp/` redirects,
+  `Start-Process`, `run_bounded`-wrapped) is confirmed reusable.
+- **Rule deviations / missing rules:** the first launch attempt used
+  `$env:TEMP` redirects (RULE VIOLATION, corrected to `.tmp/`) and the first
+  reachability probe used the invalid `/dev/tcp` (corrected to `nc -z`). The
+  "stuck tool call with output present = invocation-pattern problem first"
+  AGENTS.md rule (added this session) was followed on the relaunch: liveness
+  verified before any kill/retry.
+- **User corrections:** "continue full auto" → executed the remaining smoke +
+  docs without questions; the pre-existing directives (crash-save before each
+  run, commits + push + green CI + retrospective at the end) shaped the whole
+  close-out.
+
+**Drift**
+
+- **Per-doc audit:** ROADMAP C29 added (with Estimated/Actual); MEMORY C29
+  added; `.PLAN.md` trimmed to the toolchain/release pending items (C29's
+  device-specific entries are complete — on-robot TCP/UDP verification is now
+  DONE). No DESIGN/DECISIONS changes needed (C28 already recorded the read-path
+  decision and the protocol doc).
+- **Scripts review (standing Drift checklist item):** `ui_dump_parse.py` was
+  FIXED (console-codec robustness), not promoted — it stays the one script for
+  readable uiautomator dumps.
+- **Best-scoped doc:** the smoke's verification record → ROADMAP; the tooling
+  quirk + near-misses → MEMORY; no decision warranted (the C28 DECISIONS entry
+  already covers the protocol change).
+
+**Value**
+
+- **Measurable profit:** C28's TCP read path is now **verified on real
+  hardware**, not just Robolectric — the keepalive liveness rule kept the app
+  connected through 27+ server keepalives, the silent-robot baseline stayed
+  connected (additive rule real), UDP convergence resend confirmed on-device,
+  and MJPEG streamed at ~33 fps. The one transient disconnect (17:10:03) had
+  no `NotSent`/`Send failed`/`keepalive missed` in logcat and auto-reconnected
+  in 28 ms — benign socket blip, not a read-path failure.
+- **Deferred (→ `.PLAN.md`):** Play release (user-gated); toolchain bumps
+  (AGP matrix-gated, detekt 2.0 when stable); UDP robustness tiers (dreams);
+  `wait_boot` script (still no reusable emulator-boot helper). The release
+  smoke item (A.3, R8 signal on-device) remains pending — this campaign was
+  the debug-signed smoke only.
+- **Next automation candidates:** the C27/C28 candidate — a reusable
+  `run-as`-prefs-install helper for device smokes (the push+script+`run-as sh`
+  dance recurred three times this session). Still open: `wait_boot` script.
+- **What I should have asked earlier:** nothing blocking — the scope (TCP +
+  UDP + MJPEG + silent baseline) was the approved plan's part 2/3 and the
+  crash-save directive came from the user up front.
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added:** none — this campaign exercised existing questions
+  well; the console-codec crash is a code fix, not a checklist question.
+- **Most useless question this campaign:** none stood out — every question
+  produced a signal (the launch-hang recurrences, the prefs-injection trap,
+  the structural-verification win all map to existing Process/Signal/Value
+  questions). The "3 identical failures → stop" rule was near-missed (the
+  wrapper hang looked identical twice) but the rule itself (verify liveness
+  first) prevented a wasted kill/relaunch.
+- **Checklist itself:** all questions kept. Stamp: *Last revised: 2026-08-21
+  (C29 retrospective: all questions kept — no change; the structural-verification
+  win and the launch-hang liveness check are already covered by existing
+  questions).*

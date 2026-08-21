@@ -1170,6 +1170,43 @@ deprecations and added a **device-identifier selftest**.
 - **Retrospective** — MEMORY.md "Campaign 28 retrospective" + DECISIONS.md
   entry.
 
+## Campaign 29 — on-phone smoke verification of the TCP keepalive read path (2026-08-21)
+
+Scope (user-driven, full auto): verify the C28 TCP robot-keepalive read path
+on a **real phone** (the deferred "on-robot verification" from C28), plus the
+UDP transport, MJPEG video, and the silent-robot baseline — all against the
+host `DummyRobotServer` over Wi-Fi.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ~1 h 10 m (2026-08-21, incl. the server-launch hang cycles) |
+
+- **TCP read path VERIFIED on device:** the app (TCP transport, host
+  `192.168.88.254:4444`) stayed Connected for 20+ minutes while
+  `DummyRobotServer --tcp-keepalive 2000` emitted `keepalive 2000` every 2 s.
+  Server log: `TCP> <phone> keepalive 2000` (27+ emissions) AND the app's own
+  `TCP< <phone> keepalive 5000` (every ~4.7 s) + `pad`/`btn` commands. App
+  logcat: `Robot keepalive: 2000 ms` (parsed by `SenderService.onRobotMessage`)
+  and `Sending keepalive 5000 message`. Chip contentDescription read
+  "…192.168.88.254, control Connected, video streaming" via uiautomator.
+- **UDP VERIFIED:** with `transport=udp`, movement datagrams
+  (`UDP< pad 1 x y`), the `keepalive 5000` tick, AND the per-tick pad-state
+  resend (`pad 1 up` re-sent with each keepalive) all appear — the UDP
+  convergence rule works on-device. Chip stayed Connected.
+- **MJPEG VERIFIED:** `servedFrames` climbed steadily (~33 fps) and a pixel
+  diff of two captures 4 s apart showed ~125k differing pixels (the dark-sepia
+  vintage-cat fixture — the census bands match the fixture's actual dark tones,
+  not a black screen).
+- **Silent-robot baseline VERIFIED:** server relaunched WITHOUT
+  `--tcp-keepalive` → the robot sends nothing, the app keeps its own
+  `keepalive 5000` and STAYS Connected (liveness stays disabled at `-1` when
+  the robot never announces an expectation). The additive rule is real.
+- **Tooling:** fixed `scripts/ui_dump_parse.py` — it crashed (cp1251
+  `UnicodeEncodeError`) on the magic-button gear glyph (U+2699) in a
+  contentDescription during this smoke; `reconfigure(errors="replace")` for
+  single-byte console codecs.
+- **Retrospective** — MEMORY.md "Campaign 29 retrospective".
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass
