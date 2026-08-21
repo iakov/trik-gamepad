@@ -1220,7 +1220,7 @@ Single commit; Step 2 (upstream issues) starts after green CI.
 
 | Estimated | Actual |
 |-----------|--------|
-| ~2 h | |
+| ~2 h | ~2 h 30 m (2026-08-21, incl. the hang-fix loop + Step 2 upstream issues) |
 
 - **Protocol v1 documented** in DESIGN.md: "Protocol versioning" (v1 = no wire
   tag, additive; v2 deferred), symmetric "Keepalive semantics" (any received

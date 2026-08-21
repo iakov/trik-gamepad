@@ -506,7 +506,7 @@ restate their findings here only when a checklist entry needs an anchor.
 **Value**
 
 1. What is the measurable profit / worth-it verdict?
-1. What was deferred and why (→ `.PLAN.md`)?
+1. What was deferred and why (→ `.PLAN.md`)? Also: what should move from ROADMAP Dreams or AGENTS deferred to `.PLAN.md` as a concrete next step?
 1. What is the next automation candidate (gaps escalate)?
 1. What should I have asked the user earlier?
 
@@ -523,10 +523,7 @@ restate their findings here only when a checklist entry needs an anchor.
    useful part into another question) if a useful part remains, otherwise
    **drop it from this checklist**. Update the *last revised* stamp.
 
-*Last revised: 2026-08-20 (C26 retrospective: rephrased Process Q2 to "What
-kept each commit self-contained (compilable against HEAD's design +
-gate-green)?"; all other questions kept). See the C26 retrospective's checklist
-review.*
+*Last revised: 2026-08-21 (C30 retrospective: rephrased Value Q2 to capture ROADMAP-to-PLAN drift; added clarification that `run_bounded` must not wrap detached-launcher scripts — AGENTS.md operational rules updated accordingly).*
 
 ### [2026-08-06] Quality-gate implementation quirks (checkstyle/SpotBugs/JaCoCo)
 
@@ -3874,3 +3871,185 @@ no feature code. Commits: `docs` (ROADMAP C29 + MEMORY C29) + `fix`
   (C29 retrospective: all questions kept — no change; the structural-verification
   win and the launch-hang liveness check are already covered by existing
   questions).*
+
+### [2026-08-21] Campaign 30 retrospective — protocol v1 doc/code sync + keepalive \<= 0 + dummy_gamepad
+
+**Scope (full auto, user):** make DESIGN.md "Gamepad protocol (source of
+truth)" the future contract — document v1 protocol fully (additive features:
+robot→app keepalive read path, `custom <message>`, `keepalive <= 0` disables,
+UDP transport, canonical `btn N down`), record the robot-firmware / desktop-C++
+"Known violations" ledger, align the app code (`checkRobotLiveness` guard
+`> 0`), enforce the robot-side keepalive watchdog in `DummyRobotServer`, and
+add `scripts/dummy_gamepad.py` protocol-tracking client. Step 2 (upstream
+issues) filed against `trikset/trik-desktop-gamepad` (issues #100–104).
+Single commit `9613a6e`; CI green (run 32513695403).
+
+**Process**
+
+- **Biggest process win:** the **red-first TDD discipline** paid off
+  immediately — `keepaliveZeroDisablesRobotLiveness` failed on the old `>= 0`
+  guard, proved the guard actually controlled the behavior, then passed after
+  changing to `> 0`. Without the red-first test, I might have assumed the
+  `<= 0` doc change was sufficient and not noticed that `keepalive 0` actually
+  armed a 2 s timeout (the bug). Second win: the **single-commit approach**
+  (docs + code + scripts + tests in one commit) kept the protocol v1 contract
+  atomic — DESIGN.md, the app code, the reference implementation, and the
+  protocol-tracking client all ship together, so no intermediate state is
+  inconsistent.
+- **What kept this clean:** the `.PLAN.md` session state (the detailed plan
+  from the "go full auto" handoff) meant every step was pre-scoped and the
+  order was clear — write code, write tests, write docs, smoke, gate, commit,
+  push. The `DummyRobotServer` classpath regeneration caught any new Kotlin
+  warnings-as-errors during `writeDummyServerClasspath` (green every time).
+  The `announceKeepaliveIfPresent` + `watchKeepalive` split in the server
+  code kept the watchdog logic testable in isolation.
+- **What could have been lost:** the `run_bounded`-wrapped server launch hung
+  the tool (PID visible but no return). The server was healthy on `netstat` but
+  the tool looked stuck. The misdiagnosis (Python `print()` buffering) was
+  wrong — the real cause was `run_bounded`'s `subprocess.PIPE` + pwsh handle
+  inheritance (the `.ps1` finishes in \<1 s but the inherited pipe keeps the
+  caller blocked). Fixed by invoking the launcher directly. **The working tree
+  was always safe** (the crash-save plan and `git status` confirmation pattern
+  held).
+- **Elapsed vs Estimated:** ROADMAP Campaign 30 header — Estimated `~2 h`,
+  Actual ≈2 h 30 m (2026-08-21, incl. the hang-fix loop and the issue-filing
+  Step 2).
+
+**Learning**
+
+- **New facts worth saving:**
+  - `run_bounded` must NOT be used for a detached-launcher `.ps1` that returns
+    instantly (the launcher finishes in \<1 s) — `subprocess.PIPE` + pwsh handle
+    inheritance means the caller blocks forever even though the child process
+    already detached. C29 worked around this by accepting the timeout and
+    checking `netstat` independently; the proper fix is to invoke the launcher
+    directly (no wrapper needed since the `.ps1` runs instantly) and verify
+    liveness in a separate step.
+  - The `gh issue create --repo trikset/trik-desktop-gamepad --body-file <path>`
+    pattern works cleanly on Windows (no inline quoting traps). The PowerShell
+    `--jq` trap does not apply to issue creation.
+  - `keepalive 0` before this fix would have armed a `0 + 2000` ms timeout
+    (the `>= 0` guard in `checkRobotLiveness` treated `0` as a valid interval).
+    The `> 0` guard correctly disables liveness when the robot announces
+    `keepalive 0`.
+  - `dummy_gamepad.py --batch` with `wait` commands produces a clean smoke-test
+    protocol trace without interactive `stdin`.
+- **What the gate caught:** nothing — the gate passed green on the first run.
+  The new test (`keepaliveZeroDisablesRobotLiveness`) was pre-verified red then
+  green; no regression in existing tests.
+- **CI:** run 32513695403 green.
+
+**Signal**
+
+- **Frequency-scan:**
+  - "Deprecated Gradle features were used in this build, making it incompatible
+    with Gradle 10." — **still present** in `test-red.log`, `spotless.log`, and
+    `gate.log`. Root-caused in C28 (detekt 1.23.8 + AGP-internal); no
+    build-script fix until the toolchain bumps. `.PLAN.md` still tracks it as
+    pending. Do NOT re-mark resolved.
+  - "configuration cache cannot be reused because an input to unknown location
+    has changed." — appears in `spotless.log` and `gate.log`. Known
+    config-cache invalidation pattern (JAVA_HOME changes, file system
+    interactions). Harmless.
+  - "Daemon will be stopped at the end of the build" — appears in most logs.
+    Normal for single-use daemon. No action.
+- **Rule deviations / missing rules:**
+  1. **`run_bounded` used to wrap a detached-launcher `.ps1`** — C29
+     established "hung launch wrapper ≠ failed launch; verify liveness
+     independently" as a workaround, but this session proved that the
+     tool-level hang is still a failure signal (user: "you were stuck, you must
+     analyze this"). The correct rule is: never wrap a detached-launcher `.ps1`
+     in `run_bounded` at all — invoke directly (finishes in \<1 s) and verify
+     liveness separately. **Rule added to AGENTS.md.**
+  1. **Misdiagnosis of the hang as Python buffering** — the tool showed
+     output (`PID=15092`) but never returned. I guessed "Python `print()`
+     buffering" instead of following the established "stuck tool call with
+     output present = invocation-pattern problem first" rule (AGENTS.md). The
+     rule was correct but I didn't apply it fast enough. No new rule needed —
+     the existing rule covers it; the failure was execution discipline, not a
+     rule gap.
+- **User corrections:**
+  1. "you were stuck" — corrected after I presented `run_bounded` output
+     without analyzing the root cause. **Signal: my momentum** (assuming a
+     familiar tool works as expected instead of verifying the invocation
+     pattern). The rule it implies: when a command shows output but doesn't
+     return, stop and audit the invocation pattern before probing server/app
+     state — the AGENTS.md rule already exists; enforce it on the very first
+     occurrence, not after the user points it out.
+  1. "Reference to files as Github links to exact version commit for history.
+     Add corresponding best fitting label. What is not a bug, is a feature or
+     enhancement." — corrected my issue drafts to use commit-anchored GitHub
+     permalinks and proper labels. **Signal: my defaults** (I used relative
+     file paths and generic problem statements). Rule: when filing issues
+     against an external repo, always use commit-permalink links, label
+     strictly per the repo's label taxonomy, and classify accurately (bug vs
+     enhancement vs feature).
+
+**Drift**
+
+- **Per-doc audit:**
+  - AGENTS.md: the "Bound long-lived native commands at the process TREE"
+    rule should note that `run_bounded` is for foreground commands only —
+    detached-launcher `.ps1` scripts must NOT be wrapped. **Added.**
+  - DESIGN.md: the "Known violations" section's Step 2 forward-reference
+    ("Step 2 of the current campaign raises these as issues") is now complete.
+    The sentence is historically accurate — no change needed.
+  - MEMORY.md: C29's "hung launch wrapper ≠ failed launch" is now superseded
+    by the correct rule (don't use `run_bounded` for detached launchers at
+    all). Noted in this retrospective.
+  - ROADMAP.md: C30 Estimated/Actual filled in. No stale claims found.
+  - DECISIONS.md: no change needed — the keepalive `<= 0` decision is a
+    protocol spec update, not a new design decision (the protocol spec is the
+    DESIGN.md). The upstream issues are filing work, not decisions.
+- **Scripts review:** `dummy_gamepad.py` was written as a proper
+  `scripts/` entry (doc header, `--help`, stdin / `--batch` / `wait ms`) —
+  no promotion needed. `scripts/README.md` inventory updated. No `.tmp/`
+  ad-hoc script was reused twice this campaign.
+- **Best-scoped doc:** protocol spec → DESIGN.md; reference implementation
+  details → DummyRobotServer KDoc + code; tooling lesson (run_bounded + detached
+  launcher) → AGENTS.md; performance estimate → ROADMAP; session record →
+  MEMORY.
+
+**Value**
+
+- **Measurable profit:** DESIGN.md is now the **future source of truth** for
+  the protocol v1 contract (symmetric keepalive semantics, `keepalive <= 0`
+  disconnect, `custom <message>` spec, "Known violations" ledger). The app code
+  is aligned (the keepalive-0 bug is fixed). DummyRobotServer enforces the
+  keepalive watchdog with a conformance-signal ERROR line. `dummy_gamepad.py`
+  lets third-party developers probe the robot's control port. 5 upstream
+  issues filed against the desktop C++ client (issues `trikset/trik-desktop-gamepad#100–104`).
+- **Deferred (→ `.PLAN.md`):** protocol v2 design (seq numbers, status
+  replies, telemetry); DummyRobotServer validation oracle + fault-injection
+  scenarios; `custom` Android app-side design. All recorded in ROADMAP Dreams.
+- **Next automation candidates:** the `gh issue create` pattern with
+  `--body-file` is already scriptable but no dedicated script yet (not used
+  enough to justify). The `--batch` + `--host` pattern in `dummy_gamepad.py`
+  is automation-ready for CI smoke checks against DummyRobotServer.
+- **What I should have asked earlier:** "should I use `run_bounded` to wrap
+  the detached-launcher `.ps1`?" — the answer would have been no (C29's
+  workaround was "accept the timeout", but the user's correction proves that
+  approach was insufficient). Asking up front would have saved the
+  hang-diagnosis cycle.
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added:** "Signal Q3: When and why did the user correct my
+  behaviour or report a problem" — already exists in the checklist (it was
+  added before C30). This campaign exercised it well (two corrections
+  documented above). No new question needed.
+- **Most useless question this campaign:** "Value Q2: What was deferred and
+  why (→ `.PLAN.md`)" — this campaign's deferred items (v2 design, oracle,
+  custom UI) were all pre-recorded in the ROADMAP Dreams section before the
+  campaign started, so the question just pointed at existing records rather
+  than revealing new deferrals. **Useful part:** discovering that a deferral
+  should go to `.PLAN.md` vs staying in ROADMAP Dreams — campaign-scoped
+  deferrals go to `.PLAN.md`, multi-campaign dreams stay in ROADMAP.
+  **Improvement:** rephrase to "What should move from ROADMAP Dreams or
+  AGENTS deferred to `.PLAN.md` as a concrete next step?" — this catches
+  the drift where a deferred item has become actionable but hasn't been
+  moved to the active plan. Applied below.
+- **Checklist itself:** "Value Q2" rephrased (see above). Stamp: *Last revised:
+  2026-08-21 (C30 retrospective: rephrased Value Q2 to capture ROADMAP-to-PLAN
+  drift; added clarification that `run_bounded` must not wrap detached-launcher
+  scripts — AGENTS.md operational rules updated accordingly).*
