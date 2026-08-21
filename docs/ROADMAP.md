@@ -1207,12 +1207,73 @@ host `DummyRobotServer` over Wi-Fi.
   single-byte console codecs.
 - **Retrospective** — MEMORY.md "Campaign 29 retrospective".
 
+## Campaign 30 — protocol v1 doc/code sync + `keepalive <= 0` + dummy_gamepad (2026-08-21)
+
+Scope (user-driven, full auto): make `DESIGN.md` "Gamepad protocol (source of
+truth)" the future contract — document the v1 protocol fully (additive
+features: robot→app keepalive read path, `custom <message>`, `keepalive <= 0`
+disables the expectation, UDP transport, canonical `btn N down`), record the
+robot-firmware / desktop-C++ "Known violations" ledger, align the app code
+(`checkRobotLiveness` guard `> 0`), enforce the robot-side keepalive watchdog
+in `DummyRobotServer`, and add the `dummy_gamepad.py` protocol-tracking client.
+Single commit; Step 2 (upstream issues) starts after green CI.
+
+| Estimated | Actual |
+|-----------|--------|
+| ~2 h | |
+
+- **Protocol v1 documented** in DESIGN.md: "Protocol versioning" (v1 = no wire
+  tag, additive; v2 deferred), symmetric "Keepalive semantics" (any received
+  control message re-arms the single-shot timer; `keepalive <= 0` = disabled),
+  `custom <message>` matrix row (specified, app-side deferred), and the "Known
+  violations (review later)" ledger (robot firmware + desktop C++).
+- **App code aligned:** `SenderService.checkRobotLiveness` now guards `> 0`, so
+  a robot `keepalive 0` disables the liveness expectation (red-first test
+  `keepaliveZeroDisablesRobotLiveness`).
+- **DummyRobotServer** enforces the robot-side keepalive watchdog on its TCP
+  port: `keepalive <ms>` (`> 0`) arms it, any message re-charges it, `<= 0`
+  disarms it, and a silent client is dropped with a friendly `TCP!` ERROR line
+  (the conformance signal). `custom <message>` accepted + logged.
+- **`scripts/dummy_gamepad.py`**: protocol-tracking client (TCP/UDP), stdin
+  commands with `wait <ms>`, and `--batch "c1;c2"` for scripting. Registered in
+  `scripts/README.md`.
+- **Retrospective** — MEMORY.md "Campaign 30 retrospective".
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass
 (interactive) before it becomes a scoped campaign. The UDP control transport
 was **partially built in Campaign 27** (basic UDP + robot keepalive liveness);
 the robustness tiers below are the remaining dream.
+
+### `custom` command (deferred — Android app design)
+
+The protocol spec now defines `custom <message>` (opaque plain-text message to
+the robot, exposed to user programs) and the reference implementation
+(`DummyRobotServer`) accepts and logs it. The Android app does **not** send it
+yet: the app-side support — UI entry point, payload source, send path — is to
+be **designed before implementation** (interactive design pass) and is deferred
+until then.
+
+### Protocol v2 (deferred design)
+
+Campaign 30 documents the **v1** protocol as the contract (no wire tag,
+additive changes only). **v2** is deferred and must stay v1-compatible (a v2
+client ↔ v1 robot, and vice versa). Candidates, for when a robot can answer:
+message ids / sequence numbers (UDP, possibly TCP), robot status replies to
+numbered messages (error codes, `btn` state tracking), and **data packets /
+telemetry (v2-only)**. Framing and semantics need an interactive design pass
+before scoping.
+
+### DummyRobotServer validation oracle + fault injection (deferred)
+
+The reference server already enforces the keepalive watchdog and logs every
+line; its only `ERROR` output is the watchdog's conformance-signal disconnect.
+Deferred re-design: a semantic-validation oracle (ERROR logs for protocol
+violations a client commits) and fault-injection scenarios (e.g. a `btn N`
+toggle that stops the robot→app keepalive) so third-party implementations can
+be checked against robot failure modes. Default start stays the normal
+situation.
 
 ### UDP control transport (in addition to TCP)
 
@@ -1279,7 +1340,9 @@ Not all vars are useful in the HUD, hence the separate screen is the
 comprehensive view and the HUD is the curated subset. The wire format is open
 (likely JSON) and the transport is undecided — both are first-order design
 questions. **Recorded 2026-08-20 (user-suggested); no design work yet —
-refine interactively next time.**
+refine interactively next time.** **Re-scoped 2026-08-21 (Campaign 30):**
+telemetry / data packets are **v2-only** by design (DESIGN.md "Protocol
+versioning") — the v2 framing + schema design pass is the prerequisite.
 
 Design questions to resolve before scoping:
 

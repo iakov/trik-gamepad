@@ -82,7 +82,8 @@ class SenderService(
     private set
 
   /**
-   * The robot's announced heartbeat interval (`ms`); -1 = no expectation (disabled / unlimited).
+   * The robot's announced heartbeat interval (`ms`); `<= 0` = no expectation (disabled /
+   * unlimited).
    */
   var robotKeepaliveTimeoutMs: Int = -1
     private set
@@ -172,7 +173,7 @@ class SenderService(
   /**
    * Processes a robot→app control message (UDP inbound loop; TCP is write-only and never reports).
    * Any received line resets the liveness clock; `keepalive <ms>` additionally sets the expected
-   * heartbeat interval (`-1` = disabled). Unknown lines are ignored (additive protocol rule).
+   * heartbeat interval (`<= 0` = disabled). Unknown lines are ignored (additive protocol rule).
    */
   internal fun onRobotMessage(line: String) {
     lastRobotMessageMs = System.currentTimeMillis()
@@ -205,13 +206,13 @@ class SenderService(
 
   /**
    * Disconnects when no robot message arrived within the announced heartbeat interval plus a gap
-   * (the robot-keepalive liveness rule). No-op while the robot announced no expectation (`-1`).
+   * (the robot-keepalive liveness rule). No-op while the robot announced no expectation (`<= 0`).
    * Called from the keepalive tick. [nowMs] is injectable so tests drive the clock
    * deterministically.
    */
   fun checkRobotLiveness(nowMs: Long = System.currentTimeMillis()) {
     val timeoutMs = robotKeepaliveTimeoutMs
-    if (timeoutMs >= 0) {
+    if (timeoutMs > 0) {
       val elapsed = nowMs - lastRobotMessageMs
       if (elapsed > timeoutMs + ROBOT_KEEPALIVE_GAP_MS) {
         mainHandler.post { disconnect("Robot keepalive missed.") }

@@ -167,6 +167,20 @@ class SenderServiceUdpTest : RobolectricTestBase() {
   }
 
   @Test
+  fun keepaliveZeroDisablesRobotLiveness() {
+    TestUdpServer().use { server ->
+      udpConnected(server, "pad 1 0 0")
+      assertTrue(server.awaitReceived("pad 1 0 0"))
+      // `keepalive 0` = disabled (protocol: keepalive <= 0 disables the expectation).
+      client!!.onRobotMessage("keepalive 0")
+      val now = System.currentTimeMillis()
+      client!!.checkRobotLiveness(now + 100000)
+      shadowOf(getMainLooper()).idle()
+      assertEquals(ConnectionState.Connected, client!!.connectionState.value)
+    }
+  }
+
+  @Test
   fun unknownRobotMessageIsIgnored() {
     TestUdpServer().use { server ->
       udpConnected(server, "pad 1 0 0")

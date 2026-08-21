@@ -91,15 +91,17 @@ the host or port changes (the preference listener calls it on every change).
 ### Keepalive
 
 The app-side keepalive timer and the robot-side liveness rules (any received
-message resets the clock; `keepalive <ms>` sets the expected interval; `-1` =
-disabled; `ms + 2000` gap → disconnect) are specified in `DESIGN.md` "Gamepad
-protocol (source of truth)".
+message resets the clock; `keepalive <ms>` sets the expected interval; `<= 0`
+= disabled; `ms + 2000` gap → disconnect) plus the robot-side keepalive
+enforcement are specified in `DESIGN.md` "Gamepad protocol (source of truth)"
+(the "Keepalive semantics" subsection).
 
 `DEFAULT_KEEPALIVE = 5000` ms, `MINIMAL_KEEPALIVE = 1000` ms. A
 `ScheduledExecutorService` (constructor-injected, daemon-thread default)
 fires a keepalive tick every `keepaliveTimeout - 300` ms (300 ms "to
-compensate ping") and sends `keepalive <ms>`. Any sent command restarts the
-timer. The timeout is configurable via `SK_KEEPALIVE`.
+compensate ping") and sends `keepalive <keepaliveTimeout>` (announces the
+timeout, ticks 300 ms earlier — safe, see DESIGN.md). Any sent command restarts
+the timer. The timeout is configurable via `SK_KEEPALIVE`.
 
 ## Input handling
 

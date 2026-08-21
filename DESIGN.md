@@ -393,7 +393,22 @@ section so third-party clients can validate against it.
 - Commands are ASCII; app→robot traffic is UTF-8-encoded plain text (ASCII is
   a subset, so the wire stays byte-compatible).
 - Every command is a small set of space-separated tokens; there is no framing,
-  length prefix, or binary encoding.
+  length prefix, or binary encoding. Parsers should split on any run of
+  whitespace and tolerate a trailing separator; clients send exactly the
+  canonical form below (no trailing space).
+
+### Protocol versioning
+
+The protocol is **v1** and carries **no version tag on the wire**: a v1 robot
+and a v1 client interoperate silently, and the stream is byte-compatible with
+the historical commands. Everything new is additive (see the additive rule), so
+a v1 robot keeps working with a v1 client and vice versa.
+
+**v2 (deferred, not yet designed)** must stay v1-compatible — a v2 client talks
+to a v1 robot and a v1 client to a v2 robot. Candidate v2 features (for when a
+robot can answer): message ids / sequence numbers (UDP, possibly TCP), robot
+status replies to numbered messages (error codes, `btn` state tracking), and
+**data packets / telemetry (v2-only)**. See ROADMAP.
 
 ### Command matrix (app → robot)
 
@@ -401,9 +416,24 @@ section so third-party clients can validate against it.
 |---------|------|-------------|
 | `pad 1 x y` / `pad 2 x y` | pad movement beyond the sensitivity threshold | `x`,`y` are `-100..100` integers (y inverted). A pad stroke sends many of these. |
 | `pad 1 up` / `pad 2 up` | `ACTION_UP` / `ACTION_CANCEL` | one per touch, marks the pad released. |
-| `btn N down` | magic-button press | `N` is 1-based (`1..MAX_MAGIC_BUTTONS`, default 5). **Edge**: sent once per press, never repeated while held, and **never re-sent** by the UDP resend (a re-sent `down` would re-trigger the action). |
+| `btn N down` | magic-button press | `N` is 1-based (`1..MAX_MAGIC_BUTTONS`, default 5). **Edge**: sent once per press, never repeated while held, and **never re-sent** by the UDP resend (a re-sent `down` would re-trigger the action). The reference firmware also accepts bare `btn N` (implies `down`) and `btn N up` (explicit release); this app sends `btn N down` only. |
 | `wheel <angle>` | tilt change above the step hysteresis | `<angle>` is `-100..100`. Sent only when the angle actually changes. |
-| `keepalive <ms>` | every keepalive tick | `<ms>` is the app-side interval (`keepaliveTimeout - 300`; default 5000 → 4700). Any app→robot command also restarts the timer. |
+| `keepalive <ms>` | every keepalive tick | `<ms>` is the **robot-side expectation**: the robot disconnects the gamepad if no control message arrives within `<ms>` of the previous one (any message counts as proof of life — see "Keepalive semantics" below). The app announces its timeout (`keepalive 5000` by default) and ticks every `keepaliveTimeout − 300` ms (4700) — *earlier* than announced, which is safe. Any app→robot command also restarts the app-side timer. |
+| `custom <message>` | never (this app) | Opaque plain-text message to the robot, exposed to user programs (the robot emits a `custom` event). **Specified here but NOT implemented in this app yet** — the Android-side support is to be designed before implementation (deferred, see ROADMAP). The reference implementation already accepts and logs it. |
+
+### Keepalive semantics
+
+The keepalive interval is a **two-way contract, symmetric in both directions**:
+a peer that announces `keepalive <ms>` commits to sending *some* control
+message at least every `<ms>`, and **any incoming control message re-arms the
+peer's single-shot disconnect timer** — any traffic proves the peer is alive.
+`keepalive <= 0` disables the expectation (no disconnects). If no message
+arrives within `<ms>` of the previous one, the peer disconnects — the original
+design, meant to detect an **unreachable gamepad**. Sending keepalive *earlier*
+than announced is always safe (the timer is simply restarted), so the app
+announces its timeout and ticks 300 ms early to keep that margin. (The real
+robot firmware is stricter — it re-arms only on `keepalive` commands; see
+"Known violations (review later)".)
 
 ### Connection lifecycle
 
@@ -439,7 +469,7 @@ over UDP the loop is built in):
   robot will send *some* control message at least every `<ms>`. The app stores
   it and, per keepalive tick, disconnects (`"Robot keepalive missed."`) when no
   message arrived within `ms + 2000` (a fixed gap; `ROBOT_KEEPALIVE_GAP_MS`).
-- `keepalive -1` (or no announcement — the default `-1`) means **no
+- `keepalive <= 0` (or no announcement — the default `-1`) means **no
   expectation**: liveness checks are no-ops (disabled / unlimited).
 - **Unknown lines are ignored** (the additive rule below).
 - The app keeps sending its **own** `keepalive <ms>` as before — the robot-side
@@ -463,7 +493,55 @@ this contract; see ROADMAP.)
 log-only TCP port, a log-only UDP port, and a steady MJPEG stream, on the app
 default ports 4444/8080. It is the integration target for the app's own smoke
 tests and for any third-party client; when this protocol changes, update
-`DummyRobotServer` in the same commit.
+`DummyRobotServer` in the same commit. It implements the **contract**, not the
+firmware: it enforces the robot-side keepalive disconnect (see "Keepalive
+semantics"), accepts `custom <message>`, and tolerates parser niceties (trailing
+whitespace, bare `btn N`) only as compatibility notes here — never as behavior
+it relies on.
+
+By default the server starts in the **normal situation**: a healthy robot that
+only logs. Its only `ERROR` output is the keepalive watchdog's disconnect line,
+which is the **conformance signal** for a gamepad client — announce
+`keepalive <ms>` and then fall silent, and the connection is dropped exactly
+like the real robot. A semantic-validation oracle (ERROR logs for protocol
+violations) and fault-injection scenarios (e.g. making the robot stop its own
+keepalive) are deferred; see ROADMAP.
+
+### Known violations (review later)
+
+Real implementations deviate from the contract above. Recorded here for
+review; **none currently makes this app incompatible**, and none of them should
+be "fixed" in this app — robot-side behavior is note-only (never change the app
+to match a violation), and desktop-client behavior is reported upstream
+(Step 2 issues against `trikset/trik-desktop-gamepad`), not patched here.
+
+**Robot firmware (trikRuntime `gamepad.cpp`):**
+
+- re-arms the keepalive timer **only on `keepalive` commands** — pad/btn/wheel
+  traffic does not count as proof of life (stricter than "any message
+  re-charges"; safe for this app, which always sends keepalive).
+- `keepalive 0` stops the timer, but a **negative** value arms a 0 ms timer
+  (deviation from the contract's `keepalive <= 0` = disable; safe because this
+  app never sends `<= 0`).
+- never replies on the gamepad control channel (no robot→app keepalive from the
+  real robot today).
+- tolerates bare `btn N` and trailing whitespace (parser splits on any
+  whitespace), and auto-clears a `btn N` "pressed" state 500 ms after the last
+  press.
+
+**Desktop C++ gamepad (upstream `trikset/trik-desktop-gamepad`):**
+
+- `btn N` has no state token — the client never sends an explicit release
+  (`btn N up`), so a button sticks down until the robot's 500 ms auto-clear.
+- keyboard auto-repeat re-sends `btn N`, violating the edge rule (one `down`
+  per press).
+- sends `pad 1 x y ` with a trailing space (its own README documents the
+  canonical form without one).
+- `wheel` is documented in its README but never implemented.
+- announces `keepalive 4000` but sends every 3000 ms (safe — earlier is fine).
+
+Step 2 of the current campaign raises these as issues against the upstream
+repo.
 
 ### What belongs here
 

@@ -313,9 +313,15 @@ This section is a pointer plus the quirks that live here.
 `DEFAULT_KEEPALIVE = 5000` ms, `MINIMAL_KEEPALIVE = 1000` ms. The `KeepAliveTimer`
 (an injected `ScheduledExecutorService`, daemon-thread default) schedules every
 `keepaliveTimeout - 300` ms ("300 in order to compensate ping"), sending
-`keepalive <ms>`. Sending any command restarts the timer. Over UDP the tick
-additionally re-sends the last pad/wheel state and runs the robot-liveness
-check (spec: DESIGN.md "Gamepad protocol (source of truth)").
+`keepalive <keepaliveTimeout>` (announces the timeout, ticks 300 ms earlier).
+Sending any command restarts the timer. Over UDP the tick additionally re-sends
+the last pad/wheel state and runs the robot-liveness check (spec: DESIGN.md
+"Gamepad protocol (source of truth)"). The keepalive contract is symmetric and
+`keepalive <= 0` disables the expectation in both directions (any received
+message re-charges the clock; `-1` is the app's no-announcement default).
+`DummyRobotServer` enforces the robot-side keepalive disconnect on its TCP port
+(any message re-charges; `keepalive <= 0` disarms; a friendly `TCP!` ERROR line
+is the conformance signal) and accepts `custom <message>`.
 
 ### MJPEG video
 
