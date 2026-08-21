@@ -200,7 +200,20 @@ configurations, update this section and the referenced config files.
 - **Slow commands → research (incl. web), tune repeatable tooling, document in MEMORY.md** — never fix the symptom.
 - **Single-branch CI cache trap**: `cache-read-only: ${{ github.ref != 'refs/heads/master' }}` never writes the cache when nothing pushes to `master` — set `cache-read-only: false` and verify a follow-up run is faster (measured here: build gate 4m27s → 1m05s, ~4×). Details: MEMORY.md "CI quirks".
 - **Measure the second CI run after a build change**: the first run after a `settings.gradle`/`build.gradle` change is polluted by config-cache invalidation — compare the second run on the same head, not the first.
-- **Async turns**: capture a process handle (`Start-Process -PassThru`), verify liveness immediately, then a single bounded readiness poll in the same working loop — a turn is not complete until the readiness result is recorded; never end a turn on a bare liveness check.
+- **Async turns**: capture a process handle (`Start-Process -PassThru`),
+  verify liveness immediately, then a single bounded readiness poll in the same
+  working loop — a turn is not complete until the readiness result is recorded;
+  never end a turn on a bare liveness check.
+- **Stuck tool call WITH output present = invocation-pattern problem first**:
+  output + no-return is the pipe-inheritance hang signature (hit 2026-08-21:
+  a bare `& .tmp/launch_keepalive.ps1` printed `PID=` but the caller never
+  returned because the detached `java` child held the tool's output pipe).
+  Re-audit the invocation against MEMORY "Timeout-bound tooling" BEFORE
+  probing server/app state — never try to prove the state is fine while the
+  command itself was mis-invoked. Never invent a detached-launcher command
+  from memory: reuse the established `.tmp/launch_dummy.ps1` pattern
+  (run_bounded-wrapped `Start-Process` + `.tmp/` redirects), and never redirect
+  a server's logs to `$env:TEMP` — repo `.tmp/` always (Repo hygiene).
 - **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer actually analyzed sources before trusting green. Concrete trigger: a static-analysis task that shows `UP-TO-DATE` right after you added/renamed source files (analyzers can stay UP-TO-DATE when new files arrive via an untracked path) — force one `./gradlew detekt --rerun-tasks` pass before trusting the gate (MEMORY.md "Campaign 4").
 - **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries).
 - **Format before you gate — automate, don't remember.** `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`; run them before the gate or `spotlessCheck` fails. Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` (it rewrites `.kt` while `test` compiles them — a race). Pre-commit hooks + `scripts/gate.py` automate this (see Commands).
