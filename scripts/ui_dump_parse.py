@@ -15,8 +15,15 @@ Exit code 0 on success; 1 when the file is unreadable or not a dump.
 from __future__ import annotations
 
 import argparse
+import io
 import re
 import sys
+
+# Windows consoles default to a single-byte codec (e.g. cp1251); glyphs in
+# content-descriptions (magic-button symbols like U+2699) then crash the print.
+# Replace un-encodable chars instead of aborting (hit 2026-08-21 C29 smoke).
+if isinstance(sys.stdout, io.TextIOWrapper):
+    sys.stdout.reconfigure(errors="replace")
 
 NODE_RE = re.compile(r"<node ([^>]+)/?>")
 
