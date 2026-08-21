@@ -3,8 +3,11 @@ package com.trikset.gamepad
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.io.PrintWriter
 import java.net.ServerSocket
 import java.net.Socket
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
@@ -85,6 +88,21 @@ class TestTcpServer : AutoCloseable {
       } catch (ignored: IOException) {
         // already closed
       }
+    }
+  }
+
+  /**
+   * Sends one newline-terminated robot message to the connected client (the robot→app keepalive
+   * read-path tests). No-op when no client is connected.
+   */
+  fun sendRobotMessage(line: String) {
+    val socket = clientSocket ?: return
+    try {
+      PrintWriter(OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true).use {
+        it.println(line)
+      }
+    } catch (_: IOException) {
+      // client gone
     }
   }
 

@@ -39,7 +39,7 @@ touch one.
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-15] Idiomatic Kotlin pass (Java→Kotlin leftovers) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render | [2026-08-20] UDP control transport + robot keepalive liveness |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path | [2026-08-21] TCP robot keepalive read path |
 | Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
 | UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-18] Haptic schema: generic legacy constants, strong pulses, no VIBRATE |
@@ -2203,21 +2203,63 @@ ______________________________________________________________________
   App keepalives stay additive. Protocol contract: DESIGN.md "Gamepad protocol
   (source of truth)"; DummyRobotServer is the reference implementation for
   third-party clients. Additive rule: robots that ignore unknown lines / never
-  reply work exactly as before. TCP stays write-only (read path deferred).
-  Verified (2026-08-20): no robot→app control channel exists today (input
-  half-closed in all implementations, upstream Xamarin write-only), so the
-  liveness rules are purely additive.
+  reply work exactly as before. TCP read path was deferred at the time (see
+  the next entry — it landed in Campaign 28). Verified (2026-08-20): no
+  robot→app control channel exists today (input half-closed in all
+  implementations, upstream Xamarin write-only), so the liveness rules are
+  purely additive.
 
 - **Why:** UDP is a cheap, robot-supported control path; the liveness rules
   reuse the existing keepalive loop and are backward-compatible (a robot that
   never replies just disables the check); a single protocol source of truth
   prevents the architecture/MEMORY drift that motivated this entry.
 
-- **Out of scope / consequences:** TCP robot keepalive (read path) deferred;
-  robustness tiers (keepalive ACK → button ACK → sequence numbers) recorded as
-  dreams in ROADMAP/DESIGN, not a contract; on-robot UDP verification pending
-  a real robot. Coverage gate was restored after the new classes (branch
-  0.843 → 0.854).
+- **Out of scope / consequences:** TCP robot keepalive (read path) — shipped in
+  Campaign 28; robustness tiers (keepalive ACK → button ACK → sequence
+  numbers) recorded as dreams in ROADMAP/DESIGN, not a contract; on-robot UDP
+  verification pending a real robot. Coverage gate was restored after the new
+  classes (branch 0.843 → 0.854).
+
+### [2026-08-21] TCP robot keepalive read path
+
+- **Type:** design-clarifying (extends the gamepad protocol's "TCP is
+  write-only" rule from the C27 decision; touches S2/S10 — the liveness rules
+  now apply on the default transport too).
+
+- **Problem:** the C27 robot-keepalive liveness rule (the `keepalive <ms>`
+  interval and the any-message-resets-the-clock rule) only worked over UDP —
+  `TcpTransport` called `socket.shutdownInput()` and never read, so a TCP
+  robot that announced a heartbeat could not keep its liveness check alive,
+  and half-open TCP was only detectable via write errors.
+
+- **Alternatives considered:** (a) keep TCP write-only and document that
+  liveness is UDP-only (rejected — the default transport would lack a
+  capability the protocol already defines, and the read infrastructure was
+  trivial to add); (b) fully bidirectional TCP with mandatory robot replies
+  (rejected — breaks the additive rule; an old robot never replies and must
+  keep working); (c) keep the input half open and read optional robot
+  messages (chosen).
+
+- **Chosen solution:** `TcpTransport` no longer shuts the input half down; a
+  receive thread (`TcpReceive`) reports every inbound line via the existing
+  `CommandTransport.onMessage`, which feeds the SAME `SenderService` robot
+  keepalive machinery as UDP (already transport-agnostic). Additive rule
+  unchanged: a robot that never sends anything simply never invokes the
+  callback and liveness stays disabled at `-1`. `DummyRobotServer` gained an
+  optional `--tcp-keepalive <ms>` flag so the reference implementation can
+  demonstrate the read path. Dead-connection detection stays primarily
+  write-error-based (half-open still surfaces on the next write).
+
+- **Why:** zero cost to existing robots (additive), reuses the wired-up
+  `onRobotMessage`/`checkRobotLiveness` path, and gives the default transport
+  the same liveness option UDP already had — the "TCP read path deferred"
+  note from C27 is now closed.
+
+- **Out of scope / consequences:** robustness tiers (ACKs/sequence numbers)
+  remain a deferred dream; on-robot verification of the TCP keepalive reply
+  stays a manual user step; `SenderServiceUdpTest` gained the red-first TCP
+  keepalive tests (interval set, liveness reset, missed → disconnect, unknown
+  line ignored).
 
 ### [2026-08-20] Device-identifier pre-commit hook + gate step
 

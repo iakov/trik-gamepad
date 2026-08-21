@@ -181,6 +181,68 @@ class SenderServiceUdpTest : RobolectricTestBase() {
     }
   }
 
+  @Test
+  fun tcpRobotKeepaliveSetsTheHeartbeatInterval() {
+    TestTcpServer().use { server ->
+      // The robot announces its heartbeat interval over the TCP stream; the app must accept it.
+      val intervalSeen = announceTcpRobotKeepalive(server, 1200)
+      assertTrue("TCP robot keepalive must set the heartbeat interval", intervalSeen)
+    }
+  }
+
+  @Test
+  fun tcpRobotMessageResetsTheLivenessClock() {
+    TestTcpServer().use { server ->
+      announceTcpRobotKeepalive(server, 1200)
+      val now = System.currentTimeMillis()
+      // A fresh robot message over TCP resets the liveness clock: no disconnect at `now`.
+      server.sendRobotMessage("some other control message")
+      client!!.checkRobotLiveness(now)
+      shadowOf(getMainLooper()).idle()
+      assertEquals(ConnectionState.Connected, client!!.connectionState.value)
+    }
+  }
+
+  @Test
+  fun tcpMissingRobotKeepaliveDisconnectsAfterIntervalPlusGap() {
+    TestTcpServer().use { server ->
+      announceTcpRobotKeepalive(server, 1200)
+      val now = System.currentTimeMillis()
+      // The robot announced a 1200 ms heartbeat but went silent over TCP: gap + 1201 must
+      // disconnect.
+      client!!.checkRobotLiveness(now + SenderService.ROBOT_KEEPALIVE_GAP_MS + 1201)
+      shadowOf(getMainLooper()).idle()
+      assertEquals(
+          ConnectionState.Disconnected("Robot keepalive missed."),
+          client!!.connectionState.value,
+      )
+    }
+  }
+
+  /**
+   * Connects the TCP sender, waits for a command on the wire, has the robot announce a [ms]
+   * heartbeat, and returns whether the app accepted the interval (bounded poll — the reply arrives
+   * on the transport's own receive thread, TESTING.md "Why awaits are required").
+   */
+  private fun announceTcpRobotKeepalive(server: TestTcpServer, ms: Int): Boolean {
+    tcpConnected(server, "pad 1 0 0")
+    assertTrue(server.awaitReceived("pad 1 0 0", drain = { mExecutor.runAll() }))
+    server.sendRobotMessage("keepalive $ms")
+    return runBounded { client?.robotKeepaliveTimeoutMs == ms }
+  }
+
+  @Test
+  fun tcpUnknownRobotMessageIsIgnored() {
+    TestTcpServer().use { server ->
+      tcpConnected(server, "pad 1 0 0")
+      assertTrue(server.awaitReceived("pad 1 0 0", drain = { mExecutor.runAll() }))
+      // Additive rule: a future telemetry message over TCP must not disturb the connection.
+      server.sendRobotMessage("some future telemetry message")
+      shadowOf(getMainLooper()).idle()
+      assertEquals(ConnectionState.Connected, client!!.connectionState.value)
+    }
+  }
+
   /**
    * Connects the TCP default transport to [server] and drains the executor + main looper so the
    * socket is up and the command is on the wire before the caller asserts.

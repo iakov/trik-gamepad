@@ -409,10 +409,10 @@ section so third-party clients can validate against it.
 
 - **TCP (default):** one persistent stream to `192.168.77.1:4444`
   (`SK_HOST_ADDRESS`/`SK_HOST_PORT`). Connect timeout 5 s, `tcpNoDelay`,
-  `keepAlive`, `setSoLinger(true,0)`, traffic class `0x0F`, and the **input
-  half is shut down** — TCP control is *write-only*: the app never reads the
-  control socket, so a dead connection is detected via write errors
-  (`checkError()` → `disconnect("Send failed.")`), never by reading.
+  `keepAlive`, `setSoLinger(true,0)`, traffic class `0x0F`. The app writes
+  commands and (Campaign 28) keeps the **input half open**, reading optional
+  robot messages on a receive thread — a dead connection is still detected
+  primarily via write errors (`checkError()` → `disconnect("Send failed.")`).
 - **UDP (optional, added in Campaign 27):** the same text protocol, one command
   per datagram, to the same `host:port`. UDP is connectionless, so **"Connected"
   is optimistic**: the pill shows Connected as soon as the first datagram is
@@ -429,9 +429,9 @@ section so third-party clients can validate against it.
 
 ### Robot → app (received messages)
 
-Today the app is **write-only on the TCP control channel** (the input half is
-closed); over **UDP** the app runs an inbound receive loop and accepts optional
-robot messages:
+The app runs an inbound receive loop on **both** transports and accepts
+optional robot messages (over TCP the input half stays open since Campaign 28;
+over UDP the loop is built in):
 
 - **Any received control message resets the robot-liveness clock** (the robot
   is alive; the app is not required to understand it).
@@ -449,11 +449,12 @@ robot messages:
 
 Protocol changes are **additive and optional**: a robot that ignores messages
 it does not understand (and never replies) works exactly as before. Nothing
-new is required of an existing robot: TCP stays write-only, UDP works
-optimistically, and a robot that never sends a `keepalive` simply disables the
-robot-side liveness check. A client that receives an unknown line must ignore
-it, not error. (Robustness tiers — keepalive/button ACKs and sequence numbers —
-are a deferred dream, not part of this contract; see ROADMAP.)
+new is required of an existing robot: TCP control stays write-only in
+practice, UDP works optimistically, and a robot that never sends a
+`keepalive` simply disables the robot-side liveness check. A client that
+receives an unknown line must ignore it, not error. (Robustness tiers —
+keepalive/button ACKs and sequence numbers — are a deferred dream, not part of
+this contract; see ROADMAP.)
 
 ### Reference implementation
 

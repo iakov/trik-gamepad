@@ -24,9 +24,10 @@ interface CommandTransport {
   fun send(command: String): Boolean
 
   /**
-   * Robot→app control messages (e.g. the robot's optional `keepalive <ms>`). TCP never invokes it
-   * (the control channel is write-only there); a UDP transport with an inbound receive loop reports
-   * every received line through it.
+   * Robot→app control messages (e.g. the robot's optional `keepalive <ms>`). Both transports report
+   * every received line through it: [UdpTransport] runs an inbound receive loop, and [TcpTransport]
+   * keeps the input half open and reads optional robot replies (Campaign 28). A robot that never
+   * sends anything simply never invokes the callback — the additive protocol rule.
    */
   var onMessage: ((String) -> Unit)?
 

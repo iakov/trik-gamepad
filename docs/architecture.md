@@ -75,7 +75,9 @@ matrix for *when* each is sent); over UDP the same text is sent one command
 per datagram through the same `CommandTransport` contract.
 
 Connection setup: connect timeout 5 s, `tcpNoDelay`, `keepAlive`,
-`setSoLinger(true, 0)`, traffic class `0x0F`, input half-close. All network
+`setSoLinger(true, 0)`, traffic class `0x0F` (the input half stays open since
+Campaign 28, so optional robot `keepalive` replies are readable on a receive
+thread — see DESIGN.md "Gamepad protocol"). All network
 work runs on a single-thread executor injected via the `SenderService`
 constructor (default `Executors.newSingleThreadExecutor()`; tests substitute a
 Robolectric `PausedExecutorService`). `connectAsync()` is guarded

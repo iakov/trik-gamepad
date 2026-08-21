@@ -4,6 +4,8 @@ import com.trikset.gamepad.mjpeg.SyntheticMjpegServer
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.io.PrintWriter
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.Inet4Address
@@ -16,7 +18,8 @@ import java.time.format.DateTimeFormatter
 
 /**
  * Host-side mock of a TRIK robot for on-device smoke tests and profiling: a log-only TCP command
- * port (the app's `SenderService` writes plain-text commands; the real robot never replies), a
+ * port (the app's `SenderService` writes plain-text commands; the real robot never replies — an
+ * optional `--tcp-keepalive <ms>` makes it emit `keepalive <ms>` to exercise the TCP read path), a
  * log-only UDP command port (the UDP transport sends one command per datagram; the robot may reply
  * with optional `keepalive <ms>` — for the smoke it just logs), and a steady MJPEG stream. Pure
  * Kotlin, lives in the test source set so it reuses the committed CC0 cat fixtures and
@@ -33,17 +36,25 @@ object DummyRobotServer {
 
   @JvmStatic
   fun main(args: Array<String>) {
+    // Optional `--tcp-keepalive <ms>`: the robot emits `keepalive <ms>` on each TCP connection so
+    // the app's TCP keepalive read path can be exercised (additive protocol rule — by default the
+    // robot never replies, exactly like the real one).
+    val tcpKeepaliveMs =
+        args.indexOf("--tcp-keepalive").let { i ->
+          if (i >= 0 && i + 1 < args.size) args[i + 1].toIntOrNull() else null
+        }
     val mjpeg =
         SyntheticMjpegServer(
             framesPerConnection = Int.MAX_VALUE,
             frameIntervalMs = 20,
             port = MJPEG_PORT,
         )
-    val tcp = DummyRobotTcpServer(TCP_PORT)
+    val tcp = DummyRobotTcpServer(TCP_PORT, tcpKeepaliveMs)
     val udp = DummyRobotUdpServer(TCP_PORT)
+    val tcpNote = if (tcpKeepaliveMs != null) "; robot emits keepalive $tcpKeepaliveMs ms" else ""
     println("DummyRobotServer")
     println("  MJPEG:  http://<host-ip>:$MJPEG_PORT/?action=stream")
-    println("  TCP:    <host-ip>:$TCP_PORT (log-only, app writes plain-text commands)")
+    println("  TCP:    <host-ip>:$TCP_PORT (log-only, app writes plain-text commands$tcpNote)")
     println("  UDP:    <host-ip>:$TCP_PORT (log-only, one command per datagram)")
     println("  LAN addresses:")
     for (address in lanIpv4Addresses()) {
@@ -94,7 +105,7 @@ object DummyRobotServer {
           .toList()
 
   /** Log-only TCP server: accepts any number of connections and prints every received line. */
-  class DummyRobotTcpServer(private val port: Int) {
+  class DummyRobotTcpServer(private val port: Int, private val tcpKeepaliveMs: Int? = null) {
     private val serverSocket = ServerSocket(port)
     private var running = true
     val clients = java.util.concurrent.atomic.AtomicInteger(0)
@@ -124,6 +135,7 @@ object DummyRobotServer {
       try {
         client.use {
           val reader = BufferedReader(InputStreamReader(client.getInputStream()))
+          val keepaliveThread = tcpKeepaliveMs?.let { startKeepaliveEmitter(client, it) }
           while (true) {
             val line = reader.readLine() ?: break
             System.out.println(
@@ -131,10 +143,35 @@ object DummyRobotServer {
             )
             System.out.flush()
           }
+          keepaliveThread?.interrupt()
         }
       } catch (_: IOException) {
         // client disconnected
       }
+    }
+
+    /** Emits `keepalive <ms>` on the client socket every `<ms>` (the robot-keepalive read path). */
+    private fun startKeepaliveEmitter(client: Socket, ms: Int): Thread {
+      val writer =
+          PrintWriter(OutputStreamWriter(client.getOutputStream(), StandardCharsets.UTF_8), true)
+      return Thread {
+            while (running && !client.isClosed && !Thread.currentThread().isInterrupted) {
+              val line = "keepalive $ms"
+              writer.println(line)
+              writer.flush()
+              System.out.println(
+                  "${LocalTime.now().format(TIME_FORMAT)} TCP> ${client.inetAddress.hostAddress}: $line"
+              )
+              System.out.flush()
+              try {
+                Thread.sleep(ms.toLong())
+              } catch (_: InterruptedException) {
+                return@Thread
+              }
+            }
+          }
+          .apply { isDaemon = true }
+          .also { it.start() }
     }
   }
 

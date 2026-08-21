@@ -11,6 +11,24 @@ import org.robolectric.annotation.Config
 @Config(sdk = [Config.OLDEST_SDK, Config.TARGET_SDK, Config.NEWEST_SDK])
 open class RobolectricTestBase {
 
+  /**
+   * Bounded poll for [condition] over up to [timeoutMs] (TESTING.md "Why awaits are required": a
+   * bare assert right after `runAll()`/`idle()` races the async server/receive thread). Returns
+   * `true` as soon as the condition holds. Used for robot→app messages whose arrival is driven by
+   * the transport's own receive thread, which the paused executor cannot drain.
+   */
+  protected fun runBounded(
+      timeoutMs: Long = 5_000,
+      condition: () -> Boolean,
+  ): Boolean {
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (System.currentTimeMillis() < deadline) {
+      if (condition()) return true
+      Thread.sleep(20)
+    }
+    return condition()
+  }
+
   /** Walks a dialog's window tree for views matching [predicate] (appcompat dialog internals). */
   protected fun dialogViews(
       dialog: androidx.appcompat.app.AlertDialog,
