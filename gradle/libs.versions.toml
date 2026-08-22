@@ -1,9 +1,9 @@
 [versions]
 agp = "9.2.1"
 detekt = "1.23.8"
-spotbugs = "6.5.10"
+spotbugs = "6.5.11"
 spotbugsTool = "4.10.3"
-spotless = "8.9.0"
+spotless = "8.10.0"
 ktfmt = "0.63"
 googleJavaFormat = "1.22.0"
 jacoco = "0.8.12"
