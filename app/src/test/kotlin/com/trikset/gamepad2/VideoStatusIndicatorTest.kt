@@ -8,23 +8,18 @@ class VideoStatusIndicatorTest {
   private val indicator = VideoStatusIndicator()
 
   @Test
-  fun playingShouldMapToGreen() {
-    assertEquals(R.color.greenlight, indicator.colorResource(VideoStatus.PLAYING))
-  }
-
-  @Test
-  fun loadingAndReconnectingShouldMapToAmber() {
-    assertEquals(R.color.amber, indicator.colorResource(VideoStatus.LOADING))
-    assertEquals(R.color.amber, indicator.colorResource(VideoStatus.RECONNECTING))
-  }
-
-  @Test
-  fun unavailableShouldMapToRed() {
-    assertEquals(R.color.red, indicator.colorResource(VideoStatus.UNAVAILABLE))
-  }
-
-  @Test
-  fun disabledShouldMapToGray() {
-    assertEquals(R.color.hud_disabled, indicator.colorResource(VideoStatus.DISABLED))
+  fun colorResourceMapsEachStatus() {
+    data class Case(val status: VideoStatus, val expected: Int)
+    val cases =
+        listOf(
+            Case(VideoStatus.PLAYING, R.color.greenlight),
+            Case(VideoStatus.LOADING, R.color.amber),
+            Case(VideoStatus.RECONNECTING, R.color.amber),
+            Case(VideoStatus.UNAVAILABLE, R.color.red),
+            Case(VideoStatus.DISABLED, R.color.hud_disabled),
+        )
+    for (case in cases) {
+      assertEquals("${case.status}", case.expected, indicator.colorResource(case.status))
+    }
   }
 }

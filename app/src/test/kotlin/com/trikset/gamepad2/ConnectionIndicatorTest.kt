@@ -8,46 +8,36 @@ class ConnectionIndicatorTest {
   private val indicator = ConnectionIndicator()
 
   @Test
-  fun connectingShouldMapToAmber() {
-    assertEquals(R.color.amber, indicator.borderColorResource(ConnectionState.Connecting))
-  }
-
-  @Test
-  fun connectedShouldMapToGreen() {
-    assertEquals(R.color.greendark, indicator.borderColorResource(ConnectionState.Connected))
-  }
-
-  @Test
-  fun realErrorDisconnectShouldMapToRed() {
-    assertEquals(
-        R.color.red,
-        indicator.borderColorResource(ConnectionState.Disconnected("Target changed.")),
-    )
-  }
-
-  @Test
-  fun idleDisconnectShouldMapToSepia() {
-    // Never connected yet (empty reason) = standby, not an error.
-    assertEquals(R.color.hud_sepia, indicator.borderColorResource(ConnectionState.Disconnected("")))
-    assertEquals(
-        R.color.hud_sepia,
-        indicator.borderColorResource(
-            ConnectionState.Disconnected(ConnectionState.PAUSE_DISCONNECT_REASON)
-        ),
-    )
+  fun borderColorResourceMapsEachState() {
+    data class Case(val state: ConnectionState, val expected: Int)
+    val cases =
+        listOf(
+            Case(ConnectionState.Connecting, R.color.amber),
+            Case(ConnectionState.Connected, R.color.greendark),
+            Case(ConnectionState.Disconnected("Target changed."), R.color.red),
+            Case(ConnectionState.Disconnected(""), R.color.hud_sepia),
+            Case(
+                ConnectionState.Disconnected(ConnectionState.PAUSE_DISCONNECT_REASON),
+                R.color.hud_sepia,
+            ),
+        )
+    for (case in cases) {
+      assertEquals("border ${case.state}", case.expected, indicator.borderColorResource(case.state))
+    }
   }
 
   @Test
   fun accentColorFollowsTheSameSemantics() {
-    assertEquals(R.color.greenlight, indicator.accentColorResource(ConnectionState.Connected))
-    assertEquals(R.color.amber, indicator.accentColorResource(ConnectionState.Connecting))
-    assertEquals(
-        R.color.hud_sepia,
-        indicator.accentColorResource(ConnectionState.Disconnected("")),
-    )
-    assertEquals(
-        R.color.red,
-        indicator.accentColorResource(ConnectionState.Disconnected("Target changed.")),
-    )
+    data class Case(val state: ConnectionState, val expected: Int)
+    val cases =
+        listOf(
+            Case(ConnectionState.Connected, R.color.greenlight),
+            Case(ConnectionState.Connecting, R.color.amber),
+            Case(ConnectionState.Disconnected(""), R.color.hud_sepia),
+            Case(ConnectionState.Disconnected("Target changed."), R.color.red),
+        )
+    for (case in cases) {
+      assertEquals("accent ${case.state}", case.expected, indicator.accentColorResource(case.state))
+    }
   }
 }

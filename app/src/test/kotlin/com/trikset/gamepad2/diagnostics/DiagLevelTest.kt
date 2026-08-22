@@ -7,17 +7,20 @@ import org.junit.Test
 class DiagLevelTest {
 
   @Test
-  fun eachSettingMapsToTheExpectedBufferFloor() {
-    assertEquals(Log.WARN.toLong(), DiagLevel.toBufferLevel(DiagLevel.KEY_ERRORS).toLong())
-    assertEquals(Log.INFO.toLong(), DiagLevel.toBufferLevel(DiagLevel.KEY_INFO).toLong())
-    assertEquals(Log.DEBUG.toLong(), DiagLevel.toBufferLevel(DiagLevel.KEY_DEBUG).toLong())
-    assertEquals(Log.VERBOSE.toLong(), DiagLevel.toBufferLevel(DiagLevel.KEY_VERBOSE).toLong())
-  }
-
-  @Test
-  fun unknownOrBlankValueFallsBackToInfo() {
-    assertEquals(Log.INFO.toLong(), DiagLevel.toBufferLevel("garbage").toLong())
-    assertEquals(Log.INFO.toLong(), DiagLevel.toBufferLevel("").toLong())
-    assertEquals(Log.INFO.toLong(), DiagLevel.toBufferLevel(null).toLong())
+  fun toBufferLevelMapsEachInput() {
+    data class Case(val input: String?, val expected: Long)
+    val cases =
+        listOf(
+            Case(DiagLevel.KEY_ERRORS, Log.WARN.toLong()),
+            Case(DiagLevel.KEY_INFO, Log.INFO.toLong()),
+            Case(DiagLevel.KEY_DEBUG, Log.DEBUG.toLong()),
+            Case(DiagLevel.KEY_VERBOSE, Log.VERBOSE.toLong()),
+            Case("garbage", Log.INFO.toLong()),
+            Case("", Log.INFO.toLong()),
+            Case(null, Log.INFO.toLong()),
+        )
+    for (case in cases) {
+      assertEquals("'${case.input}'", case.expected, DiagLevel.toBufferLevel(case.input).toLong())
+    }
   }
 }

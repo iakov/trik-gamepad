@@ -5,31 +5,37 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
-/**
- * Direct tests for [MagicButtonSymbols] — the glyph resolution (display-only, protocol stays
- * numeric).
- */
 @RunWith(RobolectricTestRunner::class)
 class MagicButtonSymbolsTest : RobolectricTestBase() {
 
   @Test
-  fun defaultsFollowThePsGeometricConvention() {
-    assertEquals("▲", MagicButtonSymbols.default(1))
-    assertEquals("■", MagicButtonSymbols.default(2))
-    assertEquals("●", MagicButtonSymbols.default(3))
-    assertEquals("✕", MagicButtonSymbols.default(4))
-    assertEquals("◆", MagicButtonSymbols.default(5))
-  }
-
-  @Test
-  fun resolveFallsBackToDefaultForMissingOrBlank() {
-    assertEquals("▲", MagicButtonSymbols.resolve(1, null))
-    assertEquals("▲", MagicButtonSymbols.resolve(1, "  "))
-  }
-
-  @Test
-  fun resolveHonorsStoredSymbol() {
-    assertEquals("A", MagicButtonSymbols.resolve(1, "A"))
-    assertEquals("★", MagicButtonSymbols.resolve(4, "★"))
+  fun defaultAndResolveMapsEachInput() {
+    data class DefaultCase(val n: Int, val expected: String)
+    val defaultCases =
+        listOf(
+            DefaultCase(1, "▲"),
+            DefaultCase(2, "■"),
+            DefaultCase(3, "●"),
+            DefaultCase(4, "✕"),
+            DefaultCase(5, "◆"),
+        )
+    for (case in defaultCases) {
+      assertEquals("default(${case.n})", case.expected, MagicButtonSymbols.default(case.n))
+    }
+    data class ResolveCase(val n: Int, val stored: String?, val expected: String)
+    val resolveCases =
+        listOf(
+            ResolveCase(1, null, "▲"),
+            ResolveCase(1, "  ", "▲"),
+            ResolveCase(1, "A", "A"),
+            ResolveCase(4, "★", "★"),
+        )
+    for (case in resolveCases) {
+      assertEquals(
+          "resolve(${case.n}, '${case.stored}')",
+          case.expected,
+          MagicButtonSymbols.resolve(case.n, case.stored),
+      )
+    }
   }
 }
