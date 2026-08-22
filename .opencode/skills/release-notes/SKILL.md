@@ -53,9 +53,10 @@ PART 2 — Developer reference, in this order:
 
 1. Heading "For developers".
 1. A heading "### Version" with a short table of `Version` | `versionCode`
-   (computed `minSdk*10000 + major*100 + minor`), `minSdk`, `targetSdk`. One row
-   for the released version. If nothing notable, keep this to the released
-   version row.
+   (computed `minSdk*10000 + major*100 + minor`), `minSdk` (include full Android
+   version name and API level, e.g. `Android 5.0 Lollipop (API 21)`),
+   `targetSdk`. One row for the released version. If nothing notable, keep this
+   to the released version row.
 1. A heading "### Major changes" with a bullet list of only significant
    commits: features, fixes, large PRs, and major improvements. In
    Conventional Commits style: `- fix: short description (#123)`. Drop routine

@@ -1239,6 +1239,40 @@ Single commit; Step 2 (upstream issues) starts after green CI.
   `scripts/README.md`.
 - **Retrospective** — MEMORY.md "Campaign 30 retrospective".
 
+## Campaign 31 — package rename + minSdk 21 + custom message + release process change (2026-08-22)
+
+Scope (user-driven, plan mode → build mode): (1) package rename
+`com.trikset.gamepad` → `com.trikset.gamepad2` (140 files); (2) drop minSdk
+23 → 21 with API-22 guard in `WifiDatagramBinder`; (3) add custom message
+`EditTextPreference` to the robot network settings (5 locales); (4) bump
+version to 2.42 (`versionCode = 212042`); (5) update release process to
+signed tags + GH releases; (6) single `docs:` commit.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ~40 min (plan-mode discussion + docs edits + gate) |
+
+- **Package rename** — content replace in 131 Kotlin + resource files + `git mv`
+  of `gamepad/` → `gamepad2/` trees in `src/main`, `src/test`, `src/androidTest`.
+  `applicationId`, `AndroidManifest.xml`, CI scripts, AGENTS.md, MEMORY.md all
+  updated. Compilation green on the first pass.
+- **minSdk 21** — one-line change in `app/build.gradle`; `WifiDatagramBinder`
+  guards `Network.bindSocket(DatagramSocket)` with `Build.VERSION.SDK_INT >= 22`;
+  detekt `MagicNumber` on `22` fixed by `const val API_22 = 22`. Release notes
+  describe it as "backward compatible with Android 5.0 Lollipop (API 21)".
+- **Custom message** — `EditTextPreference` in `pref_robot.xml` (after
+  transport); 5-locale strings; wiring in `MainActivitySettingsController.kt`
+  reads `SK_CUSTOM_MESSAGE` and calls `sender.send("custom $value")`.
+- **Release process** — AGENTS.md "Before release" rewritten: signed tag
+  (`git tag -s`, 10 min GPG timeout guard), `assembleRelease`, APK attachment
+  (not committed), release-notes skill, `gh release create --draft`, user
+  publishes on web UI. DECISIONS.md entries for all three decisions.
+- **Verification** — canonical gate green (spotless, test, lint, detekt,
+  spotbugs, jacoco 0.951 line / 0.851 branch, jscpd 0 clones, translations
+  138 keys in sync). Single feature commit `deed7fe` pushed to
+  `origin/feat/global-refresh`.
+- **Retrospective** — MEMORY.md "Campaign 31 retrospective".
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass
@@ -1246,14 +1280,13 @@ Futures the user wants tracked as candidate campaigns; each needs a design pass
 was **partially built in Campaign 27** (basic UDP + robot keepalive liveness);
 the robustness tiers below are the remaining dream.
 
-### `custom` command (deferred — Android app design)
+### `custom` command ✔ Shipped in C31 (2026-08-22)
 
 The protocol spec now defines `custom <message>` (opaque plain-text message to
 the robot, exposed to user programs) and the reference implementation
-(`DummyRobotServer`) accepts and logs it. The Android app does **not** send it
-yet: the app-side support — UI entry point, payload source, send path — is to
-be **designed before implementation** (interactive design pass) and is deferred
-until then.
+(`DummyRobotServer`) accepts and logs it. The Android app ships an
+`EditTextPreference` in the robot network settings that sends `custom <value>`
+on preference change — Campaign 31 closes the app-side gap.
 
 ### Protocol v2 (deferred design)
 

@@ -36,15 +36,16 @@ touch one.
 
 | Area | Covers | Newest decision |
 |------|--------|-----------------|
-| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-15] Idiomatic Kotlin pass (Java→Kotlin leftovers) |
+| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-22] Release via signed tags + GH releases |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path | [2026-08-21] TCP robot keepalive read path |
-| Workflows | fork-only, releases | [2026-08-05] Fork-only workflow (no upstream PRs) |
+| Workflows | fork-only, releases | [2026-08-22] Release via signed tags + GH releases |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
 | UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-18] Haptic schema: generic legacy constants, strong pulses, no VIBRATE |
 | Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-20] Device-identifier pre-commit hook + gate step |
 | Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-17] Emulator launch: run_bounded-wrapped detached Start-Process |
+| Build & versioning | package naming, minSdk, versionCode formula, release signing | [2026-08-22] Package rename to com.trikset.gamepad2 |
 
 ______________________________________________________________________
 
@@ -2289,3 +2290,106 @@ ______________________________________________________________________
   `git diff` scan covers it); the regex set is additive (a new real serial
   shape extends it); a self-test of the regex (e.g. placeholder safety) is a
   future automation candidate (retrospective).
+
+______________________________________________________________________
+
+## Build & versioning
+
+### [2026-08-22] Package rename to com.trikset.gamepad2
+
+- **Type:** problem-avoiding (upstream uses the `gamepad2` namespace; keeps
+  the fork distinguishable).
+
+- **Problem:** the package name `com.trikset.gamepad` collides with the upstream
+  `trikset/trik-gamepad` project, causing confusion (which one is installed?
+  which crash report belongs to which?).
+
+- **Alternatives considered:** (a) stay on `com.trikset.gamepad` (rejected —
+  the upstream project and the installed APK would be indistinguishable);
+  (b) rename to `com.trikset.gamepad2` (chosen — upstream already uses
+  `gamepad2` for its modern version); (c) rename to a different package
+  (rejected — would diverge from the upstream convention).
+
+- **Chosen solution:** rename every source file's `package` declaration and
+  imports from `com.trikset.gamepad` → `com.trikset.gamepad2`, plus git mv
+  of the directory trees (`gamepad/` → `gamepad2/`). 140 files affected.
+  `app/build.gradle` `applicationId` set to the new name.
+
+- **Why:** the fork is a distinct app with its own APK, crash reporting, and
+  release cycle; a distinct package name avoids installation conflicts and
+  makes diagnotic reports unambiguous. The `gamepad2` suffix is already the
+  upstream's own modern-namespace convention.
+
+- **Out of scope / consequences:** old saved SharedPreferences files under
+  `com.trikset.gamepad` are not migrated (fresh install). The `_apk/` directory
+  historical APKs still carry the old name — not removed. CI scripts that
+  reference the old package (`adb shell am force-stop com.trikset.gamepad`)
+  were updated in the same commit.
+
+### [2026-08-22] minSdk 21 for Android 5.0 Lollipop
+
+- **Type:** problem-avoiding (users on Android 5.x cannot install; wider
+  device support reduces support requests).
+
+- **Problem:** the app's `minSdk 23` excluded devices running Android 5.0
+  (API 21) and 5.1 (API 22) — a non-trivial share of active Android devices
+  globally (estimated 3-5% at 2026-08-22).
+
+- **Alternatives considered:** (a) stay at minSdk 23 (rejected — users on
+  those devices are locked out); (b) drop to minSdk 21 (chosen — the maximum
+  practical reach without dropping below the NDK's official toolchain support);
+  (c) drop to minSdk 19 (rejected — KitKat is end-of-life and below the
+  Play Console's minimum distribution threshold).
+
+- **Chosen solution:** set `minSdk 21` in `app/build.gradle`. The only API-22
+  call used (`Network.bindSocket(DatagramSocket)`) is wrapped in
+  `Build.VERSION.SDK_INT >= 22` guard. Release notes refer to it as "backward
+  compatible with Android 5.0 Lollipop (API 21)".
+
+- **Why:** Android 5.0 Lollipop (API 21) is the oldest release still supported
+  by the NDK toolchain and by most major libraries (androidx, Material,
+  Robolectric). Android 5.1 (API 22) adds `Network.bindSocket` which is only
+  available on those devices when the app itself selects a Wi-Fi network.
+
+- **Out of scope / consequences:** no additional SDK-version branching (all
+  other code targets minSdk 23 as before). The `versionCode` formula uses
+  `minSdk * 10000 + ...` so the versionCode changed from `230042` to `212042`
+  — a decrease, which is permitted because the app is not published on Google
+  Play (Play Store does not allow versionCode decreases on the same track).
+  The minSdk change is explicitly noted in the release notes (Android version
+  name, not just API level).
+
+### [2026-08-22] Release via signed tags + GH releases
+
+- **Type:** problem-avoiding (replaces the `_apk/` commit convention with the
+  standard Android delivery channel; prevents unsigned tags in published
+  releases).
+
+- **Problem:** the previous release process committed the APK to `_apk/`,
+  bloating the repo history with binary files. The tag was unsigned (the
+  previous `Before release` hook used a lightweight tag). No standardized
+  release note generation.
+
+- **Alternatives considered:** (a) keep committing APKs to `_apk/` (rejected —
+  binary bloat in git history is permanent); (b) GH releases + signed tags
+  (chosen); (c) Play Store publication (rejected — the app is not on Play,
+  no plan to publish there).
+
+- **Chosen solution:** use `git tag -s` for signed tags (10 min GPG timeout
+  guard), `./gradlew assembleRelease` for the APK, `TRIKGamepad-<version>.apk`
+  as the attachment name, the release-notes skill for the body, and
+  `gh release create --draft` to create the entry. The user reviews and
+  publishes from the web UI. No APK committed to the repository.
+
+- **Why:** GitHub Releases is the standard delivery channel for open-source
+  Android apps. Signed tags verify the provenance of a release. The `gh`
+  CLI draft flow lets the maintainer review before publishing, matching the
+  "review, never auto-publish" discipline.
+
+- **Out of scope / consequences:** the tag must be pushed to GitHub before
+  `gh release create` succeeds (the tag must exist on the remote). The web
+  UI's "create a new release" button creates a lightweight (unsigned) tag —
+  the signed tag must be created locally and pushed first. GPG signing may
+  timeout (abort after 10 min). No APK is stored in the repository (the
+  release entry is the delivery channel). Historical APKs in `_apk/` are not
+  removed — the convention changes going forward.

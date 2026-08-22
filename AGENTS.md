@@ -248,10 +248,17 @@ configurations, update this section and the referenced config files.
 ### Before release
 
 - Gates: green CI, 0 open PRs, 0 security alerts.
-- Run an **upstream comparison + user-facing downside audit** (diff the app vs upstream from the user's point of view; report regressions/downgrades). Use it for PR/release descriptions written from the user's perspective.
-- Bump `appMinorVersion` in `app/build.gradle`; signing is local-only (the keystore never enters CI).
-- Commit the release APK to `_apk/`; generate notes via the release-notes skill; review the draft, never auto-publish.
-- **Refresh the README hero screenshot** (user-facing HUD changes): after the unit-test gate re-renders it, run `uv run python scripts/export_readme_screenshot.py` (with `--check`) and commit the fresh `docs/img/hud_connected.jpg` — the committed JPEG is only as fresh as the last HUD-themed commit.
+- Run an **upstream comparison + user-facing downside audit** (diff the app vs upstream from the user's point of view; report regressions/downgrades). Use it for release descriptions written from the user's perspective.
+- Bump `appMinorVersion` in `app/build.gradle`.
+- Tag: `git tag -s v<major>.<minor> -m "v<major>.<minor>"`. If GPG signing hangs ≥10 min, abort — the user may be out of office (the tag is created only locally; never push unsigned tags).
+- Build: `./gradlew assembleRelease` → `app/build/outputs/apk/release/app-release.apk`.
+- Rename APK to `TRIKGamepad-<version>.apk` (attached to the release, not committed).
+- Generate release notes via the release-notes skill → `release-notes.md`.
+- Draft: `gh release create v<version> --draft --notes-file release-notes.md "TRIKGamepad-<version>.apk"` (requires the tag on GitHub first: `git push origin v<version>`).
+- Push the tag: `git push origin v<version>` (signed; must succeed before `gh release create`).
+- The user reviews the draft on `github.com/<owner>/<repo>/releases` and publishes.
+- After publish: refresh README hero screenshot (`uv run python scripts/export_readme_screenshot.py --check`) and commit the fresh `docs/img/hud_connected.jpg` if the HUD changed.
+- No APK is committed to `_apk/` — the GH release entry is the delivery channel.
 
 ## Guardrails
 
