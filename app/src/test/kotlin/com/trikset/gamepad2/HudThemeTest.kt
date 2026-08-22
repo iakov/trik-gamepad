@@ -54,15 +54,6 @@ class HudThemeTest : RobolectricTestBase() {
         .commit()
   }
 
-  private fun setPref(key: String, value: String) {
-    PreferenceManager.getDefaultSharedPreferences(
-            org.robolectric.RuntimeEnvironment.getApplication()
-        )
-        .edit()
-        .putString(key, value)
-        .commit()
-  }
-
   private fun buildActivity(): MainActivity {
     setPref(SettingsFragment.SK_MAGIC_BUTTON_COUNT, "5")
     setPref(SettingsFragment.SK_HOST_ADDRESS, "192.168.77.1")
@@ -121,12 +112,6 @@ class HudThemeTest : RobolectricTestBase() {
     main.layout(0, 0, screenWidth, screenHeight)
     main.draw(canvas)
     return frame
-  }
-
-  private fun field(target: Any, name: String): Any? {
-    val f = target.javaClass.getDeclaredField(name)
-    f.isAccessible = true
-    return f.get(target)
   }
 
   private fun pixel(bitmap: Bitmap, x: Int, y: Int): Int = bitmap.getPixel(x, y)

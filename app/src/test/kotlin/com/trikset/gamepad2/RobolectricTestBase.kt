@@ -1,5 +1,9 @@
 package com.trikset.gamepad2
 
+import androidx.preference.PreferenceManager
+import java.lang.reflect.Field
+import java.lang.reflect.Method
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
@@ -43,5 +47,45 @@ open class RobolectricTestBase {
     }
     collect(dialog.window?.decorView ?: return emptyList())
     return found
+  }
+
+  /**
+   * Reads a private field via reflection (the "inject a collaborator" pattern used across the
+   * activity/controller tests). Deduplicated from the former per-class copies (MainActivityTest,
+   * HudThemeTest, SquareTouchPadLayoutTest).
+   */
+  protected fun field(target: Any, name: String): Any? {
+    val f: Field = target.javaClass.getDeclaredField(name)
+    f.isAccessible = true
+    return f.get(target)
+  }
+
+  /** Writes a private field via reflection (see [field]). */
+  protected fun setField(target: Any, name: String, value: Any?) {
+    val f: Field = target.javaClass.getDeclaredField(name)
+    f.isAccessible = true
+    f.set(target, value)
+  }
+
+  /** Reflects a private method (see [field]); the caller invokes it. */
+  protected fun method(target: Any, name: String, vararg params: Class<*>): Method {
+    val m = target.javaClass.getDeclaredMethod(name, *params)
+    m.isAccessible = true
+    return m
+  }
+
+  /**
+   * Stores [value] under [key] in the default prefs; optionally [controller] is notified (the
+   * MainActivity settings tests' "act" step — setting the pref must re-run onPreferenceChanged).
+   * Deduplicated from the former per-class copies (MainActivityTest, HudThemeTest).
+   */
+  protected fun setPref(
+      key: String,
+      value: String,
+      controller: MainActivitySettingsController? = null,
+  ) {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(RuntimeEnvironment.getApplication())
+    prefs.edit().putString(key, value).commit()
+    controller?.onPreferenceChanged(prefs)
   }
 }

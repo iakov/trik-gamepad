@@ -35,13 +35,6 @@ class SquareTouchPadLayoutTest : RobolectricTestBase() {
     pad.layout(0, 0, width, height)
   }
 
-  /** Reads a private field (same reflection pattern as MainActivityTest). */
-  private fun field(target: Any, name: String): Any? {
-    val f = target.javaClass.getDeclaredField(name)
-    f.isAccessible = true
-    return f.get(target)
-  }
-
   @Before
   fun setUp() {
     sender = SenderService(mExecutor)

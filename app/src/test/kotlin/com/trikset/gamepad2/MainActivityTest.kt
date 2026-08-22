@@ -5,8 +5,6 @@ import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.mjpeg.MjpegView
 import com.trikset.gamepad2.video.MjpegVideoPlayer
 import com.trikset.gamepad2.video.VideoPlayer
-import java.lang.reflect.Field
-import java.lang.reflect.Method
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -40,31 +38,10 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   /** Stores [value] under [key] and notifies the settings controller (the common act step). */
-  private fun setPref(key: String, value: String) {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-    prefs.edit().putString(key, value).commit()
-    requireNotNull(activity.settingsController).onPreferenceChanged(prefs)
-  }
+  private fun setPref(key: String, value: String) =
+      setPref(key, value, requireNotNull(activity.settingsController))
 
   private fun prefs() = PreferenceManager.getDefaultSharedPreferences(activity.baseContext)
-
-  private fun field(target: Any, name: String): Any? {
-    val f: Field = target.javaClass.getDeclaredField(name)
-    f.isAccessible = true
-    return f.get(target)
-  }
-
-  private fun setField(target: Any, name: String, value: Any?) {
-    val f: Field = target.javaClass.getDeclaredField(name)
-    f.isAccessible = true
-    f.set(target, value)
-  }
-
-  private fun method(target: Any, name: String, vararg params: Class<*>): Method {
-    val m = target.javaClass.getDeclaredMethod(name, *params)
-    m.isAccessible = true
-    return m
-  }
 
   @Test
   fun onCreateShouldSetUpSenderServiceAndPads() {
