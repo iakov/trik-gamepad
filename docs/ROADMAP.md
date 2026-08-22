@@ -1273,6 +1273,47 @@ signed tags + GH releases; (6) single `docs:` commit.
   `origin/feat/global-refresh`.
 - **Retrospective** — MEMORY.md "Campaign 31 retrospective".
 
+## Campaign 32 — VideoPlayer abstraction + RTSP support via MediaPlayer (2026-08-22)
+
+Scope (user-driven, auto mode): (1) extract a `VideoPlayer` interface so the
+retry/self-heal controller drives whichever video sink is active; (2) add
+`MediaPlayerVideoPlayer` for RTSP/H.264 streams using Android's built-in
+`MediaPlayer` + `TextureView`; (3) add `MjpegVideoPlayer` wrapping the
+existing `MjpegView`; (4) add `VideoPlayerFactory` that routes by URL scheme;
+(5) update `MainActivity` to use `VideoPlayer` instead of `MjpegView` directly;
+(6) document the WebRTC deferral and Media3 deferral in DECISIONS.md.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | — |
+
+- **Video source files** — `video/VideoPlayer.kt` (interface),
+  `video/MjpegVideoPlayer.kt` (MJPEG wrapper, uses executor + MjpegInputStream),
+  `video/MediaPlayerVideoPlayer.kt` (RTSP via `MediaPlayer` + `TextureView`,
+  surface-lifecycle-aware), `video/VideoPlayerFactory.kt` (routes by URL
+  scheme: `rtsp://` → `MediaPlayerVideoPlayer`, everything else →
+  `MjpegVideoPlayer`).
+- **Layout** — `activity_main.xml` wraps the `MjpegView` and a new `TextureView`
+  in a `FrameLayout`; the factory toggles visibility so only one surface is
+  active at a time.
+- **MainActivity refactor** — `video` field type changes from `MjpegView?` to
+  `VideoPlayer?`; `restartVideoStream` uses `player.play(url)` with an
+  `onPlayResult` callback (replacing `VideoStreamLoader.load`); `setVideoUrl`
+  recreates the player via factory on URL change; `setShowFps` delegates through
+  the interface; lifecycle methods use `video.stop()` / `video.release()`.
+- **Tests** — `MjpegVideoPlayerTest` (showFps delegation, isPlaying),
+  `VideoPlayerFactoryTest` (scheme-based routing), `MainActivityTest` updated
+  (uses `StubVideoPlayer` instead of raw `MjpegView` for null-safety tests;
+  the showFps test uses `MjpegVideoPlayer` wrapping a real `MjpegView`).
+- **Docs** — DECISIONS.md: WebRTC deferral + Media3 deferral entries under
+  Architecture; DESIGN.md: "Video player abstraction" section; ROADMAP.md: this
+  entry.
+- **Media3 deferred** — not added to dependencies until device-specific
+  `MediaPlayer` RTSP issues prove it necessary. The `VideoPlayer` interface
+  makes the swap a drop-in change.
+- **Verification** — canonical gate green; 3-variant `test` suite; lint/detekt/
+  spotbugs/jacoco spotless/jscpd clean.
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass

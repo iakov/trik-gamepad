@@ -5,7 +5,6 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.diagnostics.AppLog
-import java.net.URL
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -23,7 +22,7 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
   private class FakeUi : MainActivitySettingsController.SettingsUi {
     var chipText: String? = null
     var toasts = mutableListOf<String>()
-    var url: URL? = null
+    var url: String? = null
     var lastAlpha = 0f
     var previousAlpha = 0f
 
@@ -40,7 +39,7 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
       this.previousAlpha = previousAlpha
     }
 
-    override fun setVideoUrl(url: URL?) {
+    override fun setVideoUrl(url: String?) {
       this.url = url
     }
 
@@ -185,7 +184,7 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
   fun onPreferenceChangedWithVideoUriShouldSetUrl() {
     controller.onPreferenceChanged(prefs)
     setPref(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.7:8080/?action=stream")
-    assertEquals("http://10.0.0.7:8080/?action=stream", ui.url.toString())
+    assertEquals("http://10.0.0.7:8080/?action=stream", ui.url)
   }
 
   @Test
@@ -193,7 +192,7 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     // No URI stored: the effective URI is derived from the host (the settings row shows the same
     // derived URL — they share SettingsFragment.effectiveVideoUri).
     setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9")
-    assertEquals("http://10.0.0.9:8080/?action=stream", ui.url.toString())
+    assertEquals("http://10.0.0.9:8080/?action=stream", ui.url)
   }
 
   @Test
@@ -203,7 +202,7 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9")
     assertEquals(
         "derived URL must match the runtime value",
-        ui.url.toString(),
+        ui.url,
         SettingsFragment.effectiveVideoUri(prefs),
     )
     setPref(SettingsFragment.SK_VIDEO_URI, "")

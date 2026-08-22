@@ -3,14 +3,14 @@ package com.trikset.gamepad2
 import android.view.View
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.mjpeg.MjpegView
+import com.trikset.gamepad2.video.MjpegVideoPlayer
+import com.trikset.gamepad2.video.VideoPlayer
 import java.lang.reflect.Field
 import java.lang.reflect.Method
-import java.net.URL
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -139,11 +139,15 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun invalidVideoUriShouldNotCrash() {
-    for (value in listOf("not a uri", "foo:bar")) {
+    for (value in listOf("not a uri", "foo:bar", "rtsp://192.168.1.1:554/stream")) {
       setPref(SettingsFragment.SK_VIDEO_URI, value)
-      // "not a uri" fails URI parsing, "foo:bar" is a valid URI but toURL()
-      // throws MalformedURLException; both leave videoUrl null.
-      assertNull("video url must stay null for '$value'", field(activity, "videoUrl"))
+      // The URI flows as an opaque string; validation happens per player at open time (MJPEG
+      // parses http/https, MediaPlayer accepts rtsp). Nothing crashes at preference apply.
+      assertEquals(
+          "video url must be stored verbatim for '$value'",
+          value,
+          field(activity, "videoUrl"),
+      )
     }
   }
 
@@ -256,8 +260,8 @@ class MainActivityTest : RobolectricTestBase() {
   @Test
   fun onPauseShouldDisconnectAndStopVideo() {
     // Force a video view to cover the video != null branch in onPause.
-    val video = MjpegView(activity)
-    setField(activity, "video", video)
+    val player = StubVideoPlayer()
+    setField(activity, "video", player)
     method(activity, "onPause").invoke(activity)
     // No crash; sensor listener unregistered and sender disconnected.
   }
@@ -281,8 +285,8 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun restartVideoStreamShouldLoadWhenVideoPresent() {
-    val video = MjpegView(activity)
-    setField(activity, "video", video)
+    val player = StubVideoPlayer()
+    setField(activity, "video", player)
     method(activity, "restartVideoStream").invoke(activity)
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
@@ -318,8 +322,8 @@ class MainActivityTest : RobolectricTestBase() {
     // through the retry controller (here it fast-fails to an unreachable address and the
     // onLoadFailed path runs). Exercises the collector's Connected branch and the shouldReload
     // gate.
-    setField(activity, "video", MjpegView(activity))
-    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
+    setField(activity, "video", StubVideoPlayer())
+    setField(activity, "videoUrl", "http://127.0.0.1:1/nope")
     val sender = activity.senderService
     awaitControlConnection(sender)
     // The reload's load() runs on a real executor; give the fast-failing open + its onResult
@@ -339,8 +343,8 @@ class MainActivityTest : RobolectricTestBase() {
     // in the Connecting window). The retry tick reloads, the open fails fast, onLoadFailed
     // re-arms the loop, and the spinner stays visible the whole time.
     setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
-    setField(activity, "video", MjpegView(activity))
-    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
+    setField(activity, "video", StubVideoPlayer())
+    setField(activity, "videoUrl", "http://127.0.0.1:1/nope")
     val sender = activity.senderService
     // Control stays Disconnected forever: no setTarget/send is ever issued.
     assertTrue(sender.connectionState.value is ConnectionState.Disconnected)
@@ -467,8 +471,8 @@ class MainActivityTest : RobolectricTestBase() {
     if (connectFirst) {
       awaitControlConnection(activity.senderService)
     }
-    setField(activity, "video", MjpegView(activity))
-    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
+    setField(activity, "video", StubVideoPlayer())
+    setField(activity, "videoUrl", "http://127.0.0.1:1/nope")
     method(activity, "restartVideoStream").invoke(activity)
     org.robolectric.shadows.ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
   }
@@ -499,11 +503,11 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   /** Restarts the stream and asserts the loading spinner stays hidden (spinner-gate coverage). */
-  private fun assertSpinnerHiddenAfterRestart(videoUrl: URL?, connectFirst: Boolean) {
+  private fun assertSpinnerHiddenAfterRestart(videoUrl: String?, connectFirst: Boolean) {
     if (connectFirst) {
       awaitControlConnection(activity.senderService)
     }
-    setField(activity, "video", MjpegView(activity))
+    setField(activity, "video", StubVideoPlayer())
     if (videoUrl != null) {
       setField(activity, "videoUrl", videoUrl)
     }
@@ -540,8 +544,8 @@ class MainActivityTest : RobolectricTestBase() {
     // Option B: the retry gate is URL + not-playing only — the control connection state never
     // gates video recovery (S2: the stream must self-heal even while control is down).
     setPref(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.7")
-    setField(activity, "video", MjpegView(activity))
-    setField(activity, "videoUrl", URL("http://127.0.0.1:1/nope"))
+    setField(activity, "video", StubVideoPlayer())
+    setField(activity, "videoUrl", "http://127.0.0.1:1/nope")
     val m = method(activity, "shouldReloadVideo")
     assertTrue(
         "a configured URL must arm the retry regardless of control state",
@@ -691,12 +695,13 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun setShowFpsShouldToggleVideoOverlay() {
-    val video = MjpegView(activity)
-    setField(activity, "video", video)
+    val mjpegView = MjpegView(activity)
+    val player = MjpegVideoPlayer(mjpegView)
+    setField(activity, "video", player)
     activity.setShowFps(true)
-    assertTrue(video.showFps)
+    assertTrue(mjpegView.showFps)
     activity.setShowFps(false)
-    assertFalse(video.showFps)
+    assertFalse(mjpegView.showFps)
   }
 
   @Test
@@ -847,4 +852,23 @@ class MainActivityTest : RobolectricTestBase() {
           .setSensor(org.robolectric.shadows.ShadowSensor.newInstance(type))
           .setValues(floatArrayOf(0.7f, 0.7f, 0f))
           .build()
+}
+
+/** Lightweight [VideoPlayer] stub for tests that only need a non-null video field. */
+private class StubVideoPlayer : VideoPlayer {
+  override val isPlaying: Boolean
+    get() = false
+
+  override var showFps: Boolean = false
+  override var onPlayResult: ((Boolean) -> Unit)? = null
+
+  override fun play(url: String?) {}
+
+  override fun stop() {}
+
+  override fun setOnStreamErrorListener(listener: (() -> Unit)?) {}
+
+  override fun setOnFirstFrameListener(listener: (() -> Unit)?) {}
+
+  override fun release() {}
 }

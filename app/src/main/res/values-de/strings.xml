@@ -149,6 +149,5 @@
     <string name="settings_button_description_connecting">Verbindung wird hergestellt. Systemleisten ein-/ausblenden</string>
     <string name="settings_button_description_disconnected">Getrennt. Systemleisten ein-/ausblenden</string>
     <string name="port_number_incorrect">Portnummer „%1$s“ ist falsch.</string>
-    <string name="illegal_video_uri">Ungültige Video-Stream-URL</string>
     <string name="disconnected_notice">Getrennt. %1$s</string>
 </resources>

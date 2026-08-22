@@ -5,13 +5,24 @@
     android:layout_height="fill_parent"
     tools:context=".MainActivity">
 
-    <com.trikset.gamepad2.mjpeg.MjpegView
-        android:id="@+id/video"
+    <FrameLayout
         android:layout_width="fill_parent"
-        android:layout_height="fill_parent"
-        android:contentDescription="@string/video_description"
-        android:focusable="false"
-        android:focusableInTouchMode="false" />
+        android:layout_height="fill_parent">
+
+        <com.trikset.gamepad2.mjpeg.MjpegView
+            android:id="@+id/video"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:contentDescription="@string/video_description"
+            android:focusable="false"
+            android:focusableInTouchMode="false" />
+
+        <TextureView
+            android:id="@+id/videoTexture"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:visibility="gone" />
+    </FrameLayout>
 
     <TextView
         android:id="@+id/videoPlaceholder"

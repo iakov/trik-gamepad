@@ -39,7 +39,7 @@ touch one.
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-22] Release via signed tags + GH releases |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path | [2026-08-21] TCP robot keepalive read path |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral | [2026-08-22] VideoPlayer abstraction — WebRTC deferral + RTSP via MediaPlayer |
 | Workflows | fork-only, releases | [2026-08-22] Release via signed tags + GH releases |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
 | UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-18] Haptic schema: generic legacy constants, strong pulses, no VIBRATE |
@@ -2261,6 +2261,74 @@ ______________________________________________________________________
   stays a manual user step; `SenderServiceUdpTest` gained the red-first TCP
   keepalive tests (interval set, liveness reset, missed → disconnect, unknown
   line ignored).
+
+### [2026-08-22] VideoPlayer abstraction — WebRTC deferral + RTSP via MediaPlayer
+
+- **Type:** design-clarifying (adds RTSP video support; confirms video formats roadmap).
+
+- **Problem:** MJPEG is high-latency for FPV; the robot is Linux-based and can
+  serve RTSP/H.264 streams natively. A `VideoPlayer` interface was needed so
+  the retry/self-heal controller (`VideoRetryController`) drives whichever
+  video sink is active, and future formats are drop-in.
+
+- **Alternatives considered:**
+
+  - **WebRTC** (deferred — requires a signalling server, ~30 MB native libs,
+    no benefit on home Wi-Fi without NAT traversal);
+  - **Media3 (ExoPlayer)** (deferred — `MediaPlayer` handles RTSP natively
+    with zero new dependencies; the `VideoPlayer` interface makes swapping
+    from `MediaPlayer` → Media3 a drop-in change);
+  - **HLS** (6–30 s latency, not FPV-usable);
+  - **VLC/ijkplayer** (third-party native libs, never seriously considered
+    for a 0-Java project).
+
+- **Chosen solution:** `VideoPlayer` interface + `MjpegVideoPlayer` (wraps
+  existing `MjpegView`) + `MediaPlayerVideoPlayer` (built-in `MediaPlayer` +
+  `TextureView` for RTSP/H.264) + `VideoPlayerFactory` (routes by URL scheme:
+  `rtsp://` → `MediaPlayerVideoPlayer`, everything else →
+  `MjpegVideoPlayer`). No new dependencies; `MediaPlayer` supports `rtsp://`
+  natively since API 14.
+
+- **Why:** RTSP is the obvious SBC/robot-camera standard. The interface
+  isolates the video pipeline selection from `MainActivity`, keeps the MJPEG
+  path unchanged, and makes `MediaPlayer` → Media3 a bounded swap if
+  device-specific RTSP issues surface.
+
+- **Out of scope / consequences:** WebRTC remains deferred (re-evaluate if
+  internet-based remote FPV with NAT traversal is needed). Media3 is deferred
+  until device-specific RTSP behavior proves `MediaPlayer` insufficient. The
+  `VideoStreamLoader` class stays in the codebase (tests still use it for
+  direct MJPEG tests). `MediaPlayerVideoPlayer` is the first implementation
+  under the interface; if Media3 becomes the default, no `MainActivity` changes
+  are needed (only a factory branch).
+
+### [2026-08-22] Media3 (ExoPlayer) deferral — start with built-in MediaPlayer
+
+- **Type:** problem-avoiding (prevents adding a heavy dependency before it is
+  proven necessary; the interface makes swapping cheap).
+
+- **Problem:** `MediaPlayer` is Android's lowest-common-denominator player —
+  RTSP buffering timeouts, seek quirks, and reconnect differences vary across
+  OEMs. Media3 (Google's recommended ExoPlayer replacement) has consistent
+  cross-device behaviour.
+
+- **Alternatives considered:** (a) start with Media3 (chosen for the deferred
+  path); (b) start with `MediaPlayer` and swap when needed (chosen for now);
+  (c) keep only MJPEG (rejected — RTSP is the obvious next format).
+
+- **Chosen solution:** start with `android.media.MediaPlayer` + `TextureView`.
+  The `VideoPlayer` interface (`play`, `stop`, listeners, `onPlayResult`
+  callback) means swapping to Media3 is a single new class under the same
+  interface, with zero `MainActivity` or `VideoRetryController` changes.
+
+- **Why:** `MediaPlayer` = zero new dependencies, ~0 APK impact. Media3 adds
+  ~1-2 MB APK weight + ProGuard rules. If device-specific RTSP issues surface,
+  the swap is bounded and cheap — Media3 is the immediate next step.
+
+- **Out of scope / consequences:** Media3 is NOT added to `libs.versions.toml`
+  until the swap is needed. The `MediaPlayerVideoPlayer` ships as the initial
+  RTSP implementation. No on-robot RTSP verification has been performed yet
+  (manual user step after a campaign deploys the feature).
 
 ### [2026-08-20] Device-identifier pre-commit hook + gate step
 

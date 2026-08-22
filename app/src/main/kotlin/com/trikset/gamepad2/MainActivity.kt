@@ -26,8 +26,8 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.diagnostics.CrashLogStore
 import com.trikset.gamepad2.diagnostics.CrashReportDialog
-import com.trikset.gamepad2.mjpeg.MjpegView
-import java.net.URL
+import com.trikset.gamepad2.video.VideoPlayer
+import com.trikset.gamepad2.video.VideoPlayerFactory
 import kotlinx.coroutines.launch
 
 /**
@@ -41,8 +41,8 @@ class MainActivity :
   private var angle = 0 // -100% .. +100%
   override var wheelEnabled: Boolean = false
   override var wheelStep: Int = WHEEL_STEP_DEFAULT
-  private var video: MjpegView? = null
-  private var videoUrl: URL? = null
+  private var video: VideoPlayer? = null
+  private var videoUrl: String? = null
   var settingsController: MainActivitySettingsController? = null
     private set
 
@@ -159,7 +159,12 @@ class MainActivity :
 
     sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
-    video = findViewById(R.id.video)
+    video =
+        VideoPlayerFactory.create(
+            videoUrl,
+            requireNotNull(findViewById(R.id.video)),
+            requireNotNull(findViewById(R.id.videoTexture)),
+        )
 
     senderService.setShowTextCallback { message ->
       // The gear border is the persistent status; surface only connection *errors* as feedback,
@@ -282,7 +287,7 @@ class MainActivity :
     setVideoLoading(false)
     val video = video
     if (video != null) {
-      video.stopPlayback()
+      video.stop()
       video.setOnStreamErrorListener(null)
       video.setOnFirstFrameListener(null)
     }
@@ -330,34 +335,25 @@ class MainActivity :
   private fun shouldReloadVideo(): Boolean = videoUrl != null && video?.isPlaying == false
 
   private fun restartVideoStream() {
-    // The error listener may fire from the render thread; always hop to the
-    // main thread before touching the view hierarchy / opening the stream.
-    runOnUiThread {
-      val video = video ?: return@runOnUiThread
-      val wasPlaying = video.isPlaying
-      // URL-gated spinner: shown while a URL is configured, hidden otherwise (a null URL means
-      // video is disabled — the placeholder conveys that, no spinner). Control state is irrelevant.
-      if (videoUrl != null) {
-        // A reload of a stream that WAS playing is a reconnect: show the "Video reconnecting…"
-        // badge alongside the spinner. A first load is not a reconnect.
-        setVideoLoading(true, reconnecting = wasPlaying)
+    val currentUrl = videoUrl
+    val player = video
+    if (player == null || currentUrl == null) {
+      setVideoLoading(false)
+      return
+    }
+    val wasPlaying = player.isPlaying
+    setVideoLoading(true, reconnecting = wasPlaying)
+    player.onPlayResult = { ok ->
+      if (ok) {
+        videoRetryController?.onLoadSuccess()
       } else {
-        setVideoLoading(false)
-      }
-      // Feed the load outcome back into the retry controller: a failed open arms the bounded
-      // retry loop, a success disarms it. A failure also surfaces a throttled "video stream
-      // unavailable" Snackbar (once per failure episode, not per 5 s retry tick).
-      VideoStreamLoader(video).load(videoUrl) { ok ->
-        if (ok) {
-          videoRetryController?.onLoadSuccess()
-        } else {
-          videoRetryController?.onLoadFailed()
-          if (videoStreamErrorNotifier.shouldNotify()) {
-            connectionFeedback.error(getString(R.string.video_stream_unavailable))
-          }
+        videoRetryController?.onLoadFailed()
+        if (videoStreamErrorNotifier.shouldNotify()) {
+          connectionFeedback.error(getString(R.string.video_stream_unavailable))
         }
       }
     }
+    player.play(currentUrl)
   }
 
   private fun setVideoLoading(visible: Boolean, reconnecting: Boolean = false) {
@@ -404,15 +400,17 @@ class MainActivity :
     applyHudTone(senderViewModel.connectionState.value)
   }
 
-  override fun setVideoUrl(url: URL?) {
+  override fun setVideoUrl(url: String?) {
     videoUrl = url
-    // No URL -> show a hint instead of a silent black area. The placeholder stays hidden while a
-    // URL is configured, even if the stream is down (the loading spinner + gear border convey that
-    // state).
     findViewById<android.widget.TextView>(R.id.videoPlaceholder)?.visibility =
         if (url == null) View.VISIBLE else View.GONE
-    // A configured URL arms a load (amber eye); a null URL means video is disabled (gray eye).
     robotChip.setVideoStatus(if (url == null) VideoStatus.DISABLED else VideoStatus.LOADING)
+    video =
+        VideoPlayerFactory.create(
+            url,
+            requireNotNull(findViewById(R.id.video)),
+            requireNotNull(findViewById(R.id.videoTexture)),
+        )
   }
 
   override fun setKeepScreenOn(enabled: Boolean) {
@@ -480,9 +478,10 @@ class MainActivity :
     setVideoLoading(false)
     val video = video
     if (video != null) {
-      video.stopPlayback()
+      video.stop()
       video.setOnStreamErrorListener(null)
       video.setOnFirstFrameListener(null)
+      video.release()
       this.video = null
     }
     systemUiController.detach()

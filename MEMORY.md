@@ -4057,8 +4057,8 @@ Single commit `9613a6e`; CI green (run 32513695403).
 ### [2026-08-22] Campaign 31 retrospective — package rename + minSdk 21 + custom message + release process change
 
 **Scope (user-driven, plan mode → build mode on confirmation):** (1) package
-rename from `com.trikset.gamepad` to `com.trikset.gamepad2` (140 files, git mv
-+ content replace across main, test, androidTest); (2) drop minSdk 23 → 21 with
+rename from `com.trikset.gamepad` to `com.trikset.gamepad2` (140 files — git mv
+plus content replace across main, test, androidTest); (2) drop minSdk 23 → 21 with
 `Build.VERSION.SDK_INT >= 22` guard in `WifiDatagramBinder` (lint `NewApi` was
 enforced at minSdk 21); (3) add custom message `EditTextPreference` in the robot
 network settings screen with 5-locale strings; (4) bump version to 2.42

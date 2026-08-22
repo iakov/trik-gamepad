@@ -220,6 +220,13 @@ def coverageExcludes = [
         // "Coverage" design decisions).
         '**/MjpegView$MjpegRenderThread.class',
         '**/MjpegView$MjpegViewThread.class',
+        // The RTSP adapter (MediaPlayer + TextureView surface lifecycle) needs a
+        // hardware-accelerated Surface + MediaCodec to run its playback path;
+        // Robolectric has no ShadowTextureView surface simulation, so prepareAndStart
+        // and the surface listener are untestable there. Same rationale as the MJPEG
+        // render-thread exclusion; the class still carries unit tests for its
+        // null/lifecycle logic (see MEMORY.md "Coverage" design decisions).
+        '**/MediaPlayerVideoPlayer*.class',
 ]
 
 def debugClasses = fileTree(dir: "${buildDir}/intermediates/javac/debug/compileDebugJavaWithJavac/classes", excludes: coverageExcludes)

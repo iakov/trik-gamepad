@@ -4,11 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import androidx.preference.PreferenceManager
-import com.trikset.gamepad2.diagnostics.AppLog
-import java.net.MalformedURLException
 import java.net.URI
-import java.net.URISyntaxException
-import java.net.URL
 import java.util.Locale
 
 /**
@@ -32,7 +28,7 @@ class MainActivitySettingsController(
 
     fun animatePadsAlpha(alpha: Float, previousAlpha: Float)
 
-    fun setVideoUrl(url: URL?)
+    fun setVideoUrl(url: String?)
 
     var wheelStep: Int
 
@@ -129,17 +125,11 @@ class MainActivitySettingsController(
     val videoHost = runCatching { URI(videoStreamURI).host }.getOrNull()
     ui.setTargetChip(addr.ifBlank { videoHost?.takeIf { it.isNotBlank() } ?: TARGET_CHIP_EMPTY })
 
-    try {
-      ui.setVideoUrl(if (videoStreamURI.isEmpty()) null else URI(videoStreamURI).toURL())
-    } catch (e: URISyntaxException) {
-      ui.toast(context.getString(R.string.illegal_video_uri))
-      AppLog.e(TAG, "onPreferenceChanged: ", e)
-      ui.setVideoUrl(null)
-    } catch (e: MalformedURLException) {
-      ui.toast(context.getString(R.string.illegal_video_uri))
-      AppLog.e(TAG, "onPreferenceChanged: ", e)
-      ui.setVideoUrl(null)
-    }
+    // The URI flows as an opaque string: validation happens per video player at open time (MJPEG
+    // parses the http/https URL, MediaPlayer accepts rtsp:// directly), so an rtsp:// stream never
+    // trips URL-only parsing. An empty effective URI = video disabled (DESIGN.md "Empty-value
+    // semantics").
+    ui.setVideoUrl(videoStreamURI.ifEmpty { null })
 
     val wheelStep =
         SettingsFragment.readSeekBarValue(

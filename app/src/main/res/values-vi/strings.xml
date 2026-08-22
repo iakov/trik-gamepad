@@ -149,6 +149,5 @@
     <string name="settings_button_description_connecting">Đang kết nối. Bật/tắt thanh hệ thống</string>
     <string name="settings_button_description_disconnected">Đã ngắt kết nối. Bật/tắt thanh hệ thống</string>
     <string name="port_number_incorrect">Số cổng “%1$s” không đúng.</string>
-    <string name="illegal_video_uri">URL luồng video không hợp lệ</string>
     <string name="disconnected_notice">Đã ngắt kết nối. %1$s</string>
 </resources>

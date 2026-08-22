@@ -186,6 +186,5 @@
 
     <!-- Connection / input validation notices (previously hardcoded literals). -->
     <string name="port_number_incorrect">Port number %1$s is incorrect.</string>
-    <string name="illegal_video_uri">Illegal video stream URL</string>
     <string name="disconnected_notice">Disconnected. %1$s</string>
 </resources>

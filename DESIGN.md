@@ -103,6 +103,7 @@ ______________________________________________________________________
 | WCAG | contrast + touch-target regression tests |
 | Connection & video state UX | status pill, reconnect badge |
 | Haptics | pads, magic buttons, settings gear |
+| Video player abstraction | VideoPlayer interface, MJPEG and RTSP implementations, factory |
 | Gamepad protocol (source of truth) | every protocol change, TCP and UDP |
 
 ______________________________________________________________________
@@ -374,6 +375,54 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
   `shadowOf(view).lastHapticFeedbackPerformed()` against
   `Haptics.constant(level)` (the semantic level, not a raw constant — the unit
   suite runs under SDK 23 where the older fallback would otherwise fire).
+
+## Video player abstraction
+
+The video pipeline uses a `VideoPlayer` interface so the retry/self-heal
+controller (`VideoRetryController`) drives whichever sink is active, and future
+formats are drop-in additions.
+
+### Interface (`VideoPlayer`)
+
+```
+play(url)       — start or restart playback at the given URL
+stop()          — stop playback
+release()       — tear down resources
+isPlaying       — true while frames are being consumed
+showFps         — toggle the FPS overlay (MJPEG only; no-op for RTSP)
+onPlayResult    — callback with true/false after a play() attempt settles
+OnStreamError   — fires on a non-recoverable stream failure
+OnFirstFrame    — fires once per playback cycle when the first frame renders
+```
+
+### Two implementations
+
+- **`MjpegVideoPlayer`** wraps the existing `MjpegView` (HTTP MJPEG stream,
+  GPU-backed HWUI render). Uses an executor for async MJPEG stream opening and
+  wires the result into the view on the main thread. The `showFps` property
+  delegates to `MjpegView.showFps`.
+- **`MediaPlayerVideoPlayer`** uses Android's built-in `MediaPlayer` +
+  `TextureView` for RTSP/H.264 streams. Handles `TextureView.SurfaceTextureListener`
+  lifecycle (defers playback until the surface is available). `showFps` is a
+  no-op (the RTSP pipeline does not support an FPS overlay).
+
+### Factory (`VideoPlayerFactory`)
+
+Routes by the URL scheme:
+
+| URL scheme | Created player |
+|------------|---------------|
+| `rtsp://` | `MediaPlayerVideoPlayer` |
+| `http://` or `https://` | `MjpegVideoPlayer` |
+| `null` | `MjpegVideoPlayer` (fallback) |
+
+### Media3 swap strategy
+
+If device-specific `MediaPlayer` RTSP issues surface (buffering timeouts,
+reconnect quirks, codec mismatches), swapping to Media3 (ExoPlayer) is a single
+new class under the `VideoPlayer` interface — no `MainActivity` or
+`VideoRetryController` changes. Media3 is **not** added to the dependencies
+until proven necessary.
 
 ## Gamepad protocol (source of truth)
 

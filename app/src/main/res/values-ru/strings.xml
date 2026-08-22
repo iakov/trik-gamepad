@@ -151,6 +151,5 @@
     <string name="settings_button_description_connecting">Подключение. Переключить системные панели</string>
     <string name="settings_button_description_disconnected">Отключено. Переключить системные панели</string>
     <string name="port_number_incorrect">Номер порта «%1$s» неверен.</string>
-    <string name="illegal_video_uri">Недопустимый URL видеопотока</string>
     <string name="disconnected_notice">Отключено. %1$s</string>
 </resources>
