@@ -4188,3 +4188,148 @@ CI: runs do not appear (fork has no Actions enabled — dormant).
   all questions kept — no change; the duplicate-commit recovery is already
   covered by the existing squash-fix rule; the `custom` dream → shipped
   exercised the new Value Q2 rephrase from C30).*
+
+### [2026-08-22] Campaign 32 execution run — toolchain bump + RTSP video + test optimization
+
+Scope: (1) toolchain bump (Gradle 9.7.1, spotless 8.10.0, spotbugs 6.5.11 —
+AGP held at 9.2.1 for the Studio matrix); (2) **RTSP video** via a
+`VideoPlayer` abstraction (`MjpegVideoPlayer` wraps `MjpegView`;
+`MediaPlayerVideoPlayer` uses the built-in `MediaPlayer` + `TextureView` for
+RTSP/H.264; `VideoPlayerFactory` routes by `rtsp://`); (3) **test optimization**
+(parameterize mapping tests + consolidate duplicated reflection/pref helpers).
+Commits `3d1cdbe` (tooling), `e684059` (test param), `dfcd5d2` (RTSP video),
+`b646f78` (helper consolidation).
+
+**Process**
+
+- **Biggest process win:** the toolchain-first ordering — bumping Gradle before
+  the feature work meant the RTSP code was compiled/tested against the new
+  toolchain from the start, and the "two main commits" structure (tooling then
+  video) kept each commit self-contained.
+- **What kept each commit self-contained:** the canonical gate (`gate.py`) ran
+  green before each commit; the tooling commit was validated by the full suite
+  under the new Gradle/spotbugs/spotless.
+- **What could have been lost:** the coverage gate after adding ~180 lines of
+  new video code — it dipped to 0.847 branch (gate 0.85). Recovered by (a)
+  real-server MJPEG tests (`SyntheticMjpegServer`), (b) https-fallback tests,
+  (c) a documented coverage exclusion for the hardware-bound
+  `MediaPlayerVideoPlayer` (Surface + MediaCodec lifecycle, no
+  `ShadowTextureView` in Robolectric) — same rationale as the `MjpegView`
+  render-thread exclusion.
+- **Elapsed vs Estimated:** not estimated upfront (plan mode → "go"). Wall-clock
+  ≈ 2 h 48 m (committed span 14:04 → 16:52 +03:00); ROADMAP table filled with
+  `Actual` only.
+
+**Learning**
+
+- **New facts worth saving:**
+  - **`java.net.URL` cannot parse `rtsp://`** — `MalformedURLException`. The
+    video URI must flow as an opaque `String` through `setVideoUrl` and
+    `VideoPlayer.play`; per-player validation happens at open time (MJPEG parses
+    http/https, `MediaPlayer` accepts rtsp directly). This also removed the
+    `illegal_video_uri` toast + string (a malformed URI now fails at open with
+    the normal video-unavailable feedback, not a settings-time toast).
+  - **Parameterizing small mapping tests increases the lizard token metric.**
+    The 5 parameterized files went 16 → 6 test methods but 910 → 972 lizard
+    tokens: the `data class Case(...)` + `listOf(Case(...), ...)` definitions
+    are token-heavy. Confirms the AGENTS.md rule "Dedup drives the token
+    number, not table-ization" — parameterize for method-count/maintainability,
+    not for the token metric. Physical SLOC and method count are what table-
+    ization reduces.
+  - **The C31 spotless `NoClassDefFoundError: com/sun/source/tree/Tree`
+    quirk recurs during pre-commit when the tree has unstaged `.kt` files**
+    (the stash + config-cache invalidation + single-use daemon interaction).
+    This campaign found the hook CAN pass: commit with the tree fully staged
+    (nothing unstaged) + `JAVA_HOME` set to a JDK. The C31 note that the hook
+    "fails every time" is too absolute — it depends on the working-tree state.
+  - **AGP 9's built-in Kotlin + spotless ktfmt:** the formatter still needs the
+    JDK (not a JRE) on the classpath; a machine whose default `JAVA_HOME` is a
+    JRE crashes ktfmt only when the formatter actually re-runs (config-cache
+    invalidation), not when tasks are UP-TO-DATE.
+- **What the gate caught:** jacoco branch 0.847 → covered the new video-code
+  branches (real-server + https tests) → 0.852; lint `UnusedResources` on the
+  now-dead `illegal_video_uri` string (removed from all 5 locales);
+  detekt `TooGenericExceptionCaught` + `UseLet` on the new video classes (fixed
+  or rationale-suppressed). All fixed before commit.
+
+**Signal**
+
+- **Frequency-scan:**
+  - "Deprecated Gradle features" — still in every build log (known, `.PLAN.md`
+    Gradle-10-era bump; NOT re-marked resolved). The Gradle 9.7.1 bump did not
+    clear it (the deprecations are plugin-internal, not wrapper).
+  - `NoClassDefFoundError: com/sun/source/tree/Tree` — recurred during commit
+    with unstaged `.kt` files (known C31 quirk, refined workaround above).
+  - `replay_pid*.log` — a JVM crash dump appeared in the repo root during a
+    failed commit's spotless run; deleted (untracked junk).
+- **Rule deviations / missing rules:** none — the coverage exclusion followed
+  the documented `MjpegView` render-thread precedent with a build.gradle
+  comment + this record.
+- **User corrections:** the user redirected mid-plan from "UX + stability" to
+  "toolchain + Gradle first" (toolchain discipline), then asked for the
+  WebRTC pros/cons and later the **Media3 deferral documentation** — each is a
+  signal that deferrals need explicit, typed decision records (now in
+  DECISIONS.md). No behaviour rule implied beyond the existing
+  "Documenting decisions" guardrail.
+
+**Drift**
+
+- **Per-doc audit:**
+  - DECISIONS.md — added "VideoPlayer abstraction — WebRTC deferral + RTSP via
+    MediaPlayer" + "Media3 deferral" (Architecture); updated the AGP 9.2.1 entry
+    with Gradle 9.7.1; new toolchain-bump entry. **Updated.**
+  - DESIGN.md — added "Video player abstraction" section (interface, two
+    implementations, factory table, Media3 swap strategy). **Updated.**
+  - ROADMAP.md — Campaign 32 entry (was a plan stub). **Updated.**
+  - TESTING.md — shared `RobolectricTestBase` helpers + RTSP/String-URI test
+    notes + MediaPlayerVideoPlayer coverage exclusion. **Updated.**
+  - docs/architecture.md — video pipeline (MJPEG vs RTSP, VideoPlayer
+    abstraction). **Updated.**
+  - .PLAN.md — toolchain pair now Gradle 9.7.1; RTSP on-robot verification +
+    MediaPlayer-vs-Media3 device check added as pending. **Updated.**
+  - AGENTS.md — no new rule needed (the coverage-exclusion + String-URI facts
+    live in build.gradle comments / MEMORY / DECISIONS; the pre-commit ktfmt
+    quirk is machine-env-adjacent, kept in MEMORY).
+- **Scripts review:** reused `scripts/jacoco_report.py` for the coverage-gap
+  triage (correct tool for the job); the lizard before/after measurement was a
+  one-off inline Python (could become a `scripts/` helper if needed again).
+  No `.tmp/` ad-hoc script rose to reuse-worthy.
+- **Best-scoped doc:** decisions → DECISIONS.md; facts/quirks →
+  MEMORY.md; campaign record → ROADMAP; design → DESIGN.md.
+
+**Value**
+
+- **Measurable profit:** RTSP support is the obvious next video format for the
+  Linux robot camera (zero new dependencies via built-in `MediaPlayer`); the
+  `VideoPlayer` interface makes the Media3 swap a drop-in change if
+  device-specific RTSP issues surface; the String-URI flow unblocks rtsp
+  end-to-end (previously impossible through `java.net.URL`); test suite has
+  fewer near-duplicate methods and a single source of truth for reflection/pref
+  helpers.
+- **Deferred (→ `.PLAN.md`):** on-robot RTSP verification (manual); the
+  MediaPlayer-vs-Media3 device-behavior decision; real-robot re-verify; the
+  Gradle-10-era deprecation bump (still pending); core-ktx 1.19.0 (compileSdk 37
+  gate); detekt 2.0.0 (stable gate).
+- **Next automation candidates:** a `scripts/lizard_diff.py` (before/after token
+  diff for a test-refactor commit) if the parameterization-vs-token question
+  recurs; the pre-commit ktfmt-JRE crash could be auto-mitigated by making
+  `spotless_apply.py` fall back to a JDK if `JAVA_HOME` is a JRE.
+- **What I should have asked earlier:** whether the user wanted the RTSP feature
+  to flow the video URI as a String (a design change to the settings-controller
+  contract) vs keeping `URL` and rejecting rtsp — the String flow is the only
+  way RTSP works, so it was the right call, but the contract change should have
+  been flagged in the plan rather than discovered mid-build.
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added:** none — the existing questions covered the campaign;
+  the String-URI contract finding is captured under "What I should have asked
+  earlier" (a Value question), which is the right home.
+- **Most useless question this campaign:** "Frequency-scan Q: deprecation
+  warnings" — again stable (still present, root-caused). Consistent with C31's
+  assessment (not useless, just stable). The useful part (re-verify before
+  trusting green) is preserved.
+- **Checklist itself:** stamp: *Last revised: 2026-08-22 (C32 retrospective:
+  no question changes — the pre-commit-ktfmt quirk and the String-URI contract
+  finding are captured in the Learning/Value sections; the coverage-exclusion
+  precedent was reused without a new question).*

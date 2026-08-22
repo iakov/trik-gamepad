@@ -422,6 +422,12 @@ Data-driven tables buy clearer intent, not fewer tokens; the `cases` literals
 are the test. Expect dedup to cut tokens; don't chase the number by adding
 rows.
 
+**Shared test helpers live in `RobolectricTestBase`** (the single source of
+truth for the 3-SDK `@Config`, `runBounded`, `dialogViews`, and the
+reflection/pref helpers `field` / `setField` / `method` / `setPref`). A new
+test that needs any of these must inherit them — never re-implement a private
+copy (three per-class copies were consolidated in Campaign 32).
+
 ### Tests must be able to fail
 
 A test that cannot fail asserts nothing — it only burns time and gives false
@@ -547,9 +553,19 @@ A0 baseline (2026-08-09; `main` sources excluded) — the fixed trend anchor:
   always produces the full report. MjpegView's render-thread plumbing
   (`MjpegView$MjpegRenderThread`/`MjpegViewThread`) is excluded with a
   recorded rationale (untestable thread lifecycle; the render logic lives in
-  the covered `MjpegFrameRenderer`); so are Kotlin-inline synthetics
-  (`**/*$special$$inlined$*.class` — the `by viewModels()` delegate
-  boilerplate). Both rationales: MEMORY "Coverage" design decisions.
+  the covered `MjpegFrameRenderer`); `MediaPlayerVideoPlayer*` (the RTSP
+  adapter) is excluded for the same reason — its `MediaPlayer` + `TextureView`
+  surface lifecycle needs a hardware-accelerated Surface + MediaCodec and
+  Robolectric has no `ShadowTextureView` surface simulation (the class still
+  carries unit tests for its null/lifecycle logic). Also excluded are
+  Kotlin-inline synthetics (`**/*$special$$inlined$*.class` — the
+  `by viewModels()` delegate boilerplate). Rationales: MEMORY "Coverage"
+  design decisions.
+- **Video URI flows as an opaque `String`** (since Campaign 32): a
+  `java.net.URL` cannot parse `rtsp://`, so `setVideoUrl`/`VideoPlayer.play`
+  take the raw string and each player validates at open time. Tests must pass
+  plain strings (`"rtsp://…"`, `"http://…"`) — never `URL(...)` — and use a
+  live `SyntheticMjpegServer` to cover the MJPEG open/play success path.
 - Instrumented tests exercise only what runs on the emulator; real TRIK robot
   interaction is never in CI.
 - Espresso tests drive the settings UI through extracted helpers

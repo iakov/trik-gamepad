@@ -56,6 +56,12 @@ constants in `SettingsFragment`.
   decodes + `postInvalidate`, `onDraw` presents on the HWUI canvas),
   `MjpegInputStream` (frame parser), `MjpegFrameRenderer` (decoding
   - center-crop cover + FPS overlay).
+- `com.trikset.gamepad2.video` — the video-player abstraction (Campaign 32):
+  `VideoPlayer` (interface), `MjpegVideoPlayer` (wraps `MjpegView`),
+  `MediaPlayerVideoPlayer` (RTSP via the built-in `MediaPlayer` + `TextureView`),
+  `VideoPlayerFactory` (routes `rtsp://` → MediaPlayer, http/https → MJPEG).
+  `MainActivity` holds a `VideoPlayer?` and the video URI flows as an opaque
+  `String` (a `java.net.URL` cannot parse `rtsp://`).
 - `com.trikset.gamepad2.diagnostics` — user-facing diagnostics (Campaign 14):
   `AppLog` (logcat + ring buffer) + `LogRingBuffer`, `DiagLevel`, `DiagnosticsReport`,
   `ReportDiagnosticsWriter`/`ReportSharer`, `CrashLogStore`, `CrashHandler`,
@@ -135,8 +141,7 @@ RawSocketHttpStream (http; bypasses NSC) / WifiConnectionOpener (https; bound to
 - **`VideoStreamLoader`** (AsyncTask successor) opens the HTTP stream off the
   main thread and hands it to `MjpegView`; it reports open success/failure via
   an `onResult` callback (a failed open is no longer silent). Executor + main
-  handler are injectable for deterministic tests.
-- **`MjpegView.MjpegRenderThread`** (de-spun, C24) loops `readMjpegFrame()`,
+  handler are injectable for deterministic tests.- **`MjpegView.MjpegRenderThread`** (de-spun, C24) loops `readMjpegFrame()`,
   blocking on the socket read; a `null` frame (buffer-full drop or EOF
   recovery) triggers a 5 ms idle sleep instead of a poll spin. On `IOException`
   it stops and fires `OnStreamErrorListener`; on the first decoded frame of each
@@ -180,6 +185,23 @@ RawSocketHttpStream (http; bypasses NSC) / WifiConnectionOpener (https; bound to
 center-crop / FPS logic is testable under Robolectric (inject a decoder + plain
 `Canvas`); the render thread itself stays ~0 % covered and is excluded from the
 coverage gates.
+
+### VideoPlayer abstraction (Campaign 32)
+
+`MainActivity` does not talk to `MjpegView` directly — it holds a `VideoPlayer`
+(`com.trikset.gamepad2.video`) so the retry/self-heal controller
+(`VideoRetryController`) drives whichever sink is active and future formats are
+drop-in. `VideoPlayerFactory` routes by URL scheme: `rtsp://` →
+`MediaPlayerVideoPlayer` (built-in `MediaPlayer` + `TextureView`, no new
+dependency), `http`/`https` → `MjpegVideoPlayer` (wraps `MjpegView`, owns the
+executor + `MjpegInputStream` opening). The video URI flows as an opaque
+`String` end-to-end (`setVideoUrl(url: String?)`, `player.play(url: String?)`):
+`java.net.URL` cannot parse `rtsp://`, so each player validates its scheme at
+open time. If device-specific `MediaPlayer` RTSP behaviour proves unreliable,
+swapping to Media3 (ExoPlayer) is a single new class under the same interface
+(see `DECISIONS.md` "[2026-08-22] Media3 deferral"). `MediaPlayerVideoPlayer`'s
+hardware lifecycle is excluded from the coverage gate (Surface/MediaCodec
+untestable under Robolectric).
 
 ## Settings
 

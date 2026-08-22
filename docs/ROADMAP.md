@@ -1285,7 +1285,7 @@ existing `MjpegView`; (4) add `VideoPlayerFactory` that routes by URL scheme;
 
 | Estimated | Actual |
 |-----------|--------|
-| — | — |
+| — | ≈2 h 48 m (committed span 2026-08-22 14:04 → 16:52 +03:00) |
 
 - **Video source files** — `video/VideoPlayer.kt` (interface),
   `video/MjpegVideoPlayer.kt` (MJPEG wrapper, uses executor + MjpegInputStream),
@@ -1296,23 +1296,37 @@ existing `MjpegView`; (4) add `VideoPlayerFactory` that routes by URL scheme;
 - **Layout** — `activity_main.xml` wraps the `MjpegView` and a new `TextureView`
   in a `FrameLayout`; the factory toggles visibility so only one surface is
   active at a time.
+- **String-URI flow** — the video URI now flows as an opaque `String` (a
+  `java.net.URL` cannot parse `rtsp://`), so RTSP reaches the players;
+  per-player validation happens at open time instead of the removed
+  `illegal_video_uri` settings-time toast (all 5 locales cleaned).
 - **MainActivity refactor** — `video` field type changes from `MjpegView?` to
   `VideoPlayer?`; `restartVideoStream` uses `player.play(url)` with an
-  `onPlayResult` callback (replacing `VideoStreamLoader.load`); `setVideoUrl`
-  recreates the player via factory on URL change; `setShowFps` delegates through
-  the interface; lifecycle methods use `video.stop()` / `video.release()`.
-- **Tests** — `MjpegVideoPlayerTest` (showFps delegation, isPlaying),
-  `VideoPlayerFactoryTest` (scheme-based routing), `MainActivityTest` updated
-  (uses `StubVideoPlayer` instead of raw `MjpegView` for null-safety tests;
-  the showFps test uses `MjpegVideoPlayer` wrapping a real `MjpegView`).
-- **Docs** — DECISIONS.md: WebRTC deferral + Media3 deferral entries under
-  Architecture; DESIGN.md: "Video player abstraction" section; ROADMAP.md: this
-  entry.
+  `onPlayResult` callback; `setVideoUrl` recreates the player via factory on
+  URL change; `setShowFps` delegates through the interface; lifecycle methods
+  use `video.stop()` / `video.release()`.
+- **Tests** — `MjpegVideoPlayerTest` (delegation, null/invalid/live-server
+  open, live play), `MediaPlayerVideoPlayerTest` (null/pending/lifecycle),
+  `VideoPlayerFactoryTest` (scheme routing), `MainActivityTest` updated (uses
+  `StubVideoPlayer`; String-URL flow); parameterized 5 mapping tests
+  (`ConnectionIndicator`/`VideoStatusIndicator`/`DiagLevel`/`MagicButtonSymbols`/
+  `WheelController` — 16 → 6 methods) and consolidated reflection/pref helpers
+  (`field`/`setField`/`method`/`setPref`) into `RobolectricTestBase`.
+- **Coverage** — new video code dipped branch to 0.847; recovered to **0.852**
+  (real-server + https-fallback tests) with the hardware-bound
+  `MediaPlayerVideoPlayer` excluded from the gate (Surface/MediaCodec lifecycle,
+  no `ShadowTextureView`; same rationale as the `MjpegView` render-thread
+  exclusion). Final: **0.963 line / 0.852 branch**, jscpd 0 clones, translations
+  137 keys in sync.
+- **Docs** — DECISIONS.md: WebRTC deferral + Media3 deferral + toolchain-bump
+  entries; DESIGN.md: "Video player abstraction" section; ROADMAP.md: this
+  entry; MEMORY.md: Campaign 32 retrospective.
 - **Media3 deferred** — not added to dependencies until device-specific
   `MediaPlayer` RTSP issues prove it necessary. The `VideoPlayer` interface
   makes the swap a drop-in change.
-- **Verification** — canonical gate green; 3-variant `test` suite; lint/detekt/
-  spotbugs/jacoco spotless/jscpd clean.
+- **Verification** — canonical gate green (all steps); 3-variant `test` suite
+  green twice; lint/detekt/spotbugs/jacoco/spotless/jscpd clean. On-robot RTSP
+  verification stays a manual user step (`.PLAN.md`).
 
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 

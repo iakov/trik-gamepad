@@ -36,7 +36,7 @@ touch one.
 
 | Area | Covers | Newest decision |
 |------|--------|-----------------|
-| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-22] Release via signed tags + GH releases |
+| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-22] Toolchain bump: Gradle 9.7.1 + spotless 8.10.0 + spotbugs 6.5.11 |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral | [2026-08-22] VideoPlayer abstraction — WebRTC deferral + RTSP via MediaPlayer |
@@ -83,6 +83,46 @@ ______________________________________________________________________
 - **Update (2026-08-14):** Gradle was later bumped 9.5.0 → **9.6.1** (the AS
   Quail 1 bundled Gradle, `7585873`) — the AGP decision is unchanged, the
   wrapper is current. Toolchain pair today: **AGP 9.2.1 / Gradle 9.6.1**.
+
+- **Update (2026-08-22):** Gradle bumped **9.6.1 → 9.7.1** (plus spotless
+  8.9.0 → 8.10.0 and spotbugs 6.5.10 → 6.5.11; see the toolchain-bump entry
+  below) — AGP stays **9.2.1** (Studio matrix floor unchanged). Toolchain pair
+  today: **AGP 9.2.1 / Gradle 9.7.1**.
+
+### [2026-08-22] Toolchain bump: Gradle 9.7.1 + spotless 8.10.0 + spotbugs 6.5.11 (AGP held at 9.2.1)
+
+- **Type:** problem-avoiding (keeps the toolchain current within the
+  Studio-compatibility floor; the routine "propose a tooling bump with the
+  matrix check" release-prep step).
+
+- **Problem:** Gradle 9.6.1, spotless 8.9.0 and spotbugs 6.5.10 were current at
+  the last bump; a release prep pass should propose the next toolchain refresh
+  while verifying the AGP↔Studio matrix (AGENTS.md "Android Studio
+  compatibility floor").
+
+- **Alternatives considered:** (a) bump Gradle + minor plugin versions, hold
+  AGP (chosen); (b) bump AGP 9.2.1 → 9.3.x (rejected — 9.3.x exceeds the three
+  latest Studio releases' AGP ceiling; the matrix gate forbids it until the
+  next Studio ships); (c) bump detekt 1.23.8 → 2.0.0 (rejected — still alpha);
+  (d) bump core-ktx 1.16.0 → 1.19.0 (rejected — needs compileSdk 37, R7 locks
+  36).
+
+- **Chosen solution:** Gradle **9.7.1**, spotless **8.10.0**, spotbugs
+  **6.5.11**; AGP stays **9.2.1**; detekt and core-ktx unchanged. Verified: the
+  full canonical gate (test, lint, detekt, spotbugs, jacoco 0.963/0.852,
+  spotless, jscpd, translations) green under the new toolchain; configuration
+  cache reuses.
+
+- **Why:** keeps the build tooling on supported versions with zero Studio-
+  compatibility risk; the plugin minors are routine (formatting/static-analysis
+  tooling, not build-contract changes). The Gradle-10 deprecations persist
+  (they are plugin-internal, not wrapper) — tracked in `.PLAN.md`, do NOT mark
+  resolved.
+
+- **Out of scope / consequences:** AGP stays 9.2.1 until the Studio matrix
+  allows a bump; detekt 2.0.0 and core-ktx 1.19.0 remain gated (stable /
+  compileSdk 37); the two Gradle-10 deprecation warnings remain in every build
+  log.
 
 ### [2026-08-12] K2 -Wextra warnings-as-errors
 

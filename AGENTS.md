@@ -42,7 +42,7 @@ Improvement roadmap: `docs/ROADMAP.md`.
   AGP 9's built-in Kotlin removed the `org.jetbrains.kotlin.android` plugin;
   Gradle runs under **JDK 21** (Robolectric 4.16.1 requires it for SDK 36 —
   also the CI JDK). Toolchain rationale: `DECISIONS.md` "AGP 9.2.1 — Android
-  Studio 3-release compatibility floor" (AGP 9.2.1 + Gradle 9.6.1).
+  Studio 3-release compatibility floor" (AGP 9.2.1 + Gradle 9.7.1).
 - **Android Studio compatibility floor**: the AGP/Gradle toolchain must stay
   openable by at least the **3 latest Android Studio releases** — verify the
   chosen AGP against the official Studio↔AGP matrix
