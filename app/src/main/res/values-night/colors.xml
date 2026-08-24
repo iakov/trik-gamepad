@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Night-mode variants of the brand greens keep contrast on dark backgrounds. -->
-    <color name="greenlight">#8BD866</color>
-    <color name="greendark">#6FA855</color>
+    <!-- Night-mode variants of the brand-accent greens keep contrast on dark backgrounds. -->
+    <color name="hud_accent_connected">#8BD866</color>
+    <color name="hud_accent_connected_dark">#6FA855</color>
 </resources>

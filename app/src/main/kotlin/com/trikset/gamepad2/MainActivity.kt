@@ -26,6 +26,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.diagnostics.CrashLogStore
 import com.trikset.gamepad2.diagnostics.CrashReportDialog
+import com.trikset.gamepad2.mjpeg.ScaleMode
 import com.trikset.gamepad2.video.VideoPlayer
 import com.trikset.gamepad2.video.VideoPlayerFactory
 import kotlinx.coroutines.launch
@@ -303,8 +304,10 @@ class MainActivity :
       // drop the HTTP connection and restart it (R12; see DECISIONS.md
       // "MJPEG: reconnect-on-error").
       video.setOnStreamErrorListener {
-        robotChip.setVideoStatus(VideoStatus.UNAVAILABLE)
-        videoRetryController?.onStreamError()
+        runOnUiThread {
+          robotChip.setVideoStatus(VideoStatus.UNAVAILABLE)
+          videoRetryController?.onStreamError()
+        }
       }
       // Hide the loading indicator once the first frame of this playback cycle renders; the chip
       // eye glyph flips to streaming at the same moment.
@@ -460,6 +463,10 @@ class MainActivity :
 
   override fun setShowFps(enabled: Boolean) {
     video?.showFps = enabled
+  }
+
+  override fun setVideoCropToFill(enabled: Boolean) {
+    video?.scaleMode = if (enabled) ScaleMode.CROP else ScaleMode.FIT
   }
 
   val senderService: SenderService

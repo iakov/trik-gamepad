@@ -113,6 +113,9 @@
     <string name="pref_show_fps">Показывать FPS</string>
     <string name="pref_show_fps_on">Счётчик FPS показан поверх видео</string>
     <string name="pref_show_fps_off">Счётчик FPS скрыт</string>
+    <string name="pref_video_crop">Обрезать до экрана</string>
+    <string name="pref_video_crop_on">Видео заполняет дисплей (края могут быть обрезаны)</string>
+    <string name="pref_video_crop_off">Видео вписывается в дисплей (чёрные полосы)</string>
     <string name="pref_category_hardware">Аппаратный геймпад</string>
     <string name="pref_gamepad_swap">Поменять стики местами</string>
     <string name="pref_gamepad_swap_on">Левый и правый стики меняются местами</string>

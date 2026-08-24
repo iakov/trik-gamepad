@@ -132,10 +132,14 @@ the timer. The timeout is configurable via `SK_KEEPALIVE`.
 RawSocketHttpStream (http; bypasses NSC) / WifiConnectionOpener (https; bound to the Wi-Fi network, trust-all TLS for the robot's self-signed camera)
   5 s connect/read timeouts
   -> MjpegInputStream   parses the multipart stream into JPEG frames
-  -> MjpegFrameRenderer decodes a frame, computes the center-crop Rect,
-                        records decode-side FPS (recordFrame)
+-> MjpegFrameRenderer decodes a frame, computes the dest Rect
+                         (configurable ScaleMode: FIT letterbox by default,
+                         CROP center-fill via user preference), records
+                         decode-side FPS (integer, hysteresis-gated, on a
+                         dark pill background using hud_accent_connected)
   -> MjpegView          plain View; render thread decodes + postInvalidate,
-                        onDraw presents on the HWUI (GPU) canvas
+                        onDraw presents on the HWUI (GPU) canvas. The scale mode is set via the
+`videoCropToFill` preference (default `false` = FIT).
 ```
 
 - **`VideoStreamLoader`** (AsyncTask successor) opens the HTTP stream off the
@@ -152,7 +156,7 @@ RawSocketHttpStream (http; bypasses NSC) / WifiConnectionOpener (https; bound to
 - **GPU presentation (C24)**: `MjpegView` is a plain `View` (NOT a SurfaceView
   — `lockCanvas()` is a software canvas; not a TextureView — `onDraw` there is
   final). `onDraw` draws `renderer.lastDestRect` + the current bitmap on the
-  hardware canvas, so the center-crop scale is done by the GPU (HWUI uploads the
+  hardware canvas, so the scale (FIT or CROP) is done by the GPU (HWUI uploads the
   reused bitmap and scales it). The activity lifecycle drives
   `startPlayback()`/`stopPlayback()` (a plain view has no surface-destroyed
   signal). Measured on-device: −71% CPU samples, gfxinfo High input latency

@@ -1,5 +1,6 @@
 package com.trikset.gamepad2.video
 
+import android.os.Looper
 import android.view.TextureView
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -8,6 +9,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.Shadows.shadowOf
 
 @RunWith(RobolectricTestRunner::class)
 class MediaPlayerVideoPlayerTest {
@@ -23,6 +25,7 @@ class MediaPlayerVideoPlayerTest {
     var result: Boolean? = null
     player.onPlayResult = { result = it }
     player.play(null)
+    shadowOf(Looper.getMainLooper()).idle()
     assertFalse("null URL must report a failed play", result!!)
   }
 

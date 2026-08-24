@@ -1,39 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Type 1 HUD: translucent dark pad panel (fake glass — no real blur) with a brand-green
-     stroke + soft outer glow (a second, wider semi-transparent stroke behind the border). The
-     crosshair/arrow chrome is a separate tintable vector (hud_pad_chrome) so the connection-state
-     accent can recolor it without touching XML. -->
-<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- soft outer glow: wide, faint stroke drawn behind the border -->
-    <item
-        android:left="4dp"
-        android:top="4dp"
-        android:right="4dp"
-        android:bottom="4dp">
-        <shape android:shape="rectangle">
-            <stroke
-                android:width="@dimen/hud_pad_glow_width"
-                android:color="@color/hud_glass_glow" />
-            <corners android:radius="@dimen/hud_pad_corner" />
-        </shape>
-    </item>
-    <item>
-        <shape android:shape="rectangle">
-            <solid android:color="@android:color/transparent" />
-            <stroke
-                android:width="@dimen/hud_pad_stroke"
-                android:color="@color/greenlight" />
-            <corners android:radius="@dimen/hud_pad_corner" />
-        </shape>
-    </item>
-    <item
-        android:left="3dp"
-        android:top="3dp"
-        android:right="3dp"
-        android:bottom="3dp">
-        <shape android:shape="rectangle">
-            <solid android:color="@color/hud_glass_fill" />
-            <corners android:radius="@dimen/hud_pad_corner" />
-        </shape>
-    </item>
-</layer-list>
+<!-- Type 1 HUD: pad panel outline (no glass fill — P8 resolved). A brand-green stroke
+     defines the pad boundary; the crosshair/arrow chrome is a separate tintable vector
+     (hud_pad_chrome) so the connection-state accent can recolor it without touching XML. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+    <stroke
+        android:width="@dimen/hud_pad_stroke"
+        android:color="@color/hud_accent_connected" />
+    <corners android:radius="@dimen/hud_pad_corner" />
+</shape>

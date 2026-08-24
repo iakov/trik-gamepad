@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- Semi-transparent circular backing behind the video loading indicator so the
-     spinner stays visible over bright video frames. -->
-<shape xmlns:android="http://schemas.android.com/apk/res/android"
-    android:shape="oval">
-    <solid android:color="#66000000" />
-</shape>

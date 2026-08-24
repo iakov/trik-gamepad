@@ -3,6 +3,7 @@ package com.trikset.gamepad2
 import android.view.View
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.mjpeg.MjpegView
+import com.trikset.gamepad2.mjpeg.ScaleMode
 import com.trikset.gamepad2.video.MjpegVideoPlayer
 import com.trikset.gamepad2.video.VideoPlayer
 import org.junit.Assert.assertEquals
@@ -837,6 +838,7 @@ private class StubVideoPlayer : VideoPlayer {
     get() = false
 
   override var showFps: Boolean = false
+  override var scaleMode: ScaleMode = ScaleMode.FIT
   override var onPlayResult: ((Boolean) -> Unit)? = null
 
   override fun play(url: String?) {}

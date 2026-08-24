@@ -12,10 +12,10 @@ class VideoStatusIndicatorTest {
     data class Case(val status: VideoStatus, val expected: Int)
     val cases =
         listOf(
-            Case(VideoStatus.PLAYING, R.color.greenlight),
-            Case(VideoStatus.LOADING, R.color.amber),
-            Case(VideoStatus.RECONNECTING, R.color.amber),
-            Case(VideoStatus.UNAVAILABLE, R.color.red),
+            Case(VideoStatus.PLAYING, R.color.hud_accent_connected),
+            Case(VideoStatus.LOADING, R.color.hud_accent_connecting),
+            Case(VideoStatus.RECONNECTING, R.color.hud_accent_connecting),
+            Case(VideoStatus.UNAVAILABLE, R.color.hud_accent_error),
             Case(VideoStatus.DISABLED, R.color.hud_disabled),
         )
     for (case in cases) {

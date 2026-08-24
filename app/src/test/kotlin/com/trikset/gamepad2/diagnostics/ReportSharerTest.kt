@@ -26,6 +26,11 @@ class ReportSharerTest : RobolectricTestBase() {
   @Before
   fun setUp() {
     activity = Robolectric.buildActivity(Activity::class.java).setup().get()
+    // Force shareWithoutEditing off so the edit-path tests are deterministic
+    PreferenceManager.getDefaultSharedPreferences(activity)
+        .edit()
+        .putBoolean(SettingsFragment.SK_SHARE_WITHOUT_EDITING, false)
+        .commit()
   }
 
   private fun startedInnerIntent(): Intent {

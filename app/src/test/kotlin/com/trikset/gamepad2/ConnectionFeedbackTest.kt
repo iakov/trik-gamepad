@@ -96,11 +96,11 @@ class ConnectionFeedbackTest : RobolectricTestBase() {
     val feedback = activityFeedback(activity)
     val app = org.robolectric.RuntimeEnvironment.getApplication()
     feedback.update(ConnectionState.Connected)
-    assertEquals(app.getColor(R.color.greendark), borderStrokeColor(activity))
+    assertEquals(app.getColor(R.color.hud_accent_connected_dark), borderStrokeColor(activity))
     feedback.update(ConnectionState.Disconnected("x"))
-    assertEquals(app.getColor(R.color.red), borderStrokeColor(activity))
+    assertEquals(app.getColor(R.color.hud_accent_error), borderStrokeColor(activity))
     feedback.update(ConnectionState.Connecting)
-    assertEquals(app.getColor(R.color.amber), borderStrokeColor(activity))
+    assertEquals(app.getColor(R.color.hud_accent_connecting), borderStrokeColor(activity))
   }
 
   @Test

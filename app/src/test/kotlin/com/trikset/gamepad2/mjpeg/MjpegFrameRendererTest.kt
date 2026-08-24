@@ -39,11 +39,12 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
   }
 
   @Test
-  fun destRectCenterCropsPortraitBitmapVertically() {
-    // Portrait bitmap in a landscape display: width-limited, crops the height
+  fun destRectCropScalePortraitBitmapVertically() {
+    // Portrait bitmap in a landscape display: CROP mode crops the height
     // overflow from the center. aspect 480/640 = 0.75; scale = max(320/480,
     // 240/640) = 0.667 -> 320x426 (int truncation), top = (240-426)/2 = -93.
-    val rect = MjpegFrameRenderer().destRect(480, 640, 320, 240)
+    val rect =
+        MjpegFrameRenderer().apply { scaleMode = ScaleMode.CROP }.destRect(480, 640, 320, 240)
     assertEquals(426, rect.height())
     assertEquals(320, rect.width())
     assertEquals(0, rect.left)
@@ -51,11 +52,12 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
   }
 
   @Test
-  fun destRectCenterCropsWideBitmapHorizontally() {
-    // Very-wide bitmap in a portrait-ish display: height-limited, crops the
+  fun destRectCropScaleWideBitmapHorizontally() {
+    // Very-wide bitmap in a portrait-ish display: CROP mode crops the
     // width overflow from the center. scale = max(320/1000, 240/200) = 1.2 ->
     // 1200x240, left = (320-1200)/2 = -440 (overflow clipped).
-    val rect = MjpegFrameRenderer().destRect(1000, 200, 320, 240)
+    val rect =
+        MjpegFrameRenderer().apply { scaleMode = ScaleMode.CROP }.destRect(1000, 200, 320, 240)
     assertEquals(1200, rect.width())
     assertEquals(240, rect.height())
     assertEquals(-440, rect.left)
@@ -63,8 +65,33 @@ class MjpegFrameRendererTest : RobolectricTestBase() {
   }
 
   @Test
+  fun destRectFitScaleLetterboxesPortraitBitmap() {
+    // Portrait bitmap in a landscape display: FIT mode scales to fit within
+    // the display, leaving black bars. scale = min(320/480, 240/640) = 0.375
+    // -> 180x240, centered horizontally.
+    val rect = MjpegFrameRenderer().destRect(480, 640, 320, 240)
+    assertEquals(180, rect.width())
+    assertEquals(240, rect.height())
+    assertEquals(70, rect.left)
+    assertEquals(0, rect.top)
+  }
+
+  @Test
+  fun destRectFitScaleLetterboxesWideBitmap() {
+    // Very-wide bitmap in a portrait-ish display: FIT mode fits within the
+    // display leaving black bars. scale = min(320/1000, 240/200) = 0.32
+    // -> 320x64, centered vertically.
+    val rect = MjpegFrameRenderer().destRect(1000, 200, 320, 240)
+    assertEquals(320, rect.width())
+    assertEquals(64, rect.height())
+    assertEquals(0, rect.left)
+    assertEquals(88, rect.top)
+  }
+
+  @Test
   fun extractFrameReturnsDestRectForDecodedBitmap() {
     val renderer = MjpegFrameRenderer(decoder = stubDecoder(bitmap(100, 50)))
+    renderer.scaleMode = ScaleMode.CROP
     val rect = renderer.extractFrame(emptyFrame(), 320, 240)
     assertNotNull("expected a dest rect", rect)
     // scale = max(320/100, 240/50) = 4.8 -> 480x240, left = (320-480)/2 = -80.

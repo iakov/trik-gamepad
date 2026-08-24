@@ -23,10 +23,14 @@ object DiagnosticsReport {
       connectionState: ConnectionState?,
       logTail: List<String>,
       crashTrace: String?,
+      systemInsets: String? = null,
+      hudBounds: String? = null,
   ): String {
     val resources = context.resources
     val metrics = resources.displayMetrics
     val configuration = resources.configuration
+    val dpWidth = (metrics.widthPixels / metrics.density).toInt()
+    val dpHeight = (metrics.heightPixels / metrics.density).toInt()
     val out = StringBuilder()
     out.appendLine("# TRIK Gamepad diagnostic report")
     out.appendLine()
@@ -42,8 +46,16 @@ object DiagnosticsReport {
     out.appendLine("- Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
     out.appendLine()
     out.appendLine("## Display")
-    out.appendLine("- Resolution: ${metrics.widthPixels}x${metrics.heightPixels} px")
+    out.appendLine(
+        "- Resolution: ${metrics.widthPixels}x${metrics.heightPixels} px (${dpWidth}x${dpHeight} dp)"
+    )
     out.appendLine("- Density: ${metrics.densityDpi} dpi; font scale ${configuration.fontScale}")
+    if (systemInsets != null) {
+      out.appendLine("- Window insets (top/bottom/left/right): $systemInsets px")
+    }
+    if (hudBounds != null) {
+      out.appendLine("- HUD bounds (px): $hudBounds")
+    }
     out.appendLine("- Locale: ${Locale.getDefault()}")
     out.appendLine()
     out.appendLine("## Connection")
@@ -113,8 +125,11 @@ object DiagnosticsReport {
             prefs,
             "Share without editing",
             SettingsFragment.SK_SHARE_WITHOUT_EDITING,
-            "false",
+            "true",
         )
+    )
+    out.appendLine(
+        settingLine(prefs, "Crop to fill screen", SettingsFragment.SK_VIDEO_CROP, "false")
     )
     val presets = RobotPresetStore(prefs).all().values.map { it.name }.sorted()
     out.appendLine(

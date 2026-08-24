@@ -82,8 +82,8 @@ class RobotChipController(
 
   private fun controlWordResource(accent: Int): Int =
       when (accent) {
-        R.color.greenlight -> R.string.chip_control_connected
-        R.color.amber -> R.string.chip_control_connecting
+        R.color.hud_accent_connected -> R.string.chip_control_connected
+        R.color.hud_accent_connecting -> R.string.chip_control_connecting
         R.color.hud_sepia -> R.string.chip_control_standby
         else -> R.string.chip_control_disconnected
       }

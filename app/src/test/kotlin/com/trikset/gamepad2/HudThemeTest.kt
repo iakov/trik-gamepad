@@ -9,10 +9,12 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.mjpeg.MjpegFrameRenderer
+import com.trikset.gamepad2.mjpeg.ScaleMode
 import com.trikset.gamepad2.mjpeg.SyntheticMjpegServer
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -80,7 +82,10 @@ class HudThemeTest : RobolectricTestBase() {
     val frame = Bitmap.createBitmap(screenWidth, screenHeight, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(frame)
     val cat = catBitmap()
-    val dest = MjpegFrameRenderer().destRect(cat.width, cat.height, screenWidth, screenHeight)
+    val dest =
+        MjpegFrameRenderer()
+            .apply { scaleMode = ScaleMode.CROP }
+            .destRect(cat.width, cat.height, screenWidth, screenHeight)
     canvas.drawBitmap(cat, null, dest, Paint())
 
     // Drive the real state machine: setting the flow value triggers the lifecycle collector's
@@ -132,6 +137,15 @@ class HudThemeTest : RobolectricTestBase() {
   private fun videoIsBright(bitmap: Bitmap): Boolean =
       isBright(pixel(bitmap, screenWidth / 2, screenHeight / 4))
 
+  private fun cropDest() =
+      catBitmap().let { cat ->
+        val dest =
+            MjpegFrameRenderer()
+                .apply { scaleMode = ScaleMode.CROP }
+                .destRect(cat.width, cat.height, screenWidth, screenHeight)
+        Triple(cat, dest, cat.width.toFloat() / dest.width())
+      }
+
   private fun distinctColors(bitmap: Bitmap): Int {
     val seen = mutableSetOf<Int>()
     for (y in 0 until bitmap.height step 8) {
@@ -159,9 +173,7 @@ class HudThemeTest : RobolectricTestBase() {
     // Video fills the screen edge-to-edge: the rendered edge pixel must equal the source cat's
     // pixel at the corresponding center-crop source coordinate (no letterbox bar). The fixture has
     // a black vintage border, so "bright" is the wrong check — coordinate mapping is the check.
-    val cat = catBitmap()
-    val dest = MjpegFrameRenderer().destRect(cat.width, cat.height, screenWidth, screenHeight)
-    val scaleX = cat.width.toFloat() / dest.width()
+    val (cat, dest, scaleX) = cropDest()
     val srcLeft = (4 - dest.left) * scaleX
     val srcRight = (screenWidth - 5 - dest.left) * scaleX
     assertEquals(
@@ -226,5 +238,89 @@ class HudThemeTest : RobolectricTestBase() {
     // A real connection error surfaces the transient error pill too (the theme's error affordance).
     assertEquals(View.VISIBLE, activity.findViewById<TextView>(R.id.connectionError).visibility)
     save(frame, "hud_error.png")
+  }
+
+  @Test
+  fun videoZonesShouldBeCleanAndOverlaysShouldOnlyDarken() {
+    val activity = buildActivity()
+    val frame = render(activity, ConnectionState.Connected)
+    val (cat, dest, scaleX) = cropDest()
+    val scaleY = cat.height.toFloat() / dest.height()
+
+    // Map a display pixel back to the source cat pixel.
+    fun sourcePixel(dx: Int, dy: Int): Int {
+      val sx = ((dx - dest.left) * scaleX).toInt().coerceIn(0, cat.width - 1)
+      val sy = ((dy - dest.top) * scaleY).toInt().coerceIn(0, cat.height - 1)
+      return cat.getPixel(sx, sy)
+    }
+
+    // All clean zone probes are at y=540 (the exact center line where the scrim
+    // gradient alpha is 0), and x between the pads (1052-1228 — at 180dp on 2280-wide
+    // each pad ≈ 176px) or outside them.
+    // Zone A — clean video exact center (between the two pads).
+    assertPixelsMatch("center", frame, { x, y -> sourcePixel(x, y) }, 1140, 540)
+    // Zone B — clean video between pads, left of center.
+    assertPixelsMatch("between-pads-left", frame, { x, y -> sourcePixel(x, y) }, 1000, 540)
+    // Zone C — clean video between pads, right of center.
+    assertPixelsMatch("between-pads-right", frame, { x, y -> sourcePixel(x, y) }, 1300, 540)
+    // Zone D — left of left pad, on center line.
+    assertPixelsMatch("left-of-pads", frame, { x, y -> sourcePixel(x, y) }, 100, 540)
+    // Zone E — right of right pad, on center line.
+    assertPixelsMatch("right-of-pads", frame, { x, y -> sourcePixel(x, y) }, 2180, 540)
+
+    // Zone F — left pad center. The pixel is affected by the pad drawing
+    // (chrome vector + knob), even though the glass fill is gone (P8 resolved).
+    val leftPadPx = pixel(frame, 570, 540)
+    val leftPadSrc = sourcePixel(570, 540)
+    assertNotEquals("left pad center must be affected by pad overlay", leftPadSrc, leftPadPx)
+
+    // Zone G — right pad center (same check: chrome + knob, not glass).
+    val rightPadPx = pixel(frame, 1710, 540)
+    val rightPadSrc = sourcePixel(1710, 540)
+    assertNotEquals("right pad center must be affected by pad overlay", rightPadSrc, rightPadPx)
+
+    // Zone H — top scrim edge (should be darkened, ~15% from top).
+    val topEdgePx = pixel(frame, 1140, 50)
+    val topEdgeSrc = sourcePixel(1140, 50)
+    assertTrue(
+        "top scrim must darken the video at 1140,50",
+        topEdgePx != topEdgeSrc,
+    )
+
+    // Zone I — bottom scrim edge (should be darkened, ~15% from bottom).
+    val bottomEdgePx = pixel(frame, 1140, 1030)
+    val bottomEdgeSrc = sourcePixel(1140, 1030)
+    assertTrue(
+        "bottom scrim must darken the video at 1140,1030",
+        bottomEdgePx != bottomEdgeSrc,
+    )
+  }
+
+  private fun assertPixelsMatch(
+      label: String,
+      frame: Bitmap,
+      sourcePixel: (Int, Int) -> Int,
+      dx: Int,
+      dy: Int,
+  ) {
+    val src = sourcePixel(dx, dy)
+    val rendered = pixel(frame, dx, dy)
+    if (src != rendered) {
+      // NATIVE graphics mode (Skia) can produce 1-bit rounding differences
+      // in the composited pipeline. Accept a per-channel tolerance of 1.
+      val sr = (src shr 16) and 0xFF
+      val sg = (src shr 8) and 0xFF
+      val sb = src and 0xFF
+      val rr = (rendered shr 16) and 0xFF
+      val rg = (rendered shr 8) and 0xFF
+      val rb = rendered and 0xFF
+      assertTrue(
+          "clean video zone '$label' at ($dx,$dy): expected rgb($sr,$sg,$sb) " +
+              "but got rgb($rr,$rg,$rb) (diff >1 per channel)",
+          kotlin.math.abs(sr - rr) <= 1 &&
+              kotlin.math.abs(sg - rg) <= 1 &&
+              kotlin.math.abs(sb - rb) <= 1,
+      )
+    }
   }
 }

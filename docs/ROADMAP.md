@@ -1328,6 +1328,53 @@ existing `MjpegView`; (4) add `VideoPlayerFactory` that routes by URL scheme;
   green twice; lint/detekt/spotbugs/jacoco/spotless/jscpd clean. On-robot RTSP
   verification stays a manual user step (`.PLAN.md`).
 
+## Campaign 33 — Bug fixes + FPS + video fit mode + thread safety (2026-08-24)
+
+Scope (user-driven, auto mode): (1) fix crash `CalledFromWrongThreadException`
+on stream error (wrap `onStreamError` in `runOnUiThread`); (2) fix the same
+bug class in `MediaPlayerVideoPlayer` (route all callbacks through
+`mainHandler.post`); (3) FPS counter: integer format, hysteresis (≥2 change),
+dark pill background, accent green color; (4) rename color resources to
+semantic names (`greenlight→hud_accent_connected`, etc.); (5) add `ScaleMode`
+enum (FIT/CROP) with user preference, default FIT; (6) add pixel-probe test
+verifying P7/P8 video fidelity; (7) document P7/P8/P9 in DESIGN.md.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ≈2 h 10 m (2026-08-24 09:30 → 11:40 +03:00) |
+
+- **Crash fix** — `MainActivity.kt:305-308`: `onStreamError` now wrapped in
+  `runOnUiThread` (was missing, unlike `onFirstFrameListener`). Systemic audit
+  of all listener callbacks found one more unsafe pattern:
+  `MediaPlayerVideoPlayer`'s `onPlayResult(false)` fired from a `MediaPlayer`
+  internal thread and chained into `ConnectionFeedback.error()` which touches
+  views. Fix: `MediaPlayerVideoPlayer` now injects `mainHandler` and routes all
+  callbacks through `mainHandler.post`.
+- **FPS** — `MjpegFrameRenderer.kt`: color changed from `Color.WHITE` to
+  `hud_accent_connected`; format `%.1f` → `%d`; added hysteresis field
+  `lastShownFps`; added `fpsPillPaint` (#88000000, 6px round rect) for
+  readability. `MjpegView.kt:92`: `Color.WHITE` → `ContextCompat.getColor(context, R.color.hud_accent_connected)`.
+- **Color rename** — `greenlight→hud_accent_connected`, `greendark→hud_accent_connected_dark`,
+  `amber→hud_accent_connecting`, `red→hud_accent_error`. ~70 references across
+  20 files updated. `values-night/colors.xml` also renamed.
+- **Video fit mode** — `ScaleMode` enum (`FIT`/`CROP`), `MjpegFrameRenderer`
+  defaults to `FIT`. `VideoPlayer` interface gains `var scaleMode`. Preference
+  `videoCropToFill` (default `false` = FIT) in "Pads & video" category. 5-locale
+  strings. Tests: 2 new FIT destRect tests; existing CROP tests explicitly set
+  `scaleMode = ScaleMode.CROP`; `HudThemeTest` screenshot tests use `CROP`.
+- **Pixel-probe test** — `videoZonesShouldBeCleanAndOverlaysShouldOnlyDarken` in
+  `HudThemeTest`: 5 clean-zone probes match the source cat (1-bit tolerance for
+  NATIVE Skia), 2 pad overlay probes differ, 2 scrim probes differ. Verifies P7
+  (video fidelity) and P8 (overlay darkening).
+- **Design principles** — P7 (video fidelity), P8 (overlay design flaw), P9
+  (video processing research deferred) added to `DESIGN.md`.
+- **Thread-safety audit** — all 10 callback sources classified (1 UNSAFE found
+  and fixed, 9 SAFE confirmed). Documented in DECISIONS.md.
+- **Verification** — 849 unit tests pass (0 failures, 0 errors). Translations
+  key sync: 140 keys in sync across 5 locales. Build `releaseDebug` APK
+  (4.71 MB) copied to `_apk/TRIKGamepad-2.42-API21-releaseDebug.apk`.
+- **Retrospective** — MEMORY.md "Campaign 33 retrospective".
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass

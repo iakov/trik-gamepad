@@ -16,10 +16,10 @@ class VideoStatusIndicator {
   @ColorRes
   fun colorResource(status: VideoStatus): Int =
       when (status) {
-        VideoStatus.PLAYING -> R.color.greenlight
+        VideoStatus.PLAYING -> R.color.hud_accent_connected
         VideoStatus.LOADING,
-        VideoStatus.RECONNECTING -> R.color.amber
-        VideoStatus.UNAVAILABLE -> R.color.red
+        VideoStatus.RECONNECTING -> R.color.hud_accent_connecting
+        VideoStatus.UNAVAILABLE -> R.color.hud_accent_error
         VideoStatus.DISABLED -> R.color.hud_disabled
       }
 }

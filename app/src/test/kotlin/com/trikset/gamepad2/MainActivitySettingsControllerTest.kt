@@ -70,6 +70,12 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     override fun setShowFps(enabled: Boolean) {
       showFpsState = enabled
     }
+
+    var cropToFillState = false
+
+    override fun setVideoCropToFill(enabled: Boolean) {
+      cropToFillState = enabled
+    }
   }
 
   private lateinit var context: Context

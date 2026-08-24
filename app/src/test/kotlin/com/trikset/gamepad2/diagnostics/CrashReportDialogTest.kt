@@ -46,6 +46,11 @@ class CrashReportDialogTest : RobolectricTestBase() {
 
   @Test
   fun showsDialogWithReviewActionByDefault() {
+    // "Review & share" when shareWithoutEditing is explicitly false
+    PreferenceManager.getDefaultSharedPreferences(activity)
+        .edit()
+        .putBoolean(SettingsFragment.SK_SHARE_WITHOUT_EDITING, false)
+        .commit()
     store.save("boom")
     CrashReportDialog(activity, store) { ConnectionState.Connected }.showIfNeeded()
 

@@ -203,8 +203,12 @@ in `app/build.gradle` `testOptions`). `hud_connected.png` /
 `@GraphicsMode(NATIVE)` + `@Config(sdk=[TARGET_SDK])` so Skia rasterization is
 real and deterministic; glyph-text fidelity under Robolectric can be imperfect,
 so the in-process assertions are structural (visibility/text/bounds/alpha) plus
-a source-pixel-mapping check that the video fills the screen edge-to-edge.
-Pixel bounds are computed at **mdpi** (Robolectric's default — emulator 440dpi
+a source-pixel-mapping check that the video fills the screen edge-to-edge
+(CROP mode, the version used by the screenshot tests), and a pixel-probe test
+(`videoZonesShouldBeCleanAndOverlaysShouldOnlyDarken`) that verifies the
+PRINCIPLE P7/P8 video fidelity contract: 5 clean-zone probes match the source
+cat (within 1-bit Skia tolerance), pad/scrim overlay probes differ from the
+source. Pixel bounds are computed at **mdpi** (Robolectric's default — emulator 440dpi
 bounds do NOT match the in-test render), and the cat fixture has black vignette
 borders, so edge assertions must map pixels to the source, never expect
 "bright". Set `SK_SHOW_PADS=255` to make the connected-vs-dimmed alpha contrast

@@ -10,6 +10,7 @@ import com.trikset.gamepad2.WifiSocketBinder
 import com.trikset.gamepad2.diagnostics.AppLog
 import com.trikset.gamepad2.mjpeg.MjpegInputStream
 import com.trikset.gamepad2.mjpeg.MjpegView
+import com.trikset.gamepad2.mjpeg.ScaleMode
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
@@ -31,6 +32,12 @@ class MjpegVideoPlayer(
     get() = view.showFps
     set(value) {
       view.showFps = value
+    }
+
+  override var scaleMode: ScaleMode
+    get() = view.scaleMode
+    set(value) {
+      view.scaleMode = value
     }
 
   private var pendingStreamErrorListener: (() -> Unit)? = null

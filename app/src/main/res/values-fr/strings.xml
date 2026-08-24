@@ -111,6 +111,9 @@
     <string name="pref_show_fps">Afficher les FPS</string>
     <string name="pref_show_fps_on">Compteur FPS affiché sur la vidéo</string>
     <string name="pref_show_fps_off">Compteur FPS masqué</string>
+    <string name="pref_video_crop">Recadrer pour remplir l&#8217;écran</string>
+    <string name="pref_video_crop_on">La vidéo remplit l&#8217;écran (les bords peuvent être rognés)</string>
+    <string name="pref_video_crop_off">La vidéo s&#8217;adapte à l&#8217;écran (barres noires)</string>
     <string name="pref_category_hardware">Gamepad matériel</string>
     <string name="pref_gamepad_swap">Inverser les manettes</string>
     <string name="pref_gamepad_swap_on">Les manettes gauche et droite sont inversées</string>

@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 class RobotChipControllerTest : RobolectricTestBase() {
 
   private val context = org.robolectric.RuntimeEnvironment.getApplication()
-  private var accent = R.color.greenlight
+  private var accent = R.color.hud_accent_connected
 
   private fun chip(
       hostText: String = "192.168.0.1",
@@ -51,7 +51,7 @@ class RobotChipControllerTest : RobolectricTestBase() {
   fun paintControlAccentShouldTintControlGlyphAndSetDescription() {
     val (chipView, controller) = chip()
     controller.setVideoStatus(VideoStatus.PLAYING)
-    controller.paintControlAccent(R.color.amber)
+    controller.paintControlAccent(R.color.hud_accent_connecting)
 
     val controlIcon = chipView.findViewWithTag<ImageView>("controlStatusIcon")
     assertNotNull("control glyph must exist", controlIcon)
@@ -77,12 +77,12 @@ class RobotChipControllerTest : RobolectricTestBase() {
   fun controlAccentProviderShouldDriveDescriptionWord() {
     val (chipView, controller) = chip()
     controller.setVideoStatus(VideoStatus.LOADING)
-    accent = R.color.greenlight
-    controller.paintControlAccent(R.color.greenlight)
+    accent = R.color.hud_accent_connected
+    controller.paintControlAccent(R.color.hud_accent_connected)
     val green = chipView.contentDescription.toString()
 
-    accent = R.color.red
-    controller.paintControlAccent(R.color.red)
+    accent = R.color.hud_accent_error
+    controller.paintControlAccent(R.color.hud_accent_error)
     val red = chipView.contentDescription.toString()
 
     assertEquals(
@@ -100,7 +100,7 @@ class RobotChipControllerTest : RobolectricTestBase() {
       controller.setVideoStatus(status)
       // DISABLED equals the initial value so setVideoStatus no-ops; force the description
       // refresh to render every branch.
-      controller.paintControlAccent(R.color.greenlight)
+      controller.paintControlAccent(R.color.hud_accent_connected)
       val word = chipView.contentDescription.toString()
       assertTrue("video word must be non-empty for $status", word.isNotBlank())
       seen.add(word)
@@ -131,7 +131,7 @@ class RobotChipControllerTest : RobolectricTestBase() {
         )
     // refreshChipDescription must return early on a null chip; nothing may throw.
     controller.setVideoStatus(VideoStatus.PLAYING)
-    controller.paintControlAccent(R.color.amber)
+    controller.paintControlAccent(R.color.hud_accent_connecting)
     controller.setHost("10.0.0.9")
   }
 
@@ -150,7 +150,7 @@ class RobotChipControllerTest : RobolectricTestBase() {
             chipTextProvider = { null },
             controlAccentProvider = { accent },
         )
-    controller.paintControlAccent(R.color.greenlight)
+    controller.paintControlAccent(R.color.hud_accent_connected)
     assertTrue(
         "null host text must fall back to the empty placeholder",
         chipView.contentDescription
@@ -173,7 +173,7 @@ class RobotChipControllerTest : RobolectricTestBase() {
             controlAccentProvider = { accent },
         )
     controller.setVideoStatus(VideoStatus.PLAYING)
-    controller.paintControlAccent(R.color.greenlight)
+    controller.paintControlAccent(R.color.hud_accent_connected)
     // No glyph views with the expected tags: tintChipGlyph must no-op, not throw.
   }
 }

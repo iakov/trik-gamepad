@@ -8,7 +8,6 @@
     <!-- Type 1 HUD theme sizing. -->
     <dimen name="hud_pad_size">260dp</dimen>
     <dimen name="hud_pad_stroke">2dp</dimen>
-    <dimen name="hud_pad_glow_width">6dp</dimen>
     <dimen name="hud_pad_corner">24dp</dimen>
     <dimen name="hud_pill_corner">32dp</dimen>
     <!-- HUD edge inset shared by the status chip (top), the settings gear (left + bottom) and the

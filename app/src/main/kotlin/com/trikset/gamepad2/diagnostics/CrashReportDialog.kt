@@ -4,8 +4,11 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.ConnectionState
 import com.trikset.gamepad2.R
@@ -31,7 +34,7 @@ class CrashReportDialog(
     val crash = store.latest() ?: return
     val shareWithoutEditing =
         PreferenceManager.getDefaultSharedPreferences(activity)
-            .getBoolean(SettingsFragment.SK_SHARE_WITHOUT_EDITING, false)
+            .getBoolean(SettingsFragment.SK_SHARE_WITHOUT_EDITING, true)
     val reportText = buildReport(crash.stackTrace)
     AlertDialog.Builder(activity)
         .setTitle(R.string.crash_dialog_title)
@@ -48,13 +51,42 @@ class CrashReportDialog(
 
   private fun buildReport(crashTrace: String): String {
     val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    val systemInsets = buildSystemInsets()
+    val hudBounds = buildHudBounds()
     return DiagnosticsReport.build(
         activity,
         prefs,
         connectionState(),
         AppLog.tail(AppLog.BUFFER_CAPACITY),
         crashTrace,
+        systemInsets,
+        hudBounds,
     )
+  }
+
+  private fun buildSystemInsets(): String? {
+    val systemInsets =
+        ViewCompat.getRootWindowInsets(activity.window.decorView)
+            ?.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout() or
+                    WindowInsetsCompat.Type.systemGestures() or
+                    WindowInsetsCompat.Type.mandatorySystemGestures()
+            ) ?: return null
+    return "${systemInsets.top}, ${systemInsets.bottom}, ${systemInsets.left}, ${systemInsets.right}"
+  }
+
+  @Suppress("ReturnCount") // each missing HUD view is a real recovery edge
+  private fun buildHudBounds(): String? {
+    fun viewBounds(id: Int): String? {
+      val v = activity.findViewById<View>(id) ?: return null
+      return "${v.left},${v.top},${v.width},${v.height}"
+    }
+    val chip = viewBounds(R.id.targetChip) ?: return null
+    val leftPad = viewBounds(R.id.leftPad) ?: return null
+    val rightPad = viewBounds(R.id.rightPad) ?: return null
+    val buttons = viewBounds(R.id.buttons) ?: return null
+    return "chip=($chip) leftPad=($leftPad) rightPad=($rightPad) buttons=($buttons)"
   }
 
   private fun copyReport(reportText: String) {

@@ -16,16 +16,17 @@ class ConnectionIndicator {
   @ColorRes
   fun borderColorResource(state: ConnectionState): Int =
       when (state) {
-        is ConnectionState.Connecting -> R.color.amber
-        is ConnectionState.Connected -> R.color.greendark
+        is ConnectionState.Connecting -> R.color.hud_accent_connecting
+        is ConnectionState.Connected -> R.color.hud_accent_connected_dark
         is ConnectionState.Disconnected -> accentColorResource(state)
       }
 
   @ColorRes
   fun accentColorResource(state: ConnectionState): Int =
       when (state) {
-        is ConnectionState.Connecting -> R.color.amber
-        is ConnectionState.Connected -> R.color.greenlight
-        is ConnectionState.Disconnected -> if (state.isStandby) R.color.hud_sepia else R.color.red
+        is ConnectionState.Connecting -> R.color.hud_accent_connecting
+        is ConnectionState.Connected -> R.color.hud_accent_connected
+        is ConnectionState.Disconnected ->
+            if (state.isStandby) R.color.hud_sepia else R.color.hud_accent_error
       }
 }

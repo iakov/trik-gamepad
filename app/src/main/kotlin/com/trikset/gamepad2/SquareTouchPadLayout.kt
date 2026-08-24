@@ -21,6 +21,7 @@ class SquareTouchPadLayout : RelativeLayout {
   private var absY = 0f
   var padName: String? = null
   var sender: SenderService? = null
+  private var adaptivePadPx = -1
   private var maxX = 0f
   private var maxY = 0f
   private val touchPadController = TouchPadController()
@@ -43,7 +44,7 @@ class SquareTouchPadLayout : RelativeLayout {
 
   private fun init() {
     // Draw the pad indicator with the theme accent (was hardcoded RED).
-    paint.color = ContextCompat.getColor(context, R.color.greenlight)
+    paint.color = ContextCompat.getColor(context, R.color.hud_accent_connected)
     paint.strokeWidth = 0f
     paint.style = Paint.Style.STROKE
     paint.alpha = OPAQUE_ALPHA
@@ -178,23 +179,15 @@ class SquareTouchPadLayout : RelativeLayout {
   }
 
   override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-    val width = MeasureSpec.getSize(widthMeasureSpec)
-    val height = MeasureSpec.getSize(heightMeasureSpec)
-    val halfPerimeter = width + height
-    val size =
-        if ((width * height) != 0) {
-          min(width, height)
-        } else if (halfPerimeter != 0) {
-          halfPerimeter
-        } else {
-          DEFAULT_SIZE
-        }
-    // The pad chrome is a child view (an ImageView tagged "padChrome"); it must be measured too, or
-    // it collapses to 0x0 and the pad renders as an empty glass panel (C17 regression: the pad
-    // originally had a single background drawable and no children).
-    val squareSpec = MeasureSpec.makeMeasureSpec(size, MeasureSpec.EXACTLY)
-    setMeasuredDimension(size, size)
-    super.onMeasure(squareSpec, squareSpec)
+    if (adaptivePadPx < 0) {
+      val dm = resources.displayMetrics
+      val maxPadPx = resources.getDimensionPixelSize(R.dimen.hud_pad_size)
+      val hPx = maxOf(dm.widthPixels, dm.heightPixels)
+      adaptivePadPx = minOf(maxPadPx, (hPx * PAD_SIZE_SCREEN_RATIO).toInt())
+    }
+    val spec = MeasureSpec.makeMeasureSpec(adaptivePadPx, MeasureSpec.EXACTLY)
+    setMeasuredDimension(adaptivePadPx, adaptivePadPx)
+    super.onMeasure(spec, spec)
   }
 
   override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -292,8 +285,10 @@ class SquareTouchPadLayout : RelativeLayout {
   }
 
   private companion object {
-    const val DEFAULT_SIZE = 100
     const val OPAQUE_ALPHA = 255
+    // Adaptive pad formula: padPx = min(260dp px, screenTallestPx × PAD_SIZE_SCREEN_RATIO).
+    // 0.63 → a narrow phone (360dp landscape) gets ~227dp pads, leaving reasonable video area.
+    const val PAD_SIZE_SCREEN_RATIO = 0.63f
     // Mockup-style joystick knob: radius ~12% of the pad, with a glow halo (1.6x) and a small
     // bright center dot (0.35x). Paints rebuild only on accent change (see ensureKnobPaint).
     const val KNOB_RADIUS_RATIO = 0.12f

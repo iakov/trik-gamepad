@@ -42,7 +42,7 @@ silently patch around it. Decisions in `DECISIONS.md` cite scenario IDs.
 | **S13** | WAP ↔ cellular transition (user-managed phone setting; robot WAP has no internet) | both control and video sockets/connections (http raw socket and https) route over the Wi-Fi AP whenever one exists |
 | **S14** | Robot up, control port blocked/off, video port open | video still recovers (competition edge) |
 
-### Derived principles (P1–P6)
+### Derived principles (P1–P8)
 
 - **P1 — Video is independent of control.** A different-host video stream is
   never gated on the control connection (S4/S6/S11/S8).
@@ -61,6 +61,23 @@ silently patch around it. Decisions in `DECISIONS.md` cite scenario IDs.
   reload closes its socket, so a dead robot costs one cheap failed TCP connect
   per tick, never a leak (the 30 s-restart disease was a socket leak, not
   hammering).
+- **P7 — Video fidelity.** The decoded video frame must reach the compositor
+  with zero color transformation — no ColorMatrix, no setColorFilter, no bitmap
+  post-processing. If a plain `canvas.drawBitmap` changes color perception, it
+  is a bug. The HUD readability scrim and all overlay layers are alpha-only;
+  they darken their own pixels without modifying the decoded bitmap. (Note:
+  some video processing algorithms — e.g. contrast enhancement, white-balance
+  correction for cheap cameras in dark rooms — could improve the driving
+  experience. This is a deferred research topic; any future implementation must
+  be opt-in and configurable, never applied to the raw stream by default.)
+- **P8 — Overlay design flaw: darkened video (RESOLVED).** The translucent glass fills
+  (pad backgrounds, pill backgrounds) darkened the video behind them. The total
+  overlapped area (~55% of screen) reduced the visible video surface. Resolved by
+  removing all glass fills — pads, pills, badges, and the settings button now have
+  transparent backgrounds with only accent-colored strokes as borders. The readability
+  scrim (top/bottom gradient edges) is kept so controls stay legible over bright video.
+  The clean video area is restored to ~100% of the screen, with only thin border
+  outlines on controls.
 
 ### Empty-value semantics
 
@@ -198,12 +215,12 @@ and dark (48,48,48) mode.
 
 ## HUD themes (Type 1)
 
-The gamepad chrome ships as **"Type 1"** — a glass/arcade look (translucent dark
-fake-glass fills, brand-green glow strokes, borderless bare-circle magic buttons,
+The gamepad chrome ships as **"Type 1"** — a glass/arcade look (accent-colored
+border outlines, brand-green stroke, borderless bare-circle magic buttons,
 one tintable pad-chrome vector). Two principles:
 
 - **XML-first, code-only-where-runtime.** Shapes, gradients, ripples, corners,
-  padding, glass fills and styles live in `hud_*` resources and `Hud.*` styles;
+  padding and styles live in `hud_*` resources and `Hud.*` styles;
   Kotlin holds *only* the connection-state accent tint (`Drawable.setTint` /
   `setTextColor` / `GradientDrawable.setStroke`). Rationale: Android resources
   resolve at inflation and `ColorStateList` selectors key on a fixed framework
@@ -218,19 +235,36 @@ one tintable pad-chrome vector). Two principles:
 
 - **Placement:** the two pads are centered in their screen halves (`controlsOverlay`
   = a full-screen `LinearLayout` of two `weight=1` gravity-centered `FrameLayout`s;
-  each pad is `@dimen/hud_pad_size = 260dp` square). Pad centers land at 25%/75%
+  each pad is `@dimen/hud_pad_size = 260dp` square maximum). Pad centers land at 25%/75%
   screen width, vertically centered over the video.
+
+- **Adaptive sizing (2026-08-24):** on narrow screens the pad size shrinks to
+  avoid overcrowding. `SquareTouchPadLayout.onMeasure` computes
+  `padPx = min(260dp in px, screenTallestPx × 0.63)`. The XML `hud_pad_size`
+  (260dp) is the maximum cap; the formula reduces it on devices where the taller
+  screen dimension is < 413dp (e.g. Honor X7c at 360dp → ~227dp). The result is
+  cached per view instance (activity recreate resets it). Reference device table:
+
+  | Device | Landscape height (dp) | Pad size (dp) | Notes |
+  |--------|-----------------------|---------------|-------|
+  | Galaxy S10e | 393 | 247 → **260** (capped) | Reference target |
+  | Galaxy S24 | 407 | 256 → **260** (capped) | Slightly taller, still capped |
+  | Honor X7c | 360 | **227** | Narrowest surveyed |
+  | Surveyed min | 384 | 242 → **260** (capped) | 30 top-selling phones 2023-2027 |
+
 - **Chrome:** a single tintable vector (`hud_pad_chrome`) with a solid inner
   ring, full crosshair lines through the center and four edge arrows, plus a
   **dashed outer ring drawn in code** (`SquareTouchPadLayout.onDraw`; vector
   drawables cannot express dash patterns). The joystick **knob** is a radial
   gradient (accent → darkened edge) with a translucent glow halo and a bright
   center dot, drawn in `onDraw`, following the touch point.
-- **Glass panel:** `hud_pad_glass` (translucent fill, 2dp brand-green border, soft
-  outer glow layer). The pad chrome is a single child `ImageView` tagged
+
+- **Pad glass panel:** `hud_pad_glass` (transparent fill, accent-colored stroke border,
+  rounded corners). The pad chrome is a single child `ImageView` tagged
   `padChrome` (crosshair rings, full lines and edge arrows in one tintable
   vector) recolored via one `SRC_IN` filter in
   `SquareTouchPadLayout.setAccent` — same connection-state tone as the gear/pill.
+
 - **Measurement trap (fixed C18):** `SquareTouchPadLayout.onMeasure` must measure
   its children (`super.onMeasure(squareSpec, squareSpec)` after the square
   `setMeasuredDimension`), or the chrome collapses to 0×0 and the pad renders
@@ -390,6 +424,7 @@ stop()          — stop playback
 release()       — tear down resources
 isPlaying       — true while frames are being consumed
 showFps         — toggle the FPS overlay (MJPEG only; no-op for RTSP)
+scaleMode       — FIT (letterbox, default) or CROP (center-fill); user preference
 onPlayResult    — callback with true/false after a play() attempt settles
 OnStreamError   — fires on a non-recoverable stream failure
 OnFirstFrame    — fires once per playback cycle when the first frame renders
@@ -400,7 +435,8 @@ OnFirstFrame    — fires once per playback cycle when the first frame renders
 - **`MjpegVideoPlayer`** wraps the existing `MjpegView` (HTTP MJPEG stream,
   GPU-backed HWUI render). Uses an executor for async MJPEG stream opening and
   wires the result into the view on the main thread. The `showFps` property
-  delegates to `MjpegView.showFps`.
+  delegates to `MjpegView.showFps`; `scaleMode` delegates to `MjpegView.scaleMode`
+  which reads/writes `MjpegFrameRenderer.scaleMode`.
 - **`MediaPlayerVideoPlayer`** uses Android's built-in `MediaPlayer` +
   `TextureView` for RTSP/H.264 streams. Handles `TextureView.SurfaceTextureListener`
   lifecycle (defers playback until the surface is available). `showFps` is a

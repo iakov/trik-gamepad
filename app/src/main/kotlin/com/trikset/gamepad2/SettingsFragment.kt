@@ -39,6 +39,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val SK_KEEP_SCREEN_ON = "keepScreenOn"
     const val SK_HIDE_CONTROLS = "hideControls"
     const val SK_SHOW_FPS = "showFps"
+    const val SK_VIDEO_CROP = "videoCropToFill"
     const val SK_GAMEPAD_SWAP = "gamepadSwap"
     const val SK_ADVANCED = "advancedSettings"
     const val SK_MAGIC_BUTTON_COUNT = "magicButtonCount"

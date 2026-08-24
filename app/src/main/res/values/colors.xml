@@ -1,17 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="greenlight">#6FC555</color>
-    <color name="greendark">#559540</color>
-    <color name="amber">#FFC107</color>
-    <color name="red">#E53935</color>
+    <color name="hud_accent_connected">#6FC555</color>
+    <color name="hud_accent_connected_dark">#559540</color>
+    <color name="hud_accent_connecting">#FFC107</color>
+    <color name="hud_accent_error">#E53935</color>
     <color name="status_orange">#FF9800</color>
     <color name="white">#FFFFFF</color>
     <color name="magic_button_text">#FFFFFF</color>
-    <!-- Magic-button default fill (the platform darker_gray value, owned here so the WCAG test and
-         the drawable always agree; text on it >= 4.5:1). -->
     <color name="magic_button_fill_default">#555555</color>
-    <!-- Light gray hint over the black video area: contrast >= 4.5:1 (verified by WcagContrastTest;
-         android:color/darker_gray #555 on black was ~2.8:1 and failed AA). -->
     <color name="video_placeholder_text">#BDBDBD</color>
 
     <!-- Type 1 HUD theme (see DESIGN.md "HUD themes"). The connection-state accent set:
@@ -19,11 +15,5 @@
          red = connection error/lost. "Color is never the only signal": the pill text, gear
          description and announcements carry the state too. -->
     <color name="hud_sepia">#C9A97A</color>
-    <color name="hud_glass_fill">#33000000</color>
-    <color name="hud_glass_fill_strong">#66000000</color>
-    <!-- Video-status glyph "disabled" (no video URL configured): a muted gray that still reads
-         against the dark glass badge (>= 3:1, verified by WcagContrastTest). -->
     <color name="hud_disabled">#9E9E9E</color>
-    <!-- Soft outer glow behind the pad glass border (semi-transparent brand green). -->
-    <color name="hud_glass_glow">#336FC555</color>
 </resources>

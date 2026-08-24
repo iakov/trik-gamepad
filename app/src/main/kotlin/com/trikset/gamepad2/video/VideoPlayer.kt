@@ -1,8 +1,11 @@
 package com.trikset.gamepad2.video
 
+import com.trikset.gamepad2.mjpeg.ScaleMode
+
 interface VideoPlayer {
   val isPlaying: Boolean
   var showFps: Boolean
+  var scaleMode: ScaleMode
 
   fun play(url: String?)
 

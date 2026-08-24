@@ -333,8 +333,12 @@ implicit rewrite). The stream **reconnects on error**,
 not on a timer: `MjpegView.MjpegRenderThread` stops on `IOException` and invokes
 `OnStreamErrorListener`, which `MainActivity` registers in `onResume` and routes
 to `restartVideoStream()` (main thread, drops the HTTP connection, re-opens via
-`VideoStreamLoader`). There is **no forced periodic restart** — the old 30 s
-`mRestartCallback` timer was removed (see `DECISIONS.md` "MJPEG:
+`VideoStreamLoader`). The `MjpegFrameRenderer` supports a `ScaleMode` enum
+(`FIT`/`CROP`), defaulting to `FIT` (letterbox); the user can toggle to `CROP`
+(center-fill) via the `videoCropToFill` preference. The renderer also draws the
+FPS overlay (integer, hysteresis-gated, on a dark pill, using the
+`hud_accent_connected` theme color). There is **no forced periodic restart** —
+the old 30 s `mRestartCallback` timer was removed (see `DECISIONS.md` "MJPEG:
 reconnect-on-error"). Cleartext HTTP is enabled via
 `android:usesCleartextTraffic="true"`.
 
@@ -345,7 +349,8 @@ Keys are the `SK_*` constants in `SettingsFragment`: `SK_HOST_ADDRESS`,
 `SK_WHEEL_ENABLED`, `SK_KEEP_SCREEN_ON`, `SK_HIDE_CONTROLS`, `SK_SHOW_FPS`,
 `SK_GAMEPAD_SWAP`, `SK_MAGIC_BUTTON_COUNT` (+ display glyphs `magicSymbol1..5`),
 `SK_ABOUT_SYSTEM`, `SK_COPY_ROBOT_IP`, `SK_RESET_VIDEO_URI`, `SK_SAVE_PRESET`,
-`SK_DELETE_PRESET`, `SK_ROBOT_PRESETS`, `SK_ADVANCED` (sub-screen key).
+`SK_DELETE_PRESET`, `SK_ROBOT_PRESETS`, `SK_ADVANCED` (sub-screen key),
+`SK_VIDEO_CROP = "videoCropToFill"` (default `false` = FIT).
 Stored via androidx `PreferenceManager` (migrated 2026-08-08 from the legacy
 `android.preference.PreferenceManager`; both resolve the same
 `<package>_preferences` default file — verified via javap — so stored values

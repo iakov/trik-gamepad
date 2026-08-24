@@ -35,7 +35,7 @@ object ReportSharer {
       editorAvailable: Boolean,
   ) {
     val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-    val shareWithoutEditing = prefs.getBoolean(SettingsFragment.SK_SHARE_WITHOUT_EDITING, false)
+    val shareWithoutEditing = prefs.getBoolean(SettingsFragment.SK_SHARE_WITHOUT_EDITING, true)
     val sendDirect = shareWithoutEditing || !editorAvailable
     val intent =
         if (sendDirect) {

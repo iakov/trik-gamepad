@@ -111,6 +111,9 @@
     <string name="pref_show_fps">FPS anzeigen</string>
     <string name="pref_show_fps_on">FPS-Zähler über dem Video anzeigen</string>
     <string name="pref_show_fps_off">FPS-Zähler ausgeblendet</string>
+    <string name="pref_video_crop">Bildschirmfüllender Zuschnitt</string>
+    <string name="pref_video_crop_on">Video füllt den Bildschirm (Ränder werden ggf. beschnitten)</string>
+    <string name="pref_video_crop_off">Video passt in den Bildschirm (schwarze Balken)</string>
     <string name="pref_category_hardware">Hardware-Gamepad</string>
     <string name="pref_gamepad_swap">Sticks tauschen</string>
     <string name="pref_gamepad_swap_on">Linker und rechter Stick sind getauscht</string>

@@ -2,12 +2,13 @@ package com.trikset.gamepad2.mjpeg
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
 import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.View
+import androidx.core.content.ContextCompat
+import com.trikset.gamepad2.R
 import com.trikset.gamepad2.diagnostics.AppLog
 import java.io.IOException
 import org.apache.commons.io.input.BoundedInputStream
@@ -40,6 +41,12 @@ class MjpegView : View {
   private val fpsTextPaint = Paint()
   /** When false (default) the FPS overlay is skipped; read in [onDraw] (UI thread). */
   @Volatile var showFps: Boolean = false
+  var scaleMode: ScaleMode
+    get() = renderer.scaleMode
+    set(value) {
+      renderer.scaleMode = value
+    }
+
   private var viewThread: MjpegViewThread? = null
   @Volatile private var input: MjpegInputStream? = null
   @Volatile private var running = false
@@ -89,7 +96,7 @@ class MjpegView : View {
     fpsTextPaint.textAlign = Paint.Align.RIGHT
     fpsTextPaint.textSize = FPS_TEXT_SIZE
     fpsTextPaint.typeface = Typeface.DEFAULT
-    fpsTextPaint.color = Color.WHITE
+    fpsTextPaint.color = ContextCompat.getColor(context, R.color.hud_accent_connected)
     dispWidth = width
     dispHeight = height
   }

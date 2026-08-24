@@ -6,9 +6,12 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Rect
+import android.graphics.RectF
 import com.trikset.gamepad2.diagnostics.AppLog
 import java.io.InputStream
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 import org.apache.commons.io.input.BoundedInputStream
 
 private const val FRAME_TEMP_STORAGE_BYTES = 100000
@@ -40,10 +43,20 @@ class MjpegFrameRenderer(
   private var frameCounter = 0
   private var startTimeMs = 0L
   @Volatile private var fpsString = ""
+  @Volatile var scaleMode = ScaleMode.FIT
+  private var lastShownFps = -1
+  private val fpsPillPaint =
+      Paint().apply {
+        color = 0x88000000.toInt()
+        style = Paint.Style.FILL
+        isAntiAlias = true
+      }
 
   private companion object {
     const val TAG = "MjpegFrameRenderer"
     const val MILLIS_PER_SECOND = 1000.0f
+    const val FPS_PILL_PAD = 4f
+    const val FPS_PILL_CORNER = 6f
   }
 
   /**
@@ -52,7 +65,13 @@ class MjpegFrameRenderer(
    * returned [Rect] may sit partially outside the display — the canvas clips the overflow.
    */
   fun destRect(bitmapWidth: Int, bitmapHeight: Int, dispWidth: Int, dispHeight: Int): Rect {
-    val scale = maxOf(dispWidth.toFloat() / bitmapWidth, dispHeight.toFloat() / bitmapHeight)
+    val scale =
+        when (scaleMode) {
+          ScaleMode.FIT ->
+              minOf(dispWidth.toFloat() / bitmapWidth, dispHeight.toFloat() / bitmapHeight)
+          ScaleMode.CROP ->
+              maxOf(dispWidth.toFloat() / bitmapWidth, dispHeight.toFloat() / bitmapHeight)
+        }
     val bmw = (bitmapWidth * scale).toInt()
     val bmh = (bitmapHeight * scale).toInt()
     val tempX = dispWidth / 2 - bmw / 2
@@ -134,7 +153,11 @@ class MjpegFrameRenderer(
       startTimeMs = now
       val fps = MILLIS_PER_SECOND * frameCounter / FPS_WINDOW_MS
       frameCounter = 0
-      fpsString = String.format(Locale.getDefault(), "%.1f", fps)
+      val currentInt = fps.roundToInt()
+      if (abs(currentInt - lastShownFps) >= 2 || lastShownFps < 0) {
+        lastShownFps = currentInt
+        fpsString = String.format(Locale.getDefault(), "%d", currentInt)
+      }
     }
     return fpsString
   }
@@ -155,8 +178,24 @@ class MjpegFrameRenderer(
     if (current != null) {
       canvas.drawBitmap(current, null, destRect, null)
     }
-    if (showFps) {
-      canvas.drawText(fpsString, (dispWidth - 1).toFloat(), -fpsTextPaint.ascent(), fpsTextPaint)
+    if (showFps && fpsString.isNotEmpty()) {
+      val textWidth = fpsTextPaint.measureText(fpsString)
+      val textHeight = -fpsTextPaint.ascent() + fpsTextPaint.descent()
+      val pillPad = FPS_PILL_PAD
+      val pillRect =
+          RectF(
+              dispWidth - 1 - textWidth - pillPad * 2,
+              0f,
+              dispWidth - 1 + pillPad,
+              textHeight + pillPad * 2,
+          )
+      canvas.drawRoundRect(pillRect, FPS_PILL_CORNER, FPS_PILL_CORNER, fpsPillPaint)
+      canvas.drawText(
+          fpsString,
+          (dispWidth - 1).toFloat(),
+          pillPad - fpsTextPaint.ascent(),
+          fpsTextPaint,
+      )
     }
     return fpsString
   }

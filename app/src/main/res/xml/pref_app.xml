@@ -75,6 +75,12 @@
                 android:summaryOff="@string/pref_show_fps_off"
                 android:summaryOn="@string/pref_show_fps_on"
                 android:title="@string/pref_show_fps" />
+            <SwitchPreference
+                android:defaultValue="false"
+                android:key="videoCropToFill"
+                android:summaryOff="@string/pref_video_crop_off"
+                android:summaryOn="@string/pref_video_crop_on"
+                android:title="@string/pref_video_crop" />
         </PreferenceCategory>
 
         <PreferenceCategory android:title="@string/pref_category_hardware">
@@ -121,7 +127,7 @@
                 android:summary="@string/report_issue_summary"
                 android:title="@string/report_issue" />
             <SwitchPreference
-                android:defaultValue="false"
+                android:defaultValue="true"
                 android:key="shareWithoutEditing"
                 android:summaryOff="@string/share_without_editing_off"
                 android:summaryOn="@string/share_without_editing_on"

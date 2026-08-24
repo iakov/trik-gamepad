@@ -12,9 +12,9 @@ class ConnectionIndicatorTest {
     data class Case(val state: ConnectionState, val expected: Int)
     val cases =
         listOf(
-            Case(ConnectionState.Connecting, R.color.amber),
-            Case(ConnectionState.Connected, R.color.greendark),
-            Case(ConnectionState.Disconnected("Target changed."), R.color.red),
+            Case(ConnectionState.Connecting, R.color.hud_accent_connecting),
+            Case(ConnectionState.Connected, R.color.hud_accent_connected_dark),
+            Case(ConnectionState.Disconnected("Target changed."), R.color.hud_accent_error),
             Case(ConnectionState.Disconnected(""), R.color.hud_sepia),
             Case(
                 ConnectionState.Disconnected(ConnectionState.PAUSE_DISCONNECT_REASON),
@@ -31,10 +31,10 @@ class ConnectionIndicatorTest {
     data class Case(val state: ConnectionState, val expected: Int)
     val cases =
         listOf(
-            Case(ConnectionState.Connected, R.color.greenlight),
-            Case(ConnectionState.Connecting, R.color.amber),
+            Case(ConnectionState.Connected, R.color.hud_accent_connected),
+            Case(ConnectionState.Connecting, R.color.hud_accent_connecting),
             Case(ConnectionState.Disconnected(""), R.color.hud_sepia),
-            Case(ConnectionState.Disconnected("Target changed."), R.color.red),
+            Case(ConnectionState.Disconnected("Target changed."), R.color.hud_accent_error),
         )
     for (case in cases) {
       assertEquals("accent ${case.state}", case.expected, indicator.accentColorResource(case.state))

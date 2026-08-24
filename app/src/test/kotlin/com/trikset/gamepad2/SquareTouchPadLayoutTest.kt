@@ -76,28 +76,31 @@ class SquareTouchPadLayoutTest : RobolectricTestBase() {
   }
 
   @Test
-  fun measureShouldMakeSquareFromWidthAndHeight() {
+  fun measureShouldUseAdaptiveSizeFromScreenDimensions() {
+    // Under Robolectric's default mdpi (160dpi, 480×800px), hud_pad_size=260dp
+    // resolves to 260px, and screenTallestPx*0.63=504px, so 260px wins.
     measureAndLayout(300, 150)
-    assertEquals(150, pad.measuredWidth)
-    assertEquals(150, pad.measuredHeight)
+    assertEquals(260, pad.measuredWidth)
+    assertEquals(260, pad.measuredHeight)
   }
 
   @Test
   fun measureShouldFallBackToDefaultWhenNoSize() {
     measureAndLayout(0, 0, View.MeasureSpec.UNSPECIFIED)
+    // Adaptive formula reads screen dimensions (not specs), so still resolves.
     assertTrue(pad.measuredWidth > 0)
     assertTrue(pad.measuredHeight > 0)
   }
 
   @Test
-  fun measureShouldUseHalfPerimeterWhenOneDimensionIsZero() {
-    // width 0 + height 100 -> width*height==0, halfPerimeter!=0 -> size=100.
+  fun measureShouldUseAdaptiveSizeWhenOneDimensionIsZero() {
+    // Adaptive formula ignores the spec dimensions; result is the adaptive value.
     pad.measure(
         View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
         View.MeasureSpec.makeMeasureSpec(100, View.MeasureSpec.EXACTLY),
     )
-    assertEquals(100, pad.measuredWidth)
-    assertEquals(100, pad.measuredHeight)
+    assertEquals(260, pad.measuredWidth)
+    assertEquals(260, pad.measuredHeight)
   }
 
   @Test

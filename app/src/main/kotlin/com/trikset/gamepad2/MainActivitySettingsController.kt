@@ -41,6 +41,8 @@ class MainActivitySettingsController(
     fun setControlsVisible(visible: Boolean)
 
     fun setShowFps(enabled: Boolean)
+
+    fun setVideoCropToFill(enabled: Boolean)
   }
 
   private val context = context.applicationContext
@@ -163,6 +165,9 @@ class MainActivitySettingsController(
 
     val showFps = sharedPreferences.getBoolean(SettingsFragment.SK_SHOW_FPS, false)
     ui.setShowFps(showFps)
+
+    val cropToFill = sharedPreferences.getBoolean(SettingsFragment.SK_VIDEO_CROP, false)
+    ui.setVideoCropToFill(cropToFill)
 
     try {
       val timeout =

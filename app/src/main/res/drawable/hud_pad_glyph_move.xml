@@ -7,35 +7,35 @@
     android:viewportHeight="24">
     <path
         android:pathData="M12,3v18M3,12h18"
-        android:strokeColor="@color/greenlight"
+        android:strokeColor="@color/hud_accent_connected"
         android:strokeWidth="1.6"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
     <path
         android:pathData="M12,3l-2.4,2.6M12,3l2.4,2.6"
-        android:strokeColor="@color/greenlight"
+        android:strokeColor="@color/hud_accent_connected"
         android:strokeWidth="1.6"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
     <path
         android:pathData="M12,21l-2.4,-2.6M12,21l2.4,-2.6"
-        android:strokeColor="@color/greenlight"
+        android:strokeColor="@color/hud_accent_connected"
         android:strokeWidth="1.6"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
     <path
         android:pathData="M3,12l2.6,-2.4M3,12l2.6,2.4"
-        android:strokeColor="@color/greenlight"
+        android:strokeColor="@color/hud_accent_connected"
         android:strokeWidth="1.6"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
         android:fillColor="@android:color/transparent" />
     <path
         android:pathData="M21,12l-2.6,-2.4M21,12l-2.6,2.4"
-        android:strokeColor="@color/greenlight"
+        android:strokeColor="@color/hud_accent_connected"
         android:strokeWidth="1.6"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"

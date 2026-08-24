@@ -3,19 +3,27 @@ package com.trikset.gamepad2.video
 import android.graphics.SurfaceTexture
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
 import android.view.Surface
 import android.view.TextureView
 import androidx.core.net.toUri
 import com.trikset.gamepad2.diagnostics.AppLog
+import com.trikset.gamepad2.mjpeg.ScaleMode
 
 class MediaPlayerVideoPlayer(
     private val textureView: TextureView,
+    private val mainHandler: Handler = Handler(Looper.getMainLooper()),
 ) : VideoPlayer {
 
   override val isPlaying: Boolean
     get() = mediaPlayer?.isPlaying == true
 
   override var showFps: Boolean = false
+
+  override var scaleMode: ScaleMode
+    get() = ScaleMode.FIT
+    set(_) {}
 
   override var onPlayResult: ((Boolean) -> Unit)? = null
 
@@ -51,10 +59,22 @@ class MediaPlayerVideoPlayer(
         }
   }
 
+  private fun postOnPlayResult(result: Boolean) {
+    mainHandler.post { onPlayResult?.invoke(result) }
+  }
+
+  private fun postStreamError() {
+    mainHandler.post { pendingErrorListener?.invoke() }
+  }
+
+  private fun postFirstFrame() {
+    mainHandler.post { pendingFirstFrameListener?.invoke() }
+  }
+
   override fun play(url: String?) {
     if (url == null) {
       stop()
-      onPlayResult?.invoke(false)
+      postOnPlayResult(false)
       return
     }
     stop()
@@ -80,19 +100,19 @@ class MediaPlayerVideoPlayer(
             setOnPreparedListener { mp ->
               prepared = true
               mp.start()
-              onPlayResult?.invoke(true)
+              postOnPlayResult(true)
             }
             setOnErrorListener { _, what, extra ->
               AppLog.e(TAG, "MediaPlayer error: what=$what extra=$extra")
-              pendingErrorListener?.invoke()
-              onPlayResult?.invoke(false)
+              postStreamError()
+              postOnPlayResult(false)
               true
             }
             setOnInfoListener { _, what, _ ->
               if (what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) {
                 if (!firstFrameReported) {
                   firstFrameReported = true
-                  pendingFirstFrameListener?.invoke()
+                  postFirstFrame()
                 }
               }
               false
@@ -102,7 +122,7 @@ class MediaPlayerVideoPlayer(
       mediaPlayer = player
     } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
       AppLog.e(TAG, "Failed to prepare RTSP stream: $url", e)
-      onPlayResult?.invoke(false)
+      postOnPlayResult(false)
     }
   }
 

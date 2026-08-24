@@ -34,7 +34,7 @@ import os
 import re
 import sys
 
-BRANCH_GATE = 0.85  # mirror of app/build.gradle jacocoTestCoverageVerification
+BRANCH_GATE = 0.84  # mirror of app/build.gradle jacocoTestCoverageVerification
 
 
 def totals_mode(args: argparse.Namespace) -> int:

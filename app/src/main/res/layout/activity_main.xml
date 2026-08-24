@@ -142,8 +142,7 @@
                  (set at runtime by MainActivity.applyHudTone). -->
             <FrameLayout
                 android:layout_width="@dimen/hud_status_badge_size"
-                android:layout_height="@dimen/hud_status_badge_size"
-                android:background="@drawable/hud_status_badge">
+                android:layout_height="@dimen/hud_status_badge_size">
 
                 <ImageView
                     android:layout_width="@dimen/hud_status_glyph_size"
@@ -170,8 +169,7 @@
             <FrameLayout
                 android:layout_width="@dimen/hud_status_badge_size"
                 android:layout_height="@dimen/hud_status_badge_size"
-                android:layout_marginStart="@dimen/hud_chip_badge_gap"
-                android:background="@drawable/hud_status_badge">
+                android:layout_marginStart="@dimen/hud_chip_badge_gap">
 
                 <ImageView
                     android:layout_width="@dimen/hud_status_glyph_size"
@@ -200,7 +198,7 @@
             android:minHeight="@dimen/touch_target_min"
             android:padding="0dp"
             android:text="@string/settings_gear_glyph"
-            android:textColor="@color/greenlight"
+            android:textColor="@color/hud_accent_connected"
             android:textSize="22sp" />
 
         <LinearLayout
@@ -230,9 +228,8 @@
         android:layout_width="@dimen/video_loading_size"
         android:layout_height="@dimen/video_loading_size"
         android:layout_centerInParent="true"
-        android:background="@drawable/video_loading_background"
         android:importantForAccessibility="no"
-        android:indeterminateTint="@color/greenlight"
+        android:indeterminateTint="@color/hud_accent_connected"
         android:padding="14dp"
         android:visibility="gone" />
 
