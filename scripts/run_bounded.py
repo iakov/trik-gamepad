@@ -8,6 +8,13 @@ holding the inherited output pipe, so the CALLER blocks forever even though the
 tool "timed out" (hit 2026-08-13: an `adb install` during an emulator offline
 blip hung the caller for ~15h). See AGENTS.md "Operational rules".
 
+The child is ALWAYS started with stdout=PIPE (never the caller's own stdout), so
+no descendant can hold the caller's output-pipe handle open. A reader thread
+pumps decoded output to the sink (the --log file or stdout); the main thread
+only waits on proc.wait(timeout) and kills the tree if the budget expires.
+This combination guarantees the caller always returns: the pipe EOF is decided
+by the reader thread, and proc.wait() is bounded by the timeout.
+
 Usage:
   uv run python scripts/run_bounded.py --timeout 600 --label assembleDebug --log .tmp/x.log -- gradlew.bat --no-daemon assembleDebug
   uv run python scripts/run_bounded.py --timeout 120 -- adb -s emulator-5556 install -r app.apk
@@ -19,10 +26,12 @@ log (or stdout) gets a "TIMEOUT after Ns" marker line.
 from __future__ import annotations
 
 import argparse
+import codecs
 import os
 import signal
 import subprocess
 import sys
+import threading
 
 
 def kill_tree(proc: subprocess.Popen) -> None:
@@ -32,11 +41,48 @@ def kill_tree(proc: subprocess.Popen) -> None:
             ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            timeout=30,
         )
     else:
         try:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
         except (ProcessLookupError, PermissionError):
+            pass
+
+
+def _pump(stream, sink, close_sink) -> None:
+    """Copy child stdout to the sink until EOF; always closes the sink."""
+    decoder = None
+    try:
+        while True:
+            chunk = stream.read(65536)
+            if not chunk:
+                break
+            if decoder is None:
+                decoder = codecs.getincrementaldecoder("utf-8")("replace")
+                decoder.decode(b"")  # prime the decoder state
+            try:
+                text = decoder.decode(chunk)
+            except Exception:
+                text = chunk.decode("utf-8", "replace")
+            if text:
+                try:
+                    sink.write(text)
+                    sink.flush()
+                except Exception:
+                    pass
+        if decoder is not None:
+            try:
+                tail = decoder.decode(b"", final=True)
+                if tail:
+                    sink.write(tail)
+                    sink.flush()
+            except Exception:
+                pass
+    finally:
+        try:
+            close_sink()
+        except Exception:
             pass
 
 
@@ -54,13 +100,26 @@ def run(timeout: float, label: str, cmd: list[str], log: str | None) -> int:
         sink = sys.stdout
         close_sink = lambda: None  # noqa: E731
 
-    proc = subprocess.Popen(cmd, stdout=sink, stderr=subprocess.STDOUT, **kwargs)
+    # Always PIPE: if the child tree inherits the caller's own stdout/stderr,
+    # the pipe EOF (and therefore the bash tool's return) waits on every
+    # grandchild (adb server daemon, detached launchers, ...) — the 2026-08-13
+    # ~15h hang. PIPE keeps the caller's handles out of the child tree.
+    proc = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        **kwargs,
+    )
+    reader = threading.Thread(target=_pump, args=(proc.stdout, sink, close_sink), daemon=True)
+    reader.start()
+
     try:
-        proc.communicate(timeout=timeout)
+        proc.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
         marker = f"TIMEOUT after {timeout:g}s ({label})\n"
         try:
             sys.stderr.write(marker)
+            sys.stderr.flush()
         except Exception:
             pass
         if log is not None:
@@ -70,14 +129,13 @@ def run(timeout: float, label: str, cmd: list[str], log: str | None) -> int:
             except Exception:
                 pass
         kill_tree(proc)
-        # Reap so we do not leak a zombie; the tree is dead, so this returns fast.
         try:
-            proc.communicate(timeout=5)
+            proc.wait(timeout=30)
         except subprocess.TimeoutExpired:
             pass
-        close_sink()
         return 124
-    close_sink()
+
+    reader.join(timeout=5)
     return proc.returncode
 
 
