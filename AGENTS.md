@@ -52,6 +52,12 @@ Improvement roadmap: `docs/ROADMAP.md`.
   "[2026-08-13] AGP 9.2.1 — Android Studio 3-release compatibility floor".
 - `org.gradle.configuration-cache=true` in `gradle.properties` — do not disable
   it again (rationale: DECISIONS.md).
+- **`--add-modules=jdk.compiler` in `org.gradle.jvmargs` is load-bearing**: without
+  it the `spotlessKotlinApply` step dies with `ktfmt(java.lang.NoClassDefFoundError) com/sun/source/tree/Tree` — the daemon JVM resolves only `java.se` by default, so
+  ktfmt's javac-tree classes (via google-java-format) are unloadable in the apply
+  task's platform-parent classloader, while the check task happens to still work.
+  Do not remove the flag; if the flag ever changes, re-verify `spotlessKotlinApply --rerun-tasks`. Rationale: DECISIONS.md "[2026-08-27] jdk.compiler module in the
+  Gradle daemon (ktfmt apply-path)".
 - Three build types; `./gradlew test` runs Robolectric under all three in
   parallel JVMs — unit tests must use ephemeral ports and reset
   SharedPreferences per test (they persist across methods in a JVM; the old
@@ -194,7 +200,7 @@ configurations, update this section and the referenced config files.
 ### Operational rules (command hygiene)
 
 - **Command hygiene**: every command runs with a reasonable timeout and is logged (tee to `app/build/<task>.log` or `.tmp/`); on timeout read the log first. If a command takes ≥1.5× the expected time, analyze the wrong guess and record expected vs actual.
-- **Bound long-lived native commands at the process TREE** (`uv run python scripts/run_bounded.py --timeout N -- cmd ...`): killing only the direct process leaves children (cmd wrappers, gradle daemons, adb clients) holding the inherited output pipe, so the CALLER blocks forever even though the tool "timed out" (hit 2026-08-13: an `adb install` during an emulator offline blip hung the caller ~15 h). `_gradle.call_gradle` and `gate.py`'s non-gradle steps are already bounded; for ad-hoc `adb`/`gradlew` calls, route through the runner or pass an explicit bash-tool `timeout`. The host `adb.bat` shim (machine-local, `~/.local/bin`) auto-intercepts every `adb`. **`start /b` + a `>` redirect still hangs the caller for long-lived children** (the child inherits the tool's pipe and EOF never comes — hit 2026-08-14 twice): launch servers via `Start-Process -PassThru -RedirectStandardOutput/-RedirectStandardError` (fully detached) then verify liveness immediately + one bounded readiness poll (`netstat -ano | findstr :port`). **Emulator launches: wrap a detached-launcher `.ps1` in `run_bounded`** (the launcher returns in ~3 s so run_bounded's timeout never fires and its tree-kill only catches a hung launch; the emulator stays alive) and do the boot wait as a separate `wait_boot.ps1` under `run_bounded` in the same turn — never inline a PowerShell `$var` loop through `run_bounded` (nested quoting mangles `$b`/`$i`), never wrap the emulator itself in run_bounded (timeout kills a healthy emulator). A **hung emulator launch wrapper is NOT a failed launch** — the Start-Process-detached emulator survives a wrapper hang (hit 2026-08-17, C23: no PID output, bash-tool timeout killed the wrapper, emulator still booted); verify liveness independently (`adb devices` + boot poll) before any kill/relaunch. `adb emu kill` leaves transient `emulator -kill <pid> -sleep 20` helpers up to ~20 s — not real emulators; wait for them to clear before confirming the kill. Details: MEMORY.md "Timeout-bound tooling", DECISIONS.md "[2026-08-17] Emulator launch".
+- **Bound long-lived native commands at the process TREE** (`uv run python scripts/run_bounded.py --timeout N -- cmd ...`): killing only the direct process leaves children (cmd wrappers, gradle daemons, adb clients) holding the inherited output pipe, so the CALLER blocks forever even though the tool "timed out" (hit 2026-08-13: an `adb install` during an emulator offline blip hung the caller ~15 h). `_gradle.call_gradle` and `gate.py`'s non-gradle steps are already bounded; for ad-hoc `adb`/`gradlew` calls, route through the runner or pass an explicit bash-tool `timeout`. The host `adb.bat` shim (machine-local, `~/.local/bin`) auto-intercepts every `adb`. **`start /b` + a `>` redirect still hangs the caller for long-lived children** (the child inherits the tool's pipe and EOF never comes — hit 2026-08-14 twice): launch servers via `Start-Process -PassThru -RedirectStandardOutput/-RedirectStandardError` (fully detached) then verify liveness immediately + one bounded readiness poll (`netstat -ano | findstr :port`). **Emulator launches: wrap a detached-launcher `.ps1` in `run_bounded`** (the launcher returns in ~3 s so run_bounded's timeout never fires and its tree-kill only catches a hung launch; the emulator stays alive) and do the boot wait as a separate `wait_boot.ps1` under `run_bounded` in the same turn — never inline a PowerShell `$var` loop through `run_bounded` (nested quoting mangles `$b`/`$i`), never wrap the emulator itself in run_bounded (timeout kills a healthy emulator). A **hung emulator launch wrapper is NOT a failed launch** — the Start-Process-detached emulator survives a wrapper hang (hit 2026-08-17, C23: no PID output, bash-tool timeout killed the wrapper, emulator still booted); verify liveness independently (`adb devices` + boot poll) before any kill/relaunch. `adb emu kill` leaves transient `emulator -kill <pid> -sleep 20` helpers up to ~20 s — not real emulators; wait for them to clear before confirming the kill. Details: MEMORY.md "Timeout-bound tooling", DECISIONS.md "[2026-08-17] Emulator launch", DECISIONS.md "[2026-08-27] run_bounded hang-proof redesign".
 - **Always measure elapsed time for every campaign**: report the wall-clock elapsed figure to the console when the campaign completes, and store ONLY the campaign's `Estimated` and `Actual` (elapsed) in the ROADMAP header table — no `Start`/`End` timestamps. A campaign whose ROADMAP entry has no elapsed figure is **incomplete** — treat missing timing like missing verification.
 - **A wrong guess usually means an option was not set properly** — re-audit the invocation.
 - **Slow commands → research (incl. web), tune repeatable tooling, document in MEMORY.md** — never fix the symptom.
@@ -214,16 +220,20 @@ configurations, update this section and the referenced config files.
   from memory: reuse the established `.tmp/launch_dummy.ps1` pattern
   (`Start-Process` + `.tmp/` redirects), and never redirect
   a server's logs to `$env:TEMP` — repo `.tmp/` always (Repo hygiene).
-  **IMPORTANT: `run_bounded` must NOT wrap a detached-launcher `.ps1` that
-  returns instantly** (the dummy server launcher returns in \<1 s).
-  `run_bounded` creates `subprocess.PIPE` + pwsh handle inheritance, so the
-  caller blocks even though the child (java) detached cleanly (hit C30:
-  PID visible on stdout but tool never returned). Invoke the launcher directly
-  (no wrapper needed — the `.ps1` finishes in \<1 s) and verify liveness in a
-  separate step. The **emulator launcher** is the exception — it wraps in
-  `run_bounded` because the `.ps1` does extra work (~3-4 s) before exiting,
-  and the emulator's `Start-Process` plus the long `--timeout 180` absorb the
-  pipe-inheritance lag without blocking the caller.
+  **run_bounded is hang-proof as of 2026-08-27**: it starts every child with
+  its own `PIPE` (never the caller's stdout), pumps output via a reader thread,
+  and the main thread only does bounded `proc.wait(timeout)` — so even a
+  detached grandchild that outlives the child (the C30 `java` launcher, an adb
+  server daemon) can no longer hold the caller's pipe open. Wrapping any
+  launcher is now safe (worst case ~5 s drain wait); the old
+  "must NOT wrap a detached-launcher `.ps1`" rule is obsolete. The remaining
+  caveat is **nested `$var` quoting** — never inline a PowerShell loop
+  (e.g. `$b`/`$i`) through `run_bounded`; route the script body through a
+  `.tmp/*.ps1` file. The **emulator launcher** still wraps in `run_bounded`
+  (the `.ps1` does ~3-4 s of work; the long `--timeout 180` absorbs the drain
+  wait), but a hung wrapper is NOT a failed launch — verify liveness
+  independently (`adb devices` + boot poll) before any kill/relaunch.
+  Details: DECISIONS.md "[2026-08-27] run_bounded hang-proof redesign".
 - **"Exit 0" ≠ the tool ran** — re-run with `--info`/`--rerun-tasks` and confirm the analyzer actually analyzed sources before trusting green. Concrete trigger: a static-analysis task that shows `UP-TO-DATE` right after you added/renamed source files (analyzers can stay UP-TO-DATE when new files arrive via an untracked path) — force one `./gradlew detekt --rerun-tasks` pass before trusting the gate (MEMORY.md "Campaign 4").
 - **Apply documented class traps before writing tests** (MEMORY.md/TESTING.md per-class entries).
 - **Format before you gate — automate, don't remember.** `.kt` → `./gradlew spotlessApply` (ktfmt), `.md` → `uvx mdformat`; run them before the gate or `spotlessCheck` fails. Run `spotlessApply` as a **separate invocation** from the gate when `org.gradle.parallel=true` (it rewrites `.kt` while `test` compiles them — a race). Pre-commit hooks + `scripts/gate.py` automate this (see Commands).

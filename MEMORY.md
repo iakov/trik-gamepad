@@ -122,6 +122,17 @@ POSIX `os.killpg(SIGKILL)` via `start_new_session`. Exit code `124` + a
 `TIMEOUT after Ns (label)` marker in the log. Usage:
 `uv run python scripts/run_bounded.py --timeout 600 --label X --log .tmp/x.log -- cmd ...`.
 
+**Hang-proof redesign (2026-08-27):** the child is now ALWAYS started with its
+own `stdout=PIPE` (never the caller's `sys.stdout`); a daemon reader thread
+pumps decoded output to the sink and the main thread only does bounded
+`proc.wait(timeout)` (no `communicate()`). A detached grandchild (adb server
+daemon, a `Start-Process`-detached launcher) can no longer hold the caller's
+pipe open — the caller returns within `timeout` + ~5 s drain even when a
+grandchild outlives the child (measured ~5.7 s in the grandchild repro). The
+old "must NOT wrap a detached-launcher `.ps1`" caveat is obsolete; the nested
+`$var`-quoting caveat below still applies. Details: DECISIONS.md "[2026-08-27]
+run_bounded hang-proof redesign".
+
 Wiring (all committed except the shim):
 
 - `scripts/_gradle.py::call_gradle` runs every gradle call through it
@@ -253,6 +264,21 @@ Resolution-only, per user request; density unchanged so all dp math / pixel-cens
 scripts still compute 2.75. AVD `config.ini` is the source of truth (DECISIONS.md)
 and edits apply only at the next cold boot — kill the emulator, edit, relaunch with
 `-no-snapshot`, verify with `adb shell wm size` → `1080x2280`.
+
+**Cutout-letterbox reproduction (2026-08-27):** API 36 emulators cannot
+reproduce the display-cutout letterbox — with `targetSdk 36` the API 36
+framework forces `layoutInDisplayCutoutMode=always` on app windows, so the
+window never letterboxes. Reproduce on API ≤34 instead: the `Pixel5_API34` AVD
+(pixel_5 device profile, `system-images;android-34;google_apis;x86_64`) rotates
+its top-center punch-hole to the LEFT edge in the app's forced landscape and
+letterboxes the default-mode window (`dumpsys window displays` shows
+`mAppBounds=Rect(136, 0 - …)` with a `displayCutout` InsetsSource at the left).
+Set `immersive_mode_confirmations confirmed` on the fresh AVD before
+screenshots (the confirm dialog + SystemUI ANR overlays pollute captures).
+Also remember the fresh-APK rule: an installed APK predating an `applicationId`
+change crashes at startup (old `com.trikset.gamepad` package's leaked network
+callback per reload) — always rebuild `assembleReleaseDebug --rerun-tasks`
+after a package rename.
 
 ## Device performance profiling (simpleperf)
 

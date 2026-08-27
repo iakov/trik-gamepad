@@ -238,6 +238,15 @@ one tintable pad-chrome vector). Two principles:
   each pad is `@dimen/hud_pad_size = 260dp` square maximum). Pad centers land at 25%/75%
   screen width, vertically centered over the video.
 
+- **Full-bleed past the display cutout (2026-08-27):** the window draws behind
+  the cutout (`layoutInDisplayCutoutMode=ALWAYS`, set in `MainActivity.onCreate`),
+  so the pads center on the *physical* screen quarters. The default mode
+  letterboxes the whole window on a left-edge cutout (a camera hole rotated to
+  the landscape edge — HONOR ALT-LX1): a full-height black band plus everything
+  shifted right. Only the edge-pinned chrome insets past the cutout; the pads
+  are cutout-agnostic by design. See DECISIONS.md "Display-cutout full-bleed
+  window".
+
 - **Adaptive sizing (2026-08-24):** on narrow screens the pad size shrinks to
   avoid overcrowding. `SquareTouchPadLayout.onMeasure` computes
   `padPx = min(260dp in px, screenTallestPx × 0.63)`. The XML `hud_pad_size`
@@ -362,6 +371,14 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
   chip's taps were eaten by a Samsung shade strip; see DECISIONS.md
   "Inset-aware HUD container"). The video stays full-bleed as a sibling below
   the container; the center pills stay in `main`.
+- **The window is full-bleed past the display cutout** (`layoutInDisplayCutoutMode`
+  = `ALWAYS`/`SHORT_EDGES` in `MainActivity.onCreate`): two inset domains keep the
+  layout correct — the window draws behind the cutout (video and pads span the
+  physical screen), while `hudControls` still insets the edge-pinned chrome past
+  the cutout and the system bars. Without the window-level opt-out the default
+  mode letterboxes the whole app on a left-edge cutout (a camera hole rotated to
+  the landscape edge): a full-height black band plus every control shifted right
+  (HONOR ALT-LX1). See DECISIONS.md "Display-cutout full-bleed window".
 - **Error feedback is a content-sized glass pill** (`connectionError`,
   `Hud.GlassPill`, wrap_content → always fits its message), shown by
   `ConnectionFeedback.error()` for real connection errors: fade-in, auto-dismiss

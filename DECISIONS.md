@@ -36,20 +36,46 @@ touch one.
 
 | Area | Covers | Newest decision |
 |------|--------|-----------------|
-| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-22] Toolchain bump: Gradle 9.7.1 + spotless 8.10.0 + spotbugs 6.5.11 |
+| Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-27] jdk.compiler module in the Gradle daemon (ktfmt apply-path) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral, ScaleMode FIT/CROP, color rename, FPS integer+hysteresis, thread-safety audit | [2026-08-24] Thread-safety: runOnUiThread for stream error listeners |
 | Workflows | fork-only, releases | [2026-08-22] Release via signed tags + GH releases |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
-| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-18] Haptic schema: generic legacy constants, strong pulses, no VIBRATE |
+| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-27] Display-cutout full-bleed window (HONOR dead-band bug) |
 | Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-20] Device-identifier pre-commit hook + gate step |
-| Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-17] Emulator launch: run_bounded-wrapped detached Start-Process |
+| Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-27] run_bounded hang-proof redesign |
 | Build & versioning | package naming, minSdk, versionCode formula, release signing | [2026-08-22] Package rename to com.trikset.gamepad2 |
 
 ______________________________________________________________________
 
 ## Build & toolchain
+
+### [2026-08-27] jdk.compiler module in the Gradle daemon (ktfmt apply-path)
+
+- **Type:** problem-avoiding (build tooling must format reliably on the local
+  JDK; prevents a cryptic gate failure).
+- **Problem:** `spotlessKotlinApply` failed deterministically with
+  `ktfmt(java.lang.NoClassDefFoundError) com/sun/source/tree/Tree` while
+  `spotlessKotlin` (the check task) passed. The daemon JVM resolves only the
+  `java.se` root module by default, so `jdk.compiler`'s public
+  `com.sun.source.tree.*` API (loaded through google-java-format) is
+  unloadable in the apply task's platform-parent classloader. The check task's
+  classloader context happened to work; the apply path did not — the same
+  failure shape as Spotless issue #2646 (ktfmt 0.55+ needs the javac tree API).
+- **Alternatives considered:** (a) downgrade ktfmt to 0.54 (changes formatting
+  output — rejected); (b) add only `--add-exports` (exports are no-ops while
+  the module itself is not resolved — rejected); (c) resolve the module via
+  `--add-modules=jdk.compiler` in `org.gradle.jvmargs` (chosen).
+- **Chosen solution:** `org.gradle.jvmargs` in `gradle.properties` gains
+  `--add-modules=jdk.compiler`. Verified with `spotlessKotlinApply --rerun-tasks` (green).
+- **Why:** minimal and vendor-agnostic; it makes the local Microsoft JDK 21
+  daemon resolve the same module that the CI toolchain provides by other means
+  (the CI gate already passed without it). Harmless in CI.
+- **Out of scope / consequences:** the flag is load-bearing for the apply path —
+  do not remove it; if the daemon args ever change, re-verify
+  `spotlessKotlinApply --rerun-tasks` (the check task alone can pass while
+  apply breaks). Registered as an AGENTS.md Build rule.
 
 ### [2026-08-13] AGP 9.2.1 — Android Studio 3-release compatibility floor
 
@@ -1646,6 +1672,40 @@ ______________________________________________________________________
 
 ## UX & accessibility & i18n
 
+### [2026-08-27] Display-cutout full-bleed window (HONOR dead-band bug)
+
+- **Type:** design-clarifying (how the window treats the display cutout is
+  product-visible layout; the pads stay cutout-agnostic by design).
+- **Problem:** on the HONOR ALT-LX1 (its camera punch-hole rotates to the LEFT
+  edge under the app's forced landscape) the app window was letterboxed:
+  `layoutInDisplayCutoutMode=DEFAULT` pushed the whole layout right of the
+  cutout band (~49 dp full-height black strip) and shifted the video, scrim and
+  pads right of physical center. The video is a plain full-screen `View` — only
+  a window-level letterbox can move its left edge, so no layout change could
+  fix it.
+- **Alternatives considered:** (a) re-fit the pads around the visible camera
+  capsule (would shrink pads on every device — rejected); (b) inset the whole
+  HUD by the cutout (would shift the video too, which is the actual defect —
+  rejected); (c) full-bleed window + keep only the chrome inset (chosen).
+- **Chosen solution:** in `MainActivity.onCreate`, after
+  `WindowCompat.setDecorFitsSystemWindows(window, false)`, set
+  `layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` on API 30+
+  (`SHORT_EDGES` on API 28-29). The window draws behind the cutout; the
+  existing `hudControls` insets listener keeps the edge-pinned chrome clear.
+  API 35+ already enforces this for targetSdk 35+ apps; API 27- has no cutouts.
+- **Why:** pads are designed to be symmetric in the full-screen halves and
+  cutout-agnostic (only the chrome avoids the cutout/insets) — drawing behind
+  the cutout is the design-correct behavior: pads become truly centered on the
+  physical screen and the video returns to full-bleed.
+- **Out of scope / consequences:** pads remain cutout-agnostic (a pad's corner
+  may sit near a camera capsule on a device with a very deep cutout; a
+  fit-to-capsule refinement is deferred to screenshot review). Verified on the
+  Pixel5_API34 emulator (API 34, pixel_5 hole rotated to the left): before —
+  window letterboxed (`mAppBounds=Rect(136,0-2340,1014)`); after — content
+  `[0,0][2340,1080]` full-bleed with pads symmetric at 25%/75%.
+  `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` is not `@Deprecated` in SDK 36, so no
+  suppression is needed.
+
 ### [2026-08-24] Adaptive pad sizing
 
 - **Type:** problem-avoiding (prevents pad overcrowding on density-inflated
@@ -1872,6 +1932,37 @@ ______________________________________________________________________
   instrumented 9/9 on both emulators (after the SettingsTests fix), screenshots
   verified by pixel-census (chrome/knob/ring present in sepia idle; gear + chip
   render) and hash-matched against fresh captures.
+
+### [2026-08-27] run_bounded hang-proof redesign
+
+- **Type:** problem-avoiding (command hygiene: a bounded runner must never leave
+  the caller blocked, no matter what the child tree does).
+- **Problem:** `run_bounded.py` started the child with `stdout=sink`, where
+  `sink` was the caller's own `sys.stdout` when no `--log` was given. A
+  detached grandchild (adb server daemon, a `Start-Process`-detached launcher)
+  inherited that pipe write-end and outlived the child, so the pipe EOF — and
+  therefore the bash tool's return — never came: the caller blocked forever
+  after the runner had already "exited". This was the recurring emulator
+  boot-wait hang, the same pipe-inheritance trap as the 2026-08-13 ~15 h adb
+  hang.
+- **Alternatives considered:** (a) force `--log` everywhere (callers can forget
+  it; `_gradle.call_gradle` and `gate.py` pass it, ad-hoc calls do not —
+  rejected); (b) keep `proc.communicate()` and accept the inheritance risk
+  (rejected); (c) always give the child its own `PIPE` and pump output via a
+  reader thread (chosen).
+- **Chosen solution:** `subprocess.Popen(stdout=PIPE, stderr=STDOUT)` always; a
+  daemon reader thread pumps decoded output to the sink (the `--log` file or
+  stdout); the main thread only does bounded `proc.wait(timeout)`; no
+  `communicate()` anywhere; `kill_tree` gets `taskkill`/`proc.wait` timeouts.
+  The caller always returns within `timeout` + ~5 s drain.
+- **Why:** the caller's pipe handle never enters the child tree, so no
+  descendant can hold it open; the reader thread is a daemon, so a grandchild
+  that never closes the pipe cannot block process exit.
+- **Out of scope / consequences:** `reader.join(timeout=5)` adds up to ~5 s to a
+  normal exit when a grandchild holds the pipe (measured ~5.7 s in the
+  grandchild repro). The old "must NOT wrap a detached-launcher `.ps1`" rule is
+  obsolete (AGENTS.md updated); nested `$var` quoting through `run_bounded`
+  remains unsupported — route the script body through a `.tmp/*.ps1` file.
 
 ### [2026-08-17] Emulator launch: run_bounded-wrapped detached Start-Process
 
