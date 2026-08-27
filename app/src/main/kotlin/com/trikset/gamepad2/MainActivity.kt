@@ -7,12 +7,14 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.MenuItem
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.Button
 import android.widget.Toast
 import androidx.activity.viewModels
@@ -133,6 +135,25 @@ class MainActivity :
     // Edge-to-edge (required on API 35+; enforced for targetSdk 36): draw
     // behind the system bars instead of using the removed FLAG_FULLSCREEN.
     WindowCompat.setDecorFitsSystemWindows(window, false)
+    // Full-bleed past the display cutout: on API 28-34 the DEFAULT mode letterboxes
+    // the whole window when the cutout sits on the landscape short edge (a rotated
+    // camera hole — the HONOR ALT-LX1 dead-band bug), shifting the video and every
+    // control right and leaving a black band. ALWAYS opts back into drawing behind
+    // the cutout; the hudControls insets listener still keeps the chrome clear.
+    // API 35+ enforces this for targetSdk 35+ apps; API 27- has no cutouts.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+      window.attributes =
+          window.attributes.apply {
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+          }
+    } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      window.attributes =
+          window.attributes.apply {
+            layoutInDisplayCutoutMode =
+                WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+          }
+    }
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
     // Pad the edge-pinned HUD controls (chip, gear, magic buttons) by the window insets so they
