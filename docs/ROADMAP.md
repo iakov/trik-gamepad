@@ -1375,6 +1375,43 @@ verifying P7/P8 video fidelity; (7) document P7/P8/P9 in DESIGN.md.
   (4.71 MB) copied to `_apk/TRIKGamepad-2.42-API21-releaseDebug.apk`.
 - **Retrospective** — MEMORY.md "Campaign 33 retrospective".
 
+## Campaign 34 — display-cutout full-bleed + run_bounded hang-proof + jdk.compiler (2026-08-27)
+
+Scope (user-driven, auto mode): (1) fix the HONOR ALT-LX1 left black-band bug —
+`layoutInDisplayCutoutMode=DEFAULT` letterboxed the window on the left-edge
+rotated camera cutout; set `ALWAYS`/`SHORT_EDGES` so the window draws behind
+the cutout (video and pads full-bleed, chrome stays inset); (2) make
+`scripts/run_bounded.py` hang-proof (child always gets its own `PIPE` + reader
+thread + bounded `proc.wait`) so a detached grandchild can never hold the
+caller's pipe open; (3) resolve `jdk.compiler` in the Gradle daemon jvmargs
+(ktfmt apply-path `NoClassDefFoundError`); (4) document all three in
+DECISIONS/DESIGN/MEMORY/AGENTS.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ≈2 h 21 m (2026-08-27 12:50 → 15:11 +03:00) |
+
+- **Cutout fix** — `MainActivity.onCreate` sets `layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` (API 30+; `SHORT_EDGES` on 28-29) after
+  `setDecorFitsSystemWindows(false)`. API 36 emulators cannot reproduce the
+  letterbox (targetSdk 36 forces `always`) — reproduced on the new
+  `Pixel5_API34` AVD (pixel_5 hole rotated to the left): before
+  `mAppBounds=[136,0]` letterbox, after content `[0,0][2340,1080]` full-bleed
+  with pads symmetric at 25%/75% of the physical screen (uiautomator-verified).
+- **run_bounded redesign** — `stdout=PIPE` always + daemon reader thread pumps
+  to the sink; main thread only `proc.wait(timeout)`; no `communicate()`;
+  `kill_tree` timeouts. Verified: happy path, timeout path (RC=124 + marker),
+  and a detached-grandchild repro (caller returns in ~5.7 s instead of hanging).
+- **jdk.compiler flag** — `org.gradle.jvmargs` gains `--add-modules=jdk.compiler`;
+  `spotlessKotlinApply --rerun-tasks` now green (was `ktfmt(NoClassDefFoundError) com/sun/source/tree/Tree` while the check task passed). Root cause: daemon JVM
+  resolves only `java.se` by default.
+- **Verification** — gate fully green (spotlessApply, test, lint, detekt,
+  spotbugsDebug, jacoco report + coverage gate, spotlessCheck, jscpd, lizard,
+  translations, device-identifier sweep). CI run `33069890492` green. 4 focused
+  commits pushed to `feat/global-refresh`. Screenshot evidence:
+  `.tmp/cutout_before_pixel5.png` / `.tmp/cutout_after_pixel5.png`.
+- **Retrospective** — see MEMORY.md cutout-reproduction note (Pixel5_API34) and
+  the run_bounded hang-proof note.
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass
