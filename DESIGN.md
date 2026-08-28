@@ -243,9 +243,10 @@ one tintable pad-chrome vector). Two principles:
   so the pads center on the *physical* screen quarters. The default mode
   letterboxes the whole window on a left-edge cutout (a camera hole rotated to
   the landscape edge — HONOR ALT-LX1): a full-height black band plus everything
-  shifted right. Only the edge-pinned chrome insets past the cutout; the pads
-  are cutout-agnostic by design. See DECISIONS.md "Display-cutout full-bleed
-  window".
+  shifted right. The video and pads span the physical screen (cutout-agnostic
+  by design); the chrome is corner-flush with small margins and ignores the
+  cutout (see "Corner-flush chrome" below). See DECISIONS.md
+  "Display-cutout full-bleed window".
 
 - **Adaptive sizing (2026-08-24):** on narrow screens the pad size shrinks to
   avoid overcrowding. `SquareTouchPadLayout.onMeasure` computes
@@ -361,24 +362,24 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
   always draw and receive touches above the pads. Edge insets share one dimen
   `hud_half_glyph` (~7dp = half a caption glyph): chip top, gear left/bottom,
   buttons bottom.
-- **Edge-pinned controls live in an inset-aware container** (`@+id/hudControls`,
-  a full-screen RelativeLayout wrapping the chip, gear and magic buttons).
-  `MainActivity` pads it per edge from the window insets (`systemBars` |
-  `displayCutout` | `systemGestures` | `mandatorySystemGestures`), so the
-  controls clear the status-bar/shade strip, the display cutout and the
-  gesture-nav zones — a bare-edge chip/gear would sit inside those OS strips
-  and the system swallows their touches on physical devices (the top-left
-  chip's taps were eaten by a Samsung shade strip; see DECISIONS.md
-  "Inset-aware HUD container"). The video stays full-bleed as a sibling below
-  the container; the center pills stay in `main`.
+- **Corner-flush chrome (2026-08-29):** the edge-pinned controls live in
+  `@+id/hudControls` (a full-screen RelativeLayout wrapping the chip, gear and
+  magic buttons) and deliberately ignore the window insets: the chip is pinned
+  top-start, the gear bottom-start (decoupled from the chip via
+  `layout_alignParentStart`), the magic buttons bottom-centered — all with the
+  `hud_half_glyph` (~7dp) margin. The camera hole is usually not on the
+  landscape short edge, so the controls may reach the true screen corners; the
+  bottom gesture-nav overlap over the buttons is an accepted trade-off. Only
+  the video and pads need cutout clearance, and those are full-bleed siblings
+  below this container. See DECISIONS.md "Corner-flush HUD chrome".
 - **The window is full-bleed past the display cutout** (`layoutInDisplayCutoutMode`
-  = `ALWAYS`/`SHORT_EDGES` in `MainActivity.onCreate`): two inset domains keep the
-  layout correct — the window draws behind the cutout (video and pads span the
-  physical screen), while `hudControls` still insets the edge-pinned chrome past
-  the cutout and the system bars. Without the window-level opt-out the default
-  mode letterboxes the whole app on a left-edge cutout (a camera hole rotated to
-  the landscape edge): a full-height black band plus every control shifted right
-  (HONOR ALT-LX1). See DECISIONS.md "Display-cutout full-bleed window".
+  = `ALWAYS`/`SHORT_EDGES` in `MainActivity.onCreate`): the window draws behind
+  the cutout so the video and pads span the physical screen; the chrome is
+  corner-flush (it ignores the cutout). Without the window-level opt-out the
+  default mode letterboxes the whole app on a left-edge cutout (a camera hole
+  rotated to the landscape edge): a full-height black band plus every control
+  shifted right (HONOR ALT-LX1). See DECISIONS.md "Display-cutout full-bleed
+  window".
 - **Error feedback is a content-sized glass pill** (`connectionError`,
   `Hud.GlassPill`, wrap_content → always fits its message), shown by
   `ConnectionFeedback.error()` for real connection errors: fade-in, auto-dismiss

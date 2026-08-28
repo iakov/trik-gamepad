@@ -625,16 +625,15 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun hudControlsPaddingShouldFollowWindowInsets() {
+  fun hudControlsPaddingShouldStayZeroRegardlessOfInsets() {
     val hudControls = activity.findViewById<View>(R.id.hudControls)
     assertNotNull(hudControls)
 
-    // Dispatch a known insets frame; the container must adopt it per edge (the chips clear the
-    // status-bar/shade strip, the cutout and the gesture-nav zones on real devices). Robolectric
-    // may have already dispatched a simulated status-bar inset during activity setup (the minSdk
-    // qualifier does), so assert the effect of THIS dispatch, not an initial zero. The compat
-    // WindowInsetsCompat API is Robolectric-mocked on all SDK qualifiers (the raw platform
-    // WindowInsets.Type is not on API 23).
+    // The edge-pinned chrome deliberately ignores the window insets: it sits corner-flush
+    // with small margins (see DECISIONS.md "Corner-flush HUD chrome"). Dispatch a known insets
+    // frame and assert the container does NOT adopt it (a regression guard against
+    // reintroducing the inset-aware padding). Robolectric may have already dispatched a
+    // simulated status-bar inset during activity setup, so assert the effect of THIS dispatch.
     val frame =
         androidx.core.view.WindowInsetsCompat.Builder()
             .setInsets(
@@ -645,10 +644,10 @@ class MainActivityTest : RobolectricTestBase() {
             .toWindowInsets()
     assertNotNull(frame)
     hudControls.dispatchApplyWindowInsets(frame!!)
-    assertEquals(1, hudControls.paddingLeft)
-    assertEquals(2, hudControls.paddingTop)
-    assertEquals(3, hudControls.paddingRight)
-    assertEquals(4, hudControls.paddingBottom)
+    assertEquals(0, hudControls.paddingLeft)
+    assertEquals(0, hudControls.paddingTop)
+    assertEquals(0, hudControls.paddingRight)
+    assertEquals(0, hudControls.paddingBottom)
   }
 
   @Test

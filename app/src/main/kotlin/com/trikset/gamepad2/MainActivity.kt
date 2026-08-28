@@ -19,9 +19,7 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -139,7 +137,8 @@ class MainActivity :
     // the whole window when the cutout sits on the landscape short edge (a rotated
     // camera hole — the HONOR ALT-LX1 dead-band bug), shifting the video and every
     // control right and leaving a black band. ALWAYS opts back into drawing behind
-    // the cutout; the hudControls insets listener still keeps the chrome clear.
+    // the cutout; the video and pads run full-bleed, the chrome keeps its own small
+    // edge margins (it ignores the cutout).
     // API 35+ enforces this for targetSdk 35+ apps; API 27- has no cutouts.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
       window.attributes =
@@ -156,23 +155,11 @@ class MainActivity :
     }
     super.onCreate(savedInstanceState)
     setContentView(R.layout.activity_main)
-    // Pad the edge-pinned HUD controls (chip, gear, magic buttons) by the window insets so they
-    // clear the system chrome: the status-bar/shade strip, the display cutout and the
-    // gesture-nav zones. The video stays full-bleed (it is a sibling below hudControls). On a
-    // physical phone the chip previously sat inside the top shade strip, which swallowed its taps
-    // (see DECISIONS.md "Inset-aware HUD container"). Robolectric dispatches no insets, so the
-    // container padding stays 0 there and the layout is unchanged for unit tests.
-    ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.hudControls)) { view, insets ->
-      val systemInsets =
-          insets.getInsets(
-              WindowInsetsCompat.Type.systemBars() or
-                  WindowInsetsCompat.Type.displayCutout() or
-                  WindowInsetsCompat.Type.systemGestures() or
-                  WindowInsetsCompat.Type.mandatorySystemGestures()
-          )
-      view.setPadding(systemInsets.left, systemInsets.top, systemInsets.right, systemInsets.bottom)
-      insets
-    }
+    // The edge-pinned chrome (chip, gear, magic buttons) intentionally ignores the window insets:
+    // it sits flush to the screen corners/edges with a small margin. On typical hardware the
+    // camera is not in the landscape short edge and the bottom gesture-nav overlap is an accepted
+    // trade-off (see DECISIONS.md "Display-cutout full-bleed window"). Only the video and pads
+    // need cutout clearance, and those are full-bleed siblings below this container.
     systemUiController.setVisibility(false)
     connectionFeedback.attach()
     // No action bar on the gamepad HUD: it was the old green IP bar. The IP now lives in the

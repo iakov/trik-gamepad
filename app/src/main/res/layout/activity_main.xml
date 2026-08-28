@@ -102,14 +102,14 @@
     </LinearLayout>
 
     <!-- HUD controls container (edge-to-edge interactive layer): wraps the edge-pinned controls
-         (robot chip, gear, magic buttons) so their padding can be driven by the window insets
-         (status-bar / shade strip, display cutout, system-gesture nav zones) at runtime. Without
-         this the edge-pinned controls sit inside those OS strips, which swallow touches on
-         physical devices (a Samsung status-bar/shade strip ate the chip's tap — see DECISIONS.md
-         "Inset-aware HUD container"). RelativeLayout applies its padding before alignParent* rules,
-         so the child align relations below (buttons→btnSettings→targetChip) are unaffected. The
-         container is a sibling above the pads layer (z-order preserved) and below the center
-         pills; the video stays full-bleed under everything. -->
+         (robot chip, gear, magic buttons), which sit flush to the screen corners/edges with a
+         small margin. Chrome deliberately ignores the window insets (status bar, display cutout,
+         gesture-nav zones): on typical hardware the camera is not in the landscape short edge and
+         the bottom nav gestures overlap is an accepted trade-off, so the controls may reach the
+         true screen edges. Only the video and pads need cutout clearance, and those live outside
+         this container (the full-bleed window still draws behind the cutout). The container is a
+         sibling above the pads layer (z-order preserved) and below the center pills; the video
+         stays full-bleed under everything. -->
     <RelativeLayout
         android:id="@+id/hudControls"
         android:layout_width="fill_parent"
@@ -186,7 +186,7 @@
             android:id="@+id/btnSettings"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignStart="@+id/targetChip"
+            android:layout_alignParentStart="true"
             android:layout_alignParentBottom="true"
             android:layout_marginStart="@dimen/hud_half_glyph"
             android:layout_marginBottom="@dimen/hud_half_glyph"

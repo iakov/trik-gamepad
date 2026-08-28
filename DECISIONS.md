@@ -42,7 +42,7 @@ touch one.
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral, ScaleMode FIT/CROP, color rename, FPS integer+hysteresis, thread-safety audit | [2026-08-24] Thread-safety: runOnUiThread for stream error listeners |
 | Workflows | fork-only, releases | [2026-08-22] Release via signed tags + GH releases |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
-| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-27] Display-cutout full-bleed window (HONOR dead-band bug) |
+| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-29] Corner-flush HUD chrome (ignore window insets) |
 | Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-20] Device-identifier pre-commit hook + gate step |
 | Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-27] run_bounded hang-proof redesign |
 | Build & versioning | package naming, minSdk, versionCode formula, release signing | [2026-08-22] Package rename to com.trikset.gamepad2 |
@@ -1690,8 +1690,9 @@ ______________________________________________________________________
 - **Chosen solution:** in `MainActivity.onCreate`, after
   `WindowCompat.setDecorFitsSystemWindows(window, false)`, set
   `layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` on API 30+
-  (`SHORT_EDGES` on API 28-29). The window draws behind the cutout; the
-  existing `hudControls` insets listener keeps the edge-pinned chrome clear.
+  (`SHORT_EDGES` on API 28-29). The window draws behind the cutout. The
+  edge-pinned chrome now sits corner-flush with small margins, ignoring the
+  cutout (see [2026-08-29] "Corner-flush HUD chrome").
   API 35+ already enforces this for targetSdk 35+ apps; API 27- has no cutouts.
 - **Why:** pads are designed to be symmetric in the full-screen halves and
   cutout-agnostic (only the chrome avoids the cutout/insets) — drawing behind
@@ -1705,6 +1706,48 @@ ______________________________________________________________________
   `[0,0][2340,1080]` full-bleed with pads symmetric at 25%/75%.
   `LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS` is not `@Deprecated` in SDK 36, so no
   suppression is needed.
+
+### [2026-08-29] Corner-flush HUD chrome (ignore window insets)
+
+- **Type:** design-clarifying (where the edge-pinned chrome sits is product visual design).
+
+- **Problem:** the inset-aware container (`hudControls`) padded the chip, gear
+  and magic buttons inward by the window insets (`systemBars` |
+  `displayCutout` | `systemGestures` | `mandatorySystemGestures`), so on any
+  device with a cutout or gesture nav the controls floated toward the center
+  instead of the true corners. The gear was also coupled to the chip's inset
+  edge (`layout_alignStart="@+id/targetChip"`), inheriting the same offset.
+  Screenshot review wanted the chrome flush to the corners/edges for a cleaner
+  gamepad look.
+
+- **Alternatives considered:** (a) keep the inset-aware padding (rejected —
+  corners float on every device with chrome); (b) fit the chrome to the
+  reported cutout/visible-capsule region (rejected — the camera is usually not
+  on the landscape short edge, so most devices lose nothing and the capsule
+  fit is guesswork); (c) corner-flush chrome ignoring insets (chosen).
+
+- **Chosen solution:** removed the `hudControls` inset listener in
+  `MainActivity.onCreate`; the chip stays top-start; the gear now uses
+  `layout_alignParentStart="true"` (decoupled from the chip) with
+  `layout_alignParentBottom="true"`; the magic buttons stay bottom-centered.
+  All three keep the `hud_half_glyph` (~7dp) margins. The window-level cutout
+  opt-out (`LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS`) stays: video and pads
+  remain full-bleed past the cutout — only the chrome is corner-flush.
+
+- **Why:** on typical hardware the camera hole is not in the landscape short
+  edge and the bottom gesture-nav overlap over the buttons is an accepted
+  trade-off for a flush gamepad layout. The full-bleed fix is still needed
+  (video/pads must span the physical screen); the chrome simply no longer
+  clears the OS strips.
+
+- **Out of scope / consequences:** on a left-edge-cutout device (the HONOR
+  ALT-LX1) the chip and gear now sit inside the cutout band — taps there may
+  be affected; accepted per user review. Supersedes the container-padding half
+  of [2026-08-15] "Inset-aware HUD container" (the wrapper RelativeLayout
+  stays; its inset padding goes). `hudControlsPaddingShouldFollowWindowInsets`
+  rewritten to assert the container keeps zero padding under a dispatched
+  insets frame. Pad-fit-to-capsule policy remains deferred (screenshot
+  review). Screenshot proof: `.tmp/hud_corner_20260829-001908.png`.
 
 ### [2026-08-24] Adaptive pad sizing
 
@@ -2070,6 +2113,9 @@ ______________________________________________________________________
   insets frame and asserts the container adopts it per edge. The unchanged
   `SettingsTests` becomes the on-device verification (deferred — the phone
   dropped off adb after the change; recorded in `.PLAN.md`).
+  *Superseded 2026-08-29:* the container padding was removed (corner-flush
+  chrome); the test now asserts the padding stays zero under a dispatched
+  insets frame. See [2026-08-29] "Corner-flush HUD chrome".
 
 ### [2026-08-15] Magic-button glyph centering: asymmetric padding, not view translation
 
