@@ -4364,3 +4364,106 @@ Commits `3d1cdbe` (tooling), `e684059` (test param), `dfcd5d2` (RTSP video),
   no question changes — the pre-commit-ktfmt quirk and the String-URI contract
   finding are captured in the Learning/Value sections; the coverage-exclusion
   precedent was reused without a new question).*
+
+### [2026-09-02] Campaign 35 execution run — global-refresh feature batch
+
+Scope: (1) reusable smart-glyph core (`glyphs/`); (2) video-source preset chips
+(Camera 1/2/USB/No video) replacing the reset row; (3) structured report share subject +
+support-email addressing; (4) exported `image/*` share receiver packing screenshots + a
+report into one ZIP; then a settings SSOT/reuse pass, `VideoStreamLoader` deletion, a
+jscpd test-dedup fix, and the retrospective/docs pass. Commits listed in ROADMAP
+"Campaign 35"; decisions in DECISIONS.md "[2026-09-02]" entries.
+
+**Process**
+
+- **Biggest process win:** the plan-mode → build handoff locked every decision
+  (R1 scope, Commit-T content, tester-APK handling, Campaign-35 record, push scope)
+  *before* execution, so the whole batch ran without a mid-flight question.
+- **What kept each commit self-contained:** per-commit `testDebugUnitTest` +
+  spotless + translation sync; the canonical gate ran once at the end.
+- **What could have been lost:** (a) `ClipboardUi.kt` shipped in R1 without a test —
+  the whole-module coverage gate (branch 0.839 < 0.84) caught the shortfall, not the
+  per-commit run; (b) lint (6 errors) and detekt (4 violations) failures were latent in
+  feature commits 2/4 because the per-commit check was only `testDebugUnitTest` — the
+  end-of-batch gate caught them and cost three gate reruns. Lesson: for a multi-feature
+  batch, run at least `lint` + `detekt` once after the second feature commit, not only at
+  the very end.
+- **Elapsed vs Estimated:** Estimated "—" (user choice); Actual ≈1 h 50 m — recorded in
+  the ROADMAP Campaign 35 header.
+
+**Learning**
+
+- **New facts worth saving:**
+  - Robolectric delivers a share target's content URIs via `Intent.clipData` just like
+    Android; unit tests must cover the ClipData path, not only `EXTRA_STREAM`. A
+    URI-less clip item (`ClipData.Item(Intent)`) is legal and must be skipped — that
+    `?.let` null branch was the last branch keeping the coverage gate red.
+  - `ShareReceiverActivityTest` drives the packing runnable through the decor-view post
+    - `shadowOf(mainLooper).idle()`; the forwarding seam is `setField` before
+      `controller.setup()` (commit-4 pattern, confirmed again in C35).
+  - Gradle's build cache (`FROM-CACHE`) restores test task results after deleting local
+    outputs — to run a suite genuinely again use `--no-build-cache` (the batch's second
+    "real" full-suite run needed it).
+  - An enum's companion `const val` is **uninitialized** inside its own enum-entry
+    constructor args ("Companion object of enum class is uninitialized here") — the
+    constant must live outside the enum (here: in the sibling `VideoSourceChips` object).
+  - The `SettingsFragment.effectiveVideoUri` derived default now literally routes through
+    `VideoSourceChips.targetFor(null, host, CAMERA_1)` — the chips and the effective-URI
+    default share one computation.
+- **What the gate caught:** lint `UseCompatLoadingForDrawables` (chips pill background),
+  `UseKtx` (`Uri.parse` → `toUri`), `UnusedIds` (share-receiver layout ids), detekt
+  `UnusedParameter` (reportSendIntent context), `ReturnCount` (targetFor), `MagicNumber`
+  (chip ports) — all fixed at the source; branch coverage 0.839 → 0.840 via the
+  clip-data/editor-probe tests.
+
+**Signal**
+
+- **Frequency-scan:** "Deprecated Gradle features" still in every build (known
+  `.PLAN.md` Gradle-10-era bump; NOT re-marked resolved). No new systemic message.
+- **Rule deviations / missing rules:** R1 shipped a new main file without its test
+  (coverage budgeted only at the final gate). The existing "Budget the coverage pass with
+  the code" guardrail covers it; the concrete trigger is "a per-commit check of only
+  testDebugUnitTest never catches a coverage dip" — worth a note in the checklist.
+- **User corrections:** none this campaign (plan locked up front).
+
+**Drift**
+
+- **Per-doc audit:** DECISIONS.md — four [2026-09-02] entries + C32/smart-glyph stale
+  notes amended + index updated. DESIGN.md — no new section needed (smart-glyph section
+  already exists; chips/share map to existing conventions). ROADMAP.md — Campaign 35
+  entry added. TESTING.md — VideoStreamLoader references removed, suppression registry
+  updated for the `assertMailCover` helper. docs/architecture.md — activity inventory
+  ("Two activities" was stale: four activities now) + module map loader/share updates.
+  MEMORY.md — this record. AGENTS.md — no new rule (coverage-budget note goes into the
+  checklist here).
+- **Scripts review:** the per-class/per-line branch triage was two `.tmp/` one-off
+  scripts (`branch_report.py`, `branch_lines.py`) parsing the jacoco XML `mb`/`cb`
+  attributes — TESTING.md already documents that triage approach; promote a single
+  `jacoco_branches.py` (class + line list from the XML) if it recurs.
+- **Best-scoped doc:** decisions → DECISIONS.md; facts/quirks → MEMORY.md; campaign →
+  ROADMAP; code comments carry the suppression rationales (TESTING registry).
+
+**Value**
+
+- **Measurable profit:** share-in images (screenshots + report as one mail) closes the
+  "user bug report" loop; video chips make camera setup one-tap; the settings/video-URI
+  SSOT removes a whole class of default drift; ~190 dead `VideoStreamLoader` lines
+  deleted (with its test), coverage and all quality gates green.
+- **Deferred (→ `.PLAN.md`):** on-robot verification of the chip port table (provisional
+  8080/8081/8082); fresh UI screenshot proof (user chose to rely on the 2026-09-01
+  prototype shots); the existing toolchain bumps stay pending.
+- **Next automation candidates:** `scripts/jacoco_branches.py` (see Scripts review);
+  nothing else new — release/gate tooling already covers the campaign.
+- **What I should have asked earlier:** nothing — every fork (T scope, APK commit,
+  campaign record, screenshot proof, push target) was a pre-flight question this time.
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added:** none.
+- **Most useless question this campaign:** "Elapsed vs Estimated — recorded in the
+  ROADMAP header table?" — still needed (C35's Actual was filled at the docs commit,
+  not at campaign end); the phrasing could note that for an un-estimated campaign the
+  `Estimated` cell is "—" and the Actual is measured at the retrospective. No rephrase.
+- **Checklist itself:** stamp: *Last revised: 2026-09-02 (C35 retrospective: no question
+  changes; the "per-commit checks must include lint/detekt/coverage for a feature batch"
+  trigger is captured above under Rule deviations, to be reviewed at the next run).*

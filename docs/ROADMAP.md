@@ -1412,6 +1412,40 @@ DECISIONS/DESIGN/MEMORY/AGENTS.
 - **Retrospective** — see MEMORY.md cutout-reproduction note (Pixel5_API34) and
   the run_bounded hang-proof note.
 
+## Campaign 35 — global-refresh feature batch: smart glyphs, video chips, share-in report ZIP (DONE 2026-09-02)
+
+Scope (user-driven, auto mode, single-branch no-PR): (1) the reusable smart-glyph
+core (`glyphs/` row/button/text views, equalized centered bundled glyphs) replacing
+hand-rolled per-consumer centering; (2) video-source preset chips replacing the reset
+row (Camera 1/2, USB, No video) — glyph rows in Robot settings with
+`effectiveVideoUri` derived from the same computation; (3) diagnostics share refresh:
+structured `[trik-gamepad][report]`/`[crash]` subject + support-email addressing +
+bounded report head; (4) share-in images: an exported `image/*` share receiver packs
+screenshots + a fresh report into one ZIP and forwards it to support. Then a
+reuse/SSOT pass (shared clipboard helper, `MagicSymbolsStore` reuse, video-URI + default
+constants SSOT), deletion of the dead `VideoStreamLoader`, a jscpd test-dedup fix, and
+the retrospective/docs pass.
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ≈1 h 50 m (2026-09-02 20:53 → 22:43 +03:00) |
+
+- **Feature commits** — `60690da` (smart-glyph core), `7850738` (video-source chips),
+  `3845769` (structured report subject + support mail), `564789c` (share-in images ZIP
+  receiver). **Quality commits** — `ce85ce4` (settings SSOT: clipboard helper, magic
+  symbols, defaults), `0fef34f` (VideoStreamLoader deletion), `bf2af47`
+  (assertMailCover test-dedup), `6dfbee5` (clipboard-helper test), `19b48d0` (lint
+  cleanup), `6700c7a` (detekt cleanup), `6c0ab57` (clip-data/editor-probe branch tests).
+- **Verification** — canonical gate fully green: spotlessApply, test, lint, detekt,
+  spotbugsDebug, jacoco report + coverage gate (branch 0.839 → 0.840 after the added
+  clip-data/editor-probe tests), spotlessCheck, jscpd, lizard, translations (143 keys),
+  device-identifier sweep. Full suite additionally run twice for real (build cache
+  disabled). CI green on the pushed `feat/global-refresh` head.
+- **Decisions** — DECISIONS.md "[2026-09-02]" entries: video-source preset chips;
+  structured share subject + support mail; share-in images ZIP receiver;
+  VideoStreamLoader deletion (supersedes the C32 "stays for tests" note).
+- **Retrospective** — MEMORY.md "Campaign 35 execution run".
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass

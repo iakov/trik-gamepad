@@ -17,7 +17,7 @@ knowledge & best-practice reference → Known pitfalls & quirks.
 
 ## Module map
 
-Single Gradle module `app/` (pure Kotlin, 0 `.java`). Two activities:
+Single Gradle module `app/` (pure Kotlin, 0 `.java`). Four activities:
 
 - **`MainActivity`** — the gamepad itself: two touch pads, a configurable
   magic-button row (0–5, default 3), a sensor-driven wheel, and the MJPEG video
@@ -33,6 +33,13 @@ Single Gradle module `app/` (pure Kotlin, 0 `.java`). Two activities:
   extracted from `MainActivity` (ROADMAP Phase 2-E); see "Settings" below.
 - **`SettingsActivity`** — a thin shell that hosts the `SettingsFragment`
   (a `PreferenceFragmentCompat`) as its only content.
+- **`RobotSettingsActivity`** — the second screen using the same
+  `SettingsFragment` for the robot/target settings (network, video presets,
+  robot presets); both screens share one `SharedPreferences` store.
+- **`ShareReceiverActivity`** — an exported, launcher-less image share target
+  ("attach to report" in other apps' share sheets): packs the incoming images
+  plus a fresh `DiagnosticsReport` into one ZIP (`ReportZipWriter`) and forwards
+  it to the system share sheet pre-addressed to support (`ReportSharer.shareZip`).
 
 The two screens share one `SharedPreferences` store (androidx
 `androidx.preference.PreferenceManager`, migrated from the legacy
@@ -47,10 +54,13 @@ constants in `SettingsFragment`.
   `ConnectionIndicator` (status pill / gear-border color), `SquareTouchPadLayout`
   (pads) + `TouchPadController` (pad math), `MagicButtonPanel` +
   `MagicButtonSymbols` (magic buttons), `HardwareGamepadController`,
-  `VideoStreamLoader` (MJPEG HTTP opener), `RawSocketHttpStream` (raw-socket
+  `RawSocketHttpStream` (raw-socket
   HTTP client), `VideoRetryController` (bounded retry),
   `VideoStreamErrorNotifier` (throttled failure notice), `RobotPresetStore`,
-  `WheelController`, `SystemUiController`, `MainActivitySettingsController`.
+  `WheelController`, `SystemUiController`, `MainActivitySettingsController`,
+  `RobotSettingsActivity`, `ShareReceiverActivity` (share-in images), and the
+  video-source preset `VideoSourceChips`/`VideoSourceChipsPreference` +
+  `MagicSymbolsStore`/`MagicSymbolsDialog`.
 - `com.trikset.gamepad2.mjpeg` — the MJPEG player (vendored origin, renamed
   from `com.demo.mjpeg` in Phase 5): `MjpegView` (plain View; render thread
   decodes + `postInvalidate`, `onDraw` presents on the HWUI canvas),
@@ -63,9 +73,12 @@ constants in `SettingsFragment`.
   `MainActivity` holds a `VideoPlayer?` and the video URI flows as an opaque
   `String` (a `java.net.URL` cannot parse `rtsp://`).
 - `com.trikset.gamepad2.diagnostics` — user-facing diagnostics (Campaign 14):
-  `AppLog` (logcat + ring buffer) + `LogRingBuffer`, `DiagLevel`, `DiagnosticsReport`,
-  `ReportDiagnosticsWriter`/`ReportSharer`, `CrashLogStore`, `CrashHandler`,
-  `CrashReportDialog`. `App` (Application) lives in the root package.
+  `AppLog` (logcat + ring buffer) + `LogRingBuffer`, `DiagLevel`, `DiagnosticsReport`
+  (its `fromAppState` builds the settings-screen snapshot),
+  `ReportDiagnosticsWriter`/`ReportSharer` (mail-addressed share cover),
+  `ReportZipWriter` + `ReportShareContent` (the share-in images ZIP flow),
+  `CrashLogStore`, `CrashHandler`, `CrashReportDialog`. `App` (Application)
+  lives in the root package.
 
 ## TCP command protocol (`SenderService`)
 
@@ -142,10 +155,14 @@ RawSocketHttpStream (http; bypasses NSC) / WifiConnectionOpener (https; bound to
 `videoCropToFill` preference (default `false` = FIT).
 ```
 
-- **`VideoStreamLoader`** (AsyncTask successor) opens the HTTP stream off the
-  main thread and hands it to `MjpegView`; it reports open success/failure via
-  an `onResult` callback (a failed open is no longer silent). Executor + main
-  handler are injectable for deterministic tests.- **`MjpegView.MjpegRenderThread`** (de-spun, C24) loops `readMjpegFrame()`,
+- **`MjpegVideoPlayer` opens the HTTP stream** (AsyncTask-successor semantics
+  now living in the video package): off the main thread it opens via
+  `RawSocketHttpStream` (http) or the network-bound/trust-all connection opener
+  (https), wraps the result in `MjpegInputStream`, and hands it to `MjpegView`;
+  open success/failure is reported via `onPlayResult` (a failed open is no
+  longer silent). Executor + main handler are injectable for deterministic
+  tests.
+- **`MjpegView.MjpegRenderThread`** (de-spun, C24) loops `readMjpegFrame()`,
   blocking on the socket read; a `null` frame (buffer-full drop or EOF
   recovery) triggers a 5 ms idle sleep instead of a poll spin. On `IOException`
   it stops and fires `OnStreamErrorListener`; on the first decoded frame of each
@@ -164,8 +181,9 @@ RawSocketHttpStream (http; bypasses NSC) / WifiConnectionOpener (https; bound to
   rationale: `DECISIONS.md` "[2026-08-18] A.5 GPU-backed MJPEG rendering".
 - **Reconnect-on-error** (no forced periodic restart): `MainActivity` registers
   the listener in `onResume`; it marshals to the main thread and calls
-  `restartVideoStream()`, which re-runs `VideoStreamLoader`. See `DECISIONS.md`
-  "MJPEG: reconnect-on-error" for the rationale.
+  `restartVideoStream()`, which re-plays through the active `VideoPlayer`
+  (`MjpegVideoPlayer` for MJPEG). See `DECISIONS.md` "MJPEG:
+  reconnect-on-error" for the rationale.
 - **Bounded retry (scenario-driven, Option B)** — `VideoRetryController`: while
   the activity is resumed ∧ a video is configured ∧ `!view.isPlaying`, reloads
   the stream on a 5 s tick, and immediately on the control-`Connected` edge

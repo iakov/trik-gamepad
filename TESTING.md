@@ -153,7 +153,7 @@ Local instrumented run (per-platform acceleration prerequisites):
 
 `app/src/test/.../mjpeg/SyntheticMjpegServer.kt` is a real HTTP
 `multipart/x-mixed-replace` MJPEG server (ephemeral port) that streams seeded
-JPEG frames to the app's real `VideoStreamLoader`/`MjpegInputStream` decode path
+JPEG frames to the app's real `MjpegVideoPlayer`/`MjpegInputStream` decode path
 and can **drop the connection after N frames** to exercise the reconnect.
 Companion `mjpeg/MjpegServerTest.kt` (the single consolidated video/streaming
 test — it replaced the old `SyntheticMjpegServerTest` + `VintageCatVideoStreamTest`):
@@ -490,7 +490,6 @@ A0 baseline (2026-08-09; `main` sources excluded) — the fixed trend anchor:
 | DummyServer (androidTest) | 231 |
 | SystemUiControllerTest | 163 |
 | FocusAwareActivityTestRule (androidTest) | 159 |
-| VideoStreamLoaderTest | 113 |
 | SenderViewModelTest | 69 |
 | **Total** | **12,659** |
 
@@ -533,9 +532,10 @@ A0 baseline (2026-08-09; `main` sources excluded) — the fixed trend anchor:
 - **Accepted suppressions** (each carries a rationale comment in code; keep this
   registry in sync):
   - `@Suppress("DEPRECATION")`:
-    - The `getParcelableExtra(String)` calls in `ReportSharerTest` (report
-      stream and ZIP-forward tests) — the typed replacement overload is API
-      33+, and these tests run at minSdk 23 (Robolectric `[23]`).
+    - The `getParcelableExtra(String)` calls in `ReportSharerTest` (now in the
+      shared `assertMailCover` helper, used by the report-stream and ZIP-forward
+      tests) — the typed replacement overload is API 33+, and these tests run at
+      minSdk 23 (Robolectric `[23]`).
     - `MainActivityTest` `updateConfiguration(config, metrics)` (2-arg) — the
       1-arg form was removed in SDK 36.
     - `MainActivityTest` `dispatchKeyEventWithUnknownActionShouldFallThrough` —

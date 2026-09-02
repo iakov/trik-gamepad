@@ -39,7 +39,7 @@ touch one.
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-27] jdk.compiler module in the Gradle daemon (ktfmt apply-path) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral, ScaleMode FIT/CROP, color rename, FPS integer+hysteresis, thread-safety audit | [2026-08-24] Thread-safety: runOnUiThread for stream error listeners |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral, ScaleMode FIT/CROP, color rename, FPS integer+hysteresis, thread-safety audit, video-source preset chips, share-in images ZIP, VideoStreamLoader deletion | [2026-09-02] Share-in images ZIP receiver + VideoStreamLoader deletion |
 | Workflows | fork-only, releases | [2026-08-22] Release via signed tags + GH releases |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
 | UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-09-01] Smart glyph alignment (reusable centered-glyph core) |
@@ -878,6 +878,138 @@ ______________________________________________________________________
 ______________________________________________________________________
 
 ## Architecture
+
+### [2026-09-02] Delete VideoStreamLoader (superseded by MjpegVideoPlayer)
+
+- **Type:** problem-avoiding (removes a dead main-source duplicate that only
+  tests referenced).
+
+- **Problem:** the [2026-08-22] VideoPlayer abstraction moved the MJPEG HTTP
+  open path into `video/MjpegVideoPlayer`; `VideoStreamLoader` (root package)
+  kept a second copy of the same open logic and was referenced **only by
+  tests**, so the open semantics could drift between the two implementations.
+
+- **Alternatives considered:** (a) keep it "for tests" (rejected — dead code in
+  main; direct open tests belong against the shipped player); (b) delete and
+  re-point the test consumers at `MjpegVideoPlayer` (chosen — its
+  `MjpegVideoPlayerTest` already mirrored every loader assertion, so no coverage
+  was lost).
+
+- **Chosen solution:** `VideoStreamLoader` and its dedicated
+  `VideoStreamLoaderTest` are deleted; `HttpsVideoStreamTest`,
+  `mjpeg/MjpegViewTest`, `mjpeg/MjpegServerTest` and `VideoStreamSelfHealingTest`
+  open streams through `MjpegVideoPlayer.openStream`/`play`.
+
+- **Why:** one opener implementation, exercised by the same end-to-end tests, so
+  the https/trust-all and reconnect behavior are verified against the code the
+  app actually runs.
+
+- **Out of scope / consequences:** supersedes the C32 note "`VideoStreamLoader`
+  stays in the codebase (tests still use it)". Doc references updated in
+  `docs/architecture.md` and `TESTING.md`.
+
+### [2026-09-02] Video-source preset chips (Camera 1/2/USB/No video)
+
+- **Type:** design-clarifying (settings UX for the robot camera) with a
+  problem-avoiding part (the port table is a factual assumption that must be
+  flagged as provisional).
+
+- **Problem:** configuring a robot camera meant hand-typing
+  `http://<host>:8080/?action=stream`; a "reset to default" row gave no clue
+  which preset the default corresponds to, and "No video" (an empty-URI
+  concept) had no visible affordance.
+
+- **Alternatives considered:** (a) keep a bare "reset URI" row (rejected —
+  unclear semantics, no disable action); (b) a dropdown of named sources
+  (heavier than four discrete choices); (c) four glyph preset chips in one row
+  (chosen — one tap per source, matches the gamepad's glyph language).
+
+- **Chosen solution:** `VideoSourceChips` (pure port table + URI computation:
+  `targetFor`/`defaultStreamUri`/`rewritePort`) is the single source of truth;
+  `SettingsFragment.effectiveVideoUri` derives its host default through it
+  (Camera 1, port 8080) so the default URI *is* the Camera 1 preset. The four
+  chips render through the smart-glyph `GlyphRow`
+  (`VideoSourceChipsPreference`); tapping a chip writes the target URI and
+  refreshes the effective-URI row. "No video" writes an explicit empty URI.
+
+- **Why:** one tap instead of a remembered URL; the effective-value row and the
+  chips share one computation so they cannot disagree; the port rewrite keeps
+  userinfo/path/query intact (rtsp-style URLs included).
+
+- **Out of scope / consequences:** the port table (8080/8081/8082) mirrors the
+  robot's MJPEG stream layout and is **provisional until verified on a real
+  robot** (user-accepted "fine for now, no RTSP on the robot yet"). Per-preset
+  transport stays deferred (see the UDP decision).
+
+### [2026-09-02] Structured share subject + pre-addressed support mail
+
+- **Type:** design-clarifying (machine-processable mail routing for support).
+
+- **Problem:** user-shared reports arrived with no routing info — no recipient
+  and a generic subject — so support had to open and read every mail to triage
+  it; crash-triggered and manual report shares were indistinguishable at the
+  inbox.
+
+- **Alternatives considered:** (a) separate support mailboxes per kind (extra
+  ops, rejected); (b) subject-prefix routing on the shared mails themselves
+  (chosen); (c) leave shares free-form/unaddressed (rejected — auto-routing is
+  the point of the flow).
+
+- **Chosen solution:** report shares are pre-addressed to `support@trikset.com`;
+  `EXTRA_SUBJECT` carries a machine-readable prefix —
+  `[trik-gamepad][crash]` (crash dialog) or `[trik-gamepad][report]` (settings
+  row and the share-in ZIP) — followed by the version (`v2.42`); `EXTRA_EMAIL`
+  is set to the support address and `EXTRA_TEXT` is the bounded report head
+  (subject line + `\n\n` + head), so an inbox filter routes and triages without
+  opening the mail. The text-editor review path keeps its file-based review;
+  the "share without editing" and ZIP paths both carry the cover.
+
+- **Why:** the version in the subject tags the build at a glance; the bounded
+  body previews the report in the mail list; `crash=false` on manual shares
+  keeps the two flows distinguishable.
+
+- **Out of scope / consequences:** automatic crash upload stays offline-first
+  (Campaign 14); the subject intentionally carries no device identifier
+  (privacy — see the device-identifier decisions).
+
+### [2026-09-02] Share-in images: exported share receiver packs a report ZIP
+
+- **Type:** design-clarifying (new user flow: attach screenshots from any
+  share sheet → one mail to support) with a problem-avoiding part (a
+  launcher-less exported activity is a security surface — keep it read-only
+  over content URIs only).
+
+- **Problem:** reproducing a UI bug needs the user's screenshots *and* the
+  app's diagnostic context, but they travelled separately (report via the
+  settings row, images via a second manual mail) and often got lost or
+  detached from the report.
+
+- **Alternatives considered:** (a) an in-app photo picker shown after "Report
+  an issue" (images must already live on the device, and the flow is app-only);
+  (b) a share **target** for `image/*` (chosen — works from any screenshot app,
+  no gallery or photo-picker code, no new permissions); (c) automatic upload to
+  a server (rejected — offline-first, no egress).
+
+- **Chosen solution:** `ShareReceiverActivity` (exported, no launcher entry,
+  `image/*` `ACTION_SEND`/`ACTION_SEND_MULTIPLE` target) shows a brief "Packing
+  report…" state, resolves the incoming URIs (EXTRA_STREAM + ClipData,
+  deduplicated), reads each into memory (`ReportZipWriter.resolve`; IO and
+  security errors skip that image), and writes `report.md` + `attachments/`
+  into a ZIP under the existing `cache/diagnostics` FileProvider root. The
+  archive is forwarded by `ReportSharer.shareZip` (mail pre-addressed to
+  support). The forward step is an injectable field so Robolectric tests drive
+  the flow without FileProvider.
+
+- **Why:** one attachment carries both the report and the evidence; a share
+  target needs no storage permission (content-URI grants cover the reads); the
+  archive reuses the existing cache + FileProvider path (no manifest provider
+  change).
+
+- **Out of scope / consequences:** the receiver reads whole images into memory
+  (bounded by what share intents carry) and only accepts `image/*` content
+  URIs; it never writes external storage. `DiagnosticsReport.fromAppState`
+  (default prefs + log tail + latest crash) is the snapshot the receiver and
+  the settings row share.
 
 ### [2026-08-19] https video binds to the Wi-Fi network (Network.openConnection + trust-all TLS)
 
@@ -1761,7 +1893,9 @@ ______________________________________________________________________
 
 - **Why:** Android lays out the glyph's LINE box (ascent+descent), not the ink box — capping on the ink box alone still clipped (child measured 54px in a 48dp cell at fontScale 1.3). Em-relative metrics are size/density/font-scale invariant, and Android + Pillow rasterize the same bundled TTF via FreeType, so import-time fractions transfer to devices (validated by `scripts/measure_glyph_row.py`: medians within 1px at fontScale 1.0 and 1.3).
 
-- **Out of scope / consequences:** the video-source preset chips render through the new `GlyphRow` (tested) but are not yet wired into Settings. `magicButtonRowShouldNotClipAtLargeFontScale` now passes with the cap (was failing before it). Generated `GlyphMetrics.kt` carries `@file:Suppress("MagicNumber")` — every literal is a measured metric, not a hand-written number. On-device proof: `.tmp/glyph_fixed.png`, `.tmp/glyph_13.png`.
+- **Out of scope / consequences:** the video-source preset chips render through
+  the new `GlyphRow` and are wired into Robot settings as the preset chips (see
+  "[2026-09-02] Video-source preset chips"). `magicButtonRowShouldNotClipAtLargeFontScale` now passes with the cap (was failing before it). Generated `GlyphMetrics.kt` carries `@file:Suppress("MagicNumber")` — every literal is a measured metric, not a hand-written number. On-device proof: `.tmp/glyph_fixed.png`, `.tmp/glyph_13.png`.
 
 ### [2026-08-24] Adaptive pad sizing
 
@@ -2642,9 +2776,10 @@ ______________________________________________________________________
 
 - **Out of scope / consequences:** WebRTC remains deferred (re-evaluate if
   internet-based remote FPV with NAT traversal is needed). Media3 is deferred
-  until device-specific RTSP behavior proves `MediaPlayer` insufficient. The
-  `VideoStreamLoader` class stays in the codebase (tests still use it for
-  direct MJPEG tests). `MediaPlayerVideoPlayer` is the first implementation
+  until device-specific RTSP behavior proves `MediaPlayer` insufficient.
+  **Superseded 2026-09-02:** `VideoStreamLoader` was deleted once
+  `MjpegVideoPlayer` carried the identical open logic (see "[2026-09-02] Delete
+  VideoStreamLoader"). `MediaPlayerVideoPlayer` is the first implementation
   under the interface; if Media3 becomes the default, no `MainActivity` changes
   are needed (only a factory branch).
 
