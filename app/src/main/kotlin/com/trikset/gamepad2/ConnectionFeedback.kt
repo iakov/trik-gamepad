@@ -7,8 +7,8 @@ import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import androidx.core.content.ContextCompat
-import androidx.core.content.res.ResourcesCompat
 import androidx.core.view.isVisible
+import com.trikset.gamepad2.glyphs.GlyphRendering
 
 /**
  * Owns the connection-state feedback chrome: recolors the settings-button border by
@@ -36,11 +36,13 @@ class ConnectionFeedback(
   fun attach() {
     val status = statusTextProvider()
     // The pill glyphs (⏻ / ↺) are bundled in res/font/symbols_mono.ttf so they render identically
-    // on every device (they are rare codepoints missing from most system fonts).
-    status?.typeface = ResourcesCompat.getFont(context, R.font.symbols_mono)
-    status?.setOnClickListener { connectAction() }
-    // The gear glyph is the bundled ⚙ character (U+2699) rendered with the same symbol font.
-    settingsButtonProvider()?.typeface = ResourcesCompat.getFont(context, R.font.symbols_mono)
+    // on every device (they are rare codepoints missing from most system fonts); the shared
+    // GlyphRendering applies the typeface + font-padding-free alignment for the pill and gear.
+    status?.let {
+      GlyphRendering.configure(it)
+      it.setOnClickListener { connectAction() }
+    }
+    settingsButtonProvider()?.let(GlyphRendering::configure)
   }
 
   fun update(state: ConnectionState) {

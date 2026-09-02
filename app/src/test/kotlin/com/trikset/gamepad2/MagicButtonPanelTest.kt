@@ -4,6 +4,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.FrameLayout
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -107,31 +108,42 @@ class MagicButtonPanelTest : RobolectricTestBase() {
   }
 
   @Test
-  fun centerGlyphShouldCancelTheInkOffsetViaPadding() {
+  fun centerGlyphShouldCancelTheMetricMedianOffsetViaPadding() {
     val container = FrameLayout(context)
     panel.populate(container, 1, symbols)
+    val btn = container.getChildAt(0) as Button
+    val glyph = btn.text.toString()
+    val metric = com.trikset.gamepad2.glyphs.GlyphMetrics.metricFor(glyph)
+    // The default glyph ▲ is in the metrics table, so its vertical centering cancels the
+    // weighted-ink median offset from the line-box center (medianBiasEm * textSize), NOT the
+    // paint ink-box center. padTop - padBottom + 2*offsetY == 0 with offsetY =
+    // -medianBiasEm * textSizePx.
+    assertNotNull("default glyph ▲ must have metrics", metric)
+    val offsetY = -metric!!.medianBiasEm * btn.textSize
+    assertEquals(
+        "vertical padding must cancel the metric median offset",
+        0f,
+        btn.paddingTop - btn.paddingBottom + 2f * offsetY,
+        0.5f,
+    )
+  }
+
+  @Test
+  fun centerGlyphShouldUsePaintInkBoxForUnknownGlyphs() {
+    val container = FrameLayout(context)
+    panel.populate(container, 1, listOf("Ω")) // Ω is absent from the metrics table
     val btn = container.getChildAt(0) as Button
     val paint = btn.paint
     val text = btn.text.toString()
     val bounds = android.graphics.Rect()
     paint.getTextBounds(text, 0, text.length, bounds)
     val fm = paint.fontMetrics
-    // Ink-box center minus line-box center (the offset the old translation used to cancel).
+    // Ink-box center minus line-box center (the fallback offset when no metric exists).
     val offsetY = (bounds.top + bounds.bottom) / 2f - (fm.ascent + fm.descent) / 2f
-    val offsetX = (bounds.left + bounds.right) / 2f - paint.measureText(text) / 2f
-    // The asymmetric padding must be the exact inverse of the offset
-    // (padTop - padBottom + 2*offsetY == 0), so the ink center lands on the view center
-    // while the background stays put.
     assertEquals(
-        "vertical padding must cancel the ink offset",
+        "vertical padding must cancel the ink offset for unknown glyphs",
         0f,
         btn.paddingTop - btn.paddingBottom + 2f * offsetY,
-        0.5f,
-    )
-    assertEquals(
-        "horizontal padding must cancel the ink offset",
-        0f,
-        btn.paddingLeft - btn.paddingRight + 2f * offsetX,
         0.5f,
     )
   }

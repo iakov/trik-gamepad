@@ -32,11 +32,15 @@ import urllib.request
 
 from fontTools import subset
 from fontTools.ttLib import TTFont
+from glyph_metrics import emit_kotlin
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TMP = os.path.join(ROOT, ".tmp", "fonts")
 FONT_SRC_REL = "DejaVuSansMNerdFontMono-Regular.ttf"
 FONT_OUT = os.path.join(ROOT, "app", "src", "main", "res", "font", "symbols_mono.ttf")
+METRICS_OUT = os.path.join(
+    ROOT, "app", "src", "main", "kotlin", "com", "trikset", "gamepad2", "glyphs", "GlyphMetrics.kt"
+)
 RAW_DIR = os.path.join(ROOT, "app", "src", "main", "res", "raw")
 
 # Pinned release (see https://github.com/ryanoasis/nerd-fonts/releases).
@@ -63,6 +67,11 @@ REQUIRED = {
     "⏽": 0x23FD,  # IEC power on (reserved)
     "⏾": 0x23FE,  # IEC power sleep (reserved)
     "⭘": 0x2B58,  # IEC power off (reserved)
+    # Video-source preset chips (Settings > Video quick-fill): eye base + digit for the module
+    # cameras, eye-off for "no video", usb for the USB camera.
+    "md-eye": 0xF0208,  # eye (camera/video source base)
+    "md-eye_off": 0xF0209,  # eye with a slash (no video)
+    "md-usb": 0xF0553,  # USB (USB web-camera)
     # ASCII palette for user-typed magic symbols (digits, math, pipe, letters).
     "0": 0x30, "1": 0x31, "2": 0x32, "3": 0x33, "4": 0x34,
     "5": 0x35, "6": 0x36, "7": 0x37, "8": 0x38, "9": 0x39,
@@ -170,6 +179,12 @@ def main() -> None:
     with open(FONT_OUT, "wb") as f:
         f.write(subset_ttf)
     log(f"font written: {FONT_OUT}")
+    # Every bundled glyph ships with its em-relative "render in a row" metrics (visualHeightEm +
+    # medianBiasEm) so GlyphTextView/GlyphRow can equalize and align glyphs on any device. The
+    # metrics are computed from the exact subset written above - a glyph without metrics fails
+    # the build here (all REQUIRED codepoints must resolve).
+    os.makedirs(os.path.dirname(METRICS_OUT), exist_ok=True)
+    emit_kotlin(REQUIRED, subset_ttf, reference="1", out_path=METRICS_OUT)
     write_license_files()
 
 

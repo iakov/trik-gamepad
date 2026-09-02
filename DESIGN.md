@@ -115,6 +115,7 @@ ______________________________________________________________________
 | About system vs Copy report | About category |
 | System theme | day/night, gamepad vs Settings |
 | HUD themes (Type 1) | the gamepad chrome: pads, buttons, gear, pill, chip |
+| Smart glyph alignment | every centered bundled-font glyph (magic buttons, pill, gear, video preset chips) |
 | Robot-target chip | top-left chip + connection-tone semantics |
 | Localization | strings, locales, translations |
 | WCAG | contrast + touch-target regression tests |
@@ -302,6 +303,34 @@ status** (not the app's UI state):
   Pad render + layout"): the chip is a read-only status row whose primary
   interaction surface is the settings screen it opens, and a full 48dp target
   made the chip dominate the top-left of the video.
+
+## Smart glyph alignment
+
+Every centered bundled-font glyph in the HUD — the magic buttons, the status
+pill, the gear, and the video-source preset chips — renders through ONE shared
+core (`GlyphRendering` + `GlyphTextView`/`GlyphButton`/`GlyphRow`) so the whole
+screen reads one alignment. Three em-relative properties (computed at font
+import by `scripts/glyph_metrics.py`):
+
+- **Size equalization by VISUAL ink height** (`visualHeightEm`, the central
+  90%-mass band): `textSize = target / visualHeightEm`, so a row of different
+  glyphs all render at the same visual ink height. The magic buttons target 60%
+  of the circle diameter; the chips equalize across digits/eye/usb.
+- **Ink centering by weighted-ink median** (`medianBiasEm`): the renderer
+  cancels the median's offset from the line-box center with asymmetric padding,
+  never a view translation — a translation would move the background too
+  (regression: 2026-08-15).
+- **Never clip**: Android lays out the glyph's LINE box (ascent+descent,
+  `LINE_BOX_EM ≈ 1.16em`), so `textSize` is capped at
+  `viewHeight / (fontScale × (LINE_BOX_EM + 2·|medianBiasEm|))`. The 90% band
+  alone under-reports thin-tailed glyphs (a triangle's point carries little
+  mass) and an uncapped equalized size rendered ▲ with zero ink and clipped
+  ■/● to the lower half of the magic button (hit 2026-09-01).
+
+Suggested on-device check: `scripts/measure_glyph_row.py --dump … --shot …`
+(weighted medians within 1px, 90% bands overlap). The views guarantee alignment
+by construction from the em-relative metrics, which are size/density/font-scale
+invariant (Android and Pillow rasterize the same bundled TTF via FreeType).
 
 ## Localization
 

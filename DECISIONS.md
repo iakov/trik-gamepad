@@ -42,7 +42,7 @@ touch one.
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral, ScaleMode FIT/CROP, color rename, FPS integer+hysteresis, thread-safety audit | [2026-08-24] Thread-safety: runOnUiThread for stream error listeners |
 | Workflows | fork-only, releases | [2026-08-22] Release via signed tags + GH releases |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
-| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-08-29] Corner-flush HUD chrome (ignore window insets) |
+| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-09-01] Smart glyph alignment (reusable centered-glyph core) |
 | Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-20] Device-identifier pre-commit hook + gate step |
 | Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-27] run_bounded hang-proof redesign |
 | Build & versioning | package naming, minSdk, versionCode formula, release signing | [2026-08-22] Package rename to com.trikset.gamepad2 |
@@ -1748,6 +1748,20 @@ ______________________________________________________________________
   rewritten to assert the container keeps zero padding under a dispatched
   insets frame. Pad-fit-to-capsule policy remains deferred (screenshot
   review). Screenshot proof: `.tmp/hud_corner_20260829-001908.png`.
+
+### [2026-09-01] Smart glyph alignment (reusable centered-glyph core)
+
+- **Type:** design-clarifying (how every centered HUD glyph renders is product visual design; `Part:` problem-avoiding — the initial implementation clipped glyphs).
+
+- **Problem:** the HUD centers bundled-font glyphs in four places (magic buttons, status pill, gear, and the planned video-source preset chips) with hand-rolled per-consumer sizing/centering code. The magic buttons equalized glyph VISUAL height from the font's 90%-mass band (`textSize = target / visualHeightEm`), but the band under-reports glyphs with thin tails: a triangle's point carries little mass, so its band is ~0.45em while its full ink box is ~0.6em and its line box ~1.16em. The equalized size then overflowed the fixed 48dp button: ▲ rendered **zero ink** and ■/● were clipped to the lower half on-device (verified 2026-09-01 by pixel-census).
+
+- **Alternatives considered:** (a) keep per-consumer centering code (rejected — the four call sites drift, and the bug would be fixed four times); (b) revert the magic buttons to uniform text size (rejected — kills the chips' equalization need); (c) one reusable core + an import-time metric table (chosen).
+
+- **Chosen solution:** a shared `GlyphRendering` core + `GlyphTextView`/`GlyphButton`/`GlyphRow` views in `glyphs/`. Metrics are generated at font-import time by `scripts/glyph_metrics.py` (wired into `build_symbol_font.py`): per glyph `visualHeightEm` (90% band), `medianBiasEm` (weighted-ink median vs line-box center) and `inkBoxEm` (full ink box), plus the font-wide `LINE_BOX_EM` (ascent+descent). Sizing equalizes visual height; centering cancels the median bias via **asymmetric padding** (never translation — supersedes [2026-08-15] "Magic-button glyph centering", whose padding math now lives in the shared core). `render` caps the text size at `viewHeight / (fontScale × (LINE_BOX_EM + 2·|medianBiasEm|))` so the line box + padding always fit the fixed view at any font scale; padding rounds to the nearest int (truncation left up to a full px of un-cancelled offset). AppCompat base classes keep lint `AppCompatCustomView` green.
+
+- **Why:** Android lays out the glyph's LINE box (ascent+descent), not the ink box — capping on the ink box alone still clipped (child measured 54px in a 48dp cell at fontScale 1.3). Em-relative metrics are size/density/font-scale invariant, and Android + Pillow rasterize the same bundled TTF via FreeType, so import-time fractions transfer to devices (validated by `scripts/measure_glyph_row.py`: medians within 1px at fontScale 1.0 and 1.3).
+
+- **Out of scope / consequences:** the video-source preset chips render through the new `GlyphRow` (tested) but are not yet wired into Settings. `magicButtonRowShouldNotClipAtLargeFontScale` now passes with the cap (was failing before it). Generated `GlyphMetrics.kt` carries `@file:Suppress("MagicNumber")` — every literal is a measured metric, not a hand-written number. On-device proof: `.tmp/glyph_fixed.png`, `.tmp/glyph_13.png`.
 
 ### [2026-08-24] Adaptive pad sizing
 

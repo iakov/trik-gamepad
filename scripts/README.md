@@ -42,6 +42,8 @@ the same command works on Windows and POSIX, and CI invokes them the same way.
 | `check_device_identifiers.py` | Reject device serials / model codes / IMEIs in committed content | pre-commit hook + gate.py + CI |
 | `export_readme_screenshot.py` | Export the README hero screenshot from the HudThemeTest render (`--check` verifies freshness) | before release / HUD changes |
 | `build_symbol_font.py` | Regenerate the bundled HUD symbol font (DejaVuSansMono Nerd Font subset) | when the glyph set changes |
+| `glyph_metrics.py` | Rasterize the bundled font (Pillow) and emit per-glyph `visualHeightEm`/`medianBiasEm` metrics (Kotlin `GlyphMetrics` or `--print`) | when the glyph set changes (wired into `build_symbol_font.py`) |
+| `measure_glyph_row.py` | Measure a row of glyph buttons' VISUAL ink alignment (weighted median + 90% band per button) from a uiautomator dump + screenshot | on-device verification of `GlyphRow` / video-source preset chips |
 | `png_census.py` | **Pixel-census / pixel-diff** of UI screenshots (pure Python PNG decode; no PIL) — verify "the look changed" or "video is live" by pixels, not eyeballing | any UI screenshot proof (AGENTS.md pixel-census guardrail) |
 | `jacoco_report.py` | Summarize the JaCoCo report — global counters + per-class missed branches (`totals`) and exact uncovered lines (`lines`) | when the coverage gate fails or a feature adds app classes |
 | `ci_failures.py` | Which job/step failed in a `gh run`? (avoids the PowerShell `--jq` quoting trap) | the "check CI" loop after every push |
