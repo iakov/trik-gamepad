@@ -11,15 +11,21 @@ import java.io.File
  */
 object ReportDiagnosticsWriter {
   const val DIAGNOSTICS_DIR = "diagnostics"
+  const val FILE_PREFIX = "trik-gamepad-report"
 
   fun write(context: Context, reportText: String): File {
+    val file = newFile(context, "md")
+    file.writeText(reportText, Charsets.UTF_8)
+    return file
+  }
+
+  /** A fresh timestamped file in the diagnostics dir with the given [extension]. */
+  fun newFile(context: Context, extension: String): File {
     val dir = File(context.cacheDir, DIAGNOSTICS_DIR)
     if (!dir.exists()) {
       dir.mkdirs()
     }
-    val file = File(dir, "trik-gamepad-report-${System.currentTimeMillis()}.md")
-    file.writeText(reportText, Charsets.UTF_8)
-    return file
+    return File(dir, "$FILE_PREFIX-${System.currentTimeMillis()}.$extension")
   }
 
   fun fileProviderAuthority(context: Context): String = context.packageName + ".fileprovider"

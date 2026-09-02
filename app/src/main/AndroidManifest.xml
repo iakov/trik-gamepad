@@ -70,6 +70,27 @@
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value=".MainActivity" />
         </activity>
+
+        <!-- Share-in target: other apps' share sheets offer TRIK Gamepad for photos/screenshots
+             ("attach to report"); the receiver packs them with a fresh diagnostic report into a
+             ZIP (ReportZipWriter) and forwards it through ReportSharer's mail share sheet. No
+             launcher entry; exported because the system launches it with the sender's image URIs. -->
+        <activity
+            android:name="com.trikset.gamepad2.ShareReceiverActivity"
+            android:label="@string/share_receiver_label"
+            android:exported="true"
+            android:theme="@style/Theme.AppCompat.NoActionBar.FullScreen">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
     </application>
 
 </manifest>

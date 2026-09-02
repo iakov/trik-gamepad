@@ -533,9 +533,9 @@ A0 baseline (2026-08-09; `main` sources excluded) — the fixed trend anchor:
 - **Accepted suppressions** (each carries a rationale comment in code; keep this
   registry in sync):
   - `@Suppress("DEPRECATION")`:
-    - The two `getParcelableExtra(String)` calls in `ReportSharerTest` — the
-      typed replacement overload is API 33+, and these tests run at minSdk 23
-      (Robolectric `[23]`).
+    - The `getParcelableExtra(String)` calls in `ReportSharerTest` (report
+      stream and ZIP-forward tests) — the typed replacement overload is API
+      33+, and these tests run at minSdk 23 (Robolectric `[23]`).
     - `MainActivityTest` `updateConfiguration(config, metrics)` (2-arg) — the
       1-arg form was removed in SDK 36.
     - `MainActivityTest` `dispatchKeyEventWithUnknownActionShouldFallThrough` —
@@ -546,6 +546,9 @@ A0 baseline (2026-08-09; `main` sources excluded) — the fixed trend anchor:
     - `FocusAwareActivityTestRule` (file-level) — deliberately extends the
       deprecated `ActivityTestRule` to add focus-wait/back-dismiss logic that
       `ActivityScenarioRule` does not expose.
+    - `ShareReceiverActivity` `streamUris()` — the typed `getParcelableExtra`
+      overloads are API 33+; at minSdk 23 (and in Robolectric) only the legacy
+      single-arg forms exist for reading `EXTRA_STREAM`.
   - `@Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")`:
     - `DummyServer`'s monitor `Object()` — `kotlin.Any` has no `wait`/`notifyAll`
       monitor methods.

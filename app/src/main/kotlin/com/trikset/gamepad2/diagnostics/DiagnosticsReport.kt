@@ -3,6 +3,7 @@ package com.trikset.gamepad2.diagnostics
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
+import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.BuildConfig
 import com.trikset.gamepad2.ConnectionState
 import com.trikset.gamepad2.RobotPresetStore
@@ -12,10 +13,28 @@ import java.util.Locale
 /**
  * Builds the one-file diagnostic "data block" users share with developers: app/device/display
  * identity, the live connection state, the full settings snapshot (non-defaults marked) and the
- * recent [AppLog] tail, optionally followed by a crash stack trace. Pure formatting — inputs are
- * passed in, so every section is unit-testable under Robolectric.
+ * recent [AppLog] tail, optionally followed by a crash stack trace. [build] is pure formatting —
+ * inputs are passed in, so every section is unit-testable under Robolectric — while [fromAppState]
+ * gathers the app-level inputs (default prefs, log tail, latest crash) for entry points that have
+ * no live connection state to report.
  */
 object DiagnosticsReport {
+
+  /**
+   * The default-prefs app snapshot: no live connection state ("not running" line), as the Settings
+   * "Report an issue" row produces. Shared by that row and the image share receiver.
+   */
+  fun fromAppState(context: Context): String {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(context)
+    val crash = CrashLogStore(context).latest()
+    return build(
+        context,
+        prefs,
+        null,
+        AppLog.tail(AppLog.BUFFER_CAPACITY),
+        crash?.stackTrace,
+    )
+  }
 
   fun build(
       context: Context,

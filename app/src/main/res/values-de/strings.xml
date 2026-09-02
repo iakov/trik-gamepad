@@ -40,6 +40,8 @@
     <string name="share_without_editing_on">Deaktivieren, um zur Prüfung in einen Editor zu senden</string>
     <string name="report_editor_chooser_title">Wähle einen Texteditor, um den Bericht vor dem Senden an Entwickler zu prüfen und zu bearbeiten</string>
     <string name="share_report">Diagnosebericht teilen</string>
+    <string name="share_receiver_label">TRIK Gamepad — an Bericht anhängen</string>
+    <string name="share_receiver_packing">Bericht wird erstellt…</string>
     <string name="crash_dialog_title">TRIK Gamepad wurde unerwartet beendet</string>
     <string name="crash_dialog_message">Ein Bericht mit den Absturzdaten ist fertig. Du kannst ihn prüfen und bearbeiten, bevor du ihn an die Entwickler sendest.</string>
     <string name="review_and_share">Prüfen und teilen</string>

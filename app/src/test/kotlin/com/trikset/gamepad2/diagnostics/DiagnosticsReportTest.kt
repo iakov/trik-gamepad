@@ -7,6 +7,7 @@ import com.trikset.gamepad2.BuildConfig
 import com.trikset.gamepad2.ConnectionState
 import com.trikset.gamepad2.RobotPresetStore
 import com.trikset.gamepad2.SettingsFragment
+import java.io.File
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -26,6 +27,8 @@ class DiagnosticsReportTest {
     context = RuntimeEnvironment.getApplication()
     prefs = PreferenceManager.getDefaultSharedPreferences(context)
     prefs.edit().clear().commit()
+    // fromAppState reads the latest crash; keep the store empty so no stale record leaks in.
+    File(context.filesDir, CrashLogStore.CRASH_DIR).deleteRecursively()
   }
 
   @Test
@@ -128,5 +131,14 @@ class DiagnosticsReportTest {
 
     val withoutCrash = DiagnosticsReport.build(context, prefs, null, emptyList(), null)
     assertFalse(withoutCrash.contains("## Last crash"))
+  }
+
+  @Test
+  fun fromAppStateBuildsFromDefaultPrefsAndLatestCrash() {
+    CrashLogStore(context).save("java.lang.IllegalState: stuck")
+    val report = DiagnosticsReport.fromAppState(context)
+    assertTrue(report.contains("# TRIK Gamepad diagnostic report"))
+    assertTrue(report.contains("java.lang.IllegalState: stuck"))
+    assertTrue(report.contains("Robot IP address: 192.168.77.1 (default)"))
   }
 }

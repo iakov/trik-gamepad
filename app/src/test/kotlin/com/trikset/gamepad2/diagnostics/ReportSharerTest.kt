@@ -111,4 +111,46 @@ class ReportSharerTest : RobolectricTestBase() {
     val inner = startedInnerIntent()
     assertEquals(Intent.ACTION_SEND, inner.action)
   }
+
+  @Test
+  fun zipForwardUsesZipMimeAndMailCover() {
+    val zipUri =
+        Uri.parse(
+            "content://com.trikset.gamepad2.fileprovider/diagnostics/trik-gamepad-report-1.zip"
+        )
+    ReportSharer.shareZip(activity, "report head", zipUri)
+
+    val inner = startedInnerIntent()
+    assertEquals(Intent.ACTION_SEND, inner.action)
+    assertEquals("application/zip", inner.type)
+    // The typed getParcelableExtra(String, Class) overload is API 33+; these tests run at
+    // minSdk (23), so the deprecated single-arg form is the only one available.
+    @Suppress("DEPRECATION")
+    assertEquals(zipUri, inner.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
+    val subject = inner.getStringExtra(Intent.EXTRA_SUBJECT)
+    assertNotNull(subject)
+    assertTrue(subject!!.startsWith("[trik-gamepad][report] v"))
+    assertEquals(
+        listOf(ReportShareContent.SUPPORT_EMAIL),
+        inner.getStringArrayExtra(Intent.EXTRA_EMAIL)?.toList(),
+    )
+    val body = inner.getStringExtra(Intent.EXTRA_TEXT)
+    assertTrue("body must lead with the subject", body!!.startsWith(subject + "\n\n"))
+    assertTrue("body must carry the report head", body.endsWith("report head"))
+  }
+
+  @Test
+  fun zipForwardChooserTitleMatchesReportShare() {
+    val zipUri =
+        Uri.parse(
+            "content://com.trikset.gamepad2.fileprovider/diagnostics/trik-gamepad-report-1.zip"
+        )
+    ReportSharer.shareZip(activity, "report head", zipUri)
+
+    val chooser = shadowOf(activity).nextStartedActivity
+    assertEquals(
+        activity.getString(R.string.share_report),
+        chooser.getStringExtra(Intent.EXTRA_TITLE),
+    )
+  }
 }

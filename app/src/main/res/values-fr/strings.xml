@@ -40,6 +40,8 @@
     <string name="share_without_editing_on">Décochez pour ouvrir dans un éditeur avant de partager</string>
     <string name="report_editor_chooser_title">Choisissez un éditeur de texte pour relire et modifier avant l’envoi aux développeurs</string>
     <string name="share_report">Partager le rapport de diagnostic</string>
+    <string name="share_receiver_label">TRIK Gamepad — joindre au rapport</string>
+    <string name="share_receiver_packing">Préparation du rapport…</string>
     <string name="crash_dialog_title">TRIK Gamepad s’est arrêté de façon inattendue</string>
     <string name="crash_dialog_message">Un rapport détaillant l’incident est prêt. Vous pouvez le relire et le modifier avant de l’envoyer aux développeurs.</string>
     <string name="review_and_share">Relire et partager</string>

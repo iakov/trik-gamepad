@@ -15,7 +15,6 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.diagnostics.AppLog
-import com.trikset.gamepad2.diagnostics.CrashLogStore
 import com.trikset.gamepad2.diagnostics.DiagLevel
 import com.trikset.gamepad2.diagnostics.DiagnosticsReport
 import com.trikset.gamepad2.diagnostics.ReportSharer
@@ -264,17 +263,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
   }
 
-  private fun buildDiagnosticsReport(): String {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
-    val crash = CrashLogStore(requireContext()).latest()
-    return DiagnosticsReport.build(
-        requireContext(),
-        prefs,
-        null,
-        AppLog.tail(AppLog.BUFFER_CAPACITY),
-        crash?.stackTrace,
-    )
-  }
+  private fun buildDiagnosticsReport(): String = DiagnosticsReport.fromAppState(requireContext())
 
   private fun initializeDynamicPreferenceSummary() {
     val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
