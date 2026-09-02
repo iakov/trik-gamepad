@@ -76,12 +76,16 @@ class MainActivitySettingsController(
 
   fun onPreferenceChanged(sharedPreferences: SharedPreferences) {
     val addr =
-        sharedPreferences.getString(SettingsFragment.SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS)
-            ?: DEFAULT_HOST_ADDRESS
+        sharedPreferences.getString(
+            SettingsFragment.SK_HOST_ADDRESS,
+            SettingsFragment.DEFAULT_HOST_ADDRESS,
+        ) ?: SettingsFragment.DEFAULT_HOST_ADDRESS
     var portNumber = DEFAULT_PORT
     val portStr =
-        sharedPreferences.getString(SettingsFragment.SK_HOST_PORT, DEFAULT_HOST_PORT)
-            ?: DEFAULT_HOST_PORT
+        sharedPreferences.getString(
+            SettingsFragment.SK_HOST_PORT,
+            SettingsFragment.DEFAULT_HOST_PORT,
+        ) ?: SettingsFragment.DEFAULT_HOST_PORT
     try {
       portNumber = portStr.toInt()
     } catch (e: NumberFormatException) {
@@ -102,7 +106,7 @@ class MainActivitySettingsController(
           TransportMode.TCP
         }
 
-    val defAlpha = PADS_ALPHA_DEFAULT
+    val defAlpha = SettingsFragment.DEFAULT_PADS_ALPHA
     // SeekBarPreference stores Int; legacy String values are still honored.
     val padsAlpha =
         SettingsFragment.readSeekBarValue(
@@ -150,14 +154,7 @@ class MainActivitySettingsController(
     // Magic buttons: count (0 hides the row; capped at the maximum) + a display glyph per button
     // (defaults ▲ ■ ● ✕ ◆); the protocol command stays numeric `btn N down`.
     val magicCount = readMagicButtonCount(sharedPreferences)
-    val symbols =
-        (1..SettingsFragment.MAX_MAGIC_BUTTONS).map { n ->
-          MagicButtonSymbols.resolve(
-              n,
-              sharedPreferences.getString(SettingsFragment.magicSymbolKey(n), null),
-          )
-        }
-    ui.setMagicButtons(magicCount, symbols)
+    ui.setMagicButtons(magicCount, MagicSymbolsStore(sharedPreferences).readAll())
 
     val hideControls = sharedPreferences.getBoolean(SettingsFragment.SK_HIDE_CONTROLS, false)
     // Empty host = video-only device: no pads/buttons to tap regardless of the toggle.
@@ -206,16 +203,12 @@ class MainActivitySettingsController(
 
   internal companion object {
     const val TAG = "SettingsController"
-    const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
-    const val DEFAULT_HOST_PORT = "4444"
     const val DEFAULT_PORT = 4444
     const val TRANSPORT_DEFAULT = "tcp"
     const val TRANSPORT_UDP = "udp"
-    const val PADS_ALPHA_DEFAULT = 100
     const val ALPHA_MAX = 255
     const val WHEEL_STEP_MIN = 1
     const val WHEEL_STEP_MAX = 100
-    const val DEFAULT_MAGIC_BUTTON_COUNT = 3
     // Shown in the top-left IP chip when neither a host nor a video stream is configured
     // (the chip stays readable instead of empty).
     const val TARGET_CHIP_EMPTY = "---.---.---.---"
@@ -228,7 +221,10 @@ class MainActivitySettingsController(
             is String -> value.toIntOrNull()
             else -> null
           }
-      return (parsed ?: DEFAULT_MAGIC_BUTTON_COUNT).coerceIn(0, SettingsFragment.MAX_MAGIC_BUTTONS)
+      return (parsed ?: SettingsFragment.DEFAULT_MAGIC_BUTTON_COUNT).coerceIn(
+          0,
+          SettingsFragment.MAX_MAGIC_BUTTONS,
+      )
     }
   }
 }

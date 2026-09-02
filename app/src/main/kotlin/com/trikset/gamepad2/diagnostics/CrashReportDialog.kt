@@ -1,11 +1,7 @@
 package com.trikset.gamepad2.diagnostics
 
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.view.View
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -13,6 +9,7 @@ import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.ConnectionState
 import com.trikset.gamepad2.R
 import com.trikset.gamepad2.SettingsFragment
+import com.trikset.gamepad2.copyToClipboard
 
 /**
  * Owns the next-launch crash-report dialog: surfaces a captured crash exactly once, offering to
@@ -90,10 +87,6 @@ class CrashReportDialog(
   }
 
   private fun copyReport(reportText: String) {
-    val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-    clipboard.setPrimaryClip(
-        ClipData.newPlainText(ReportShareContent.subject(crash = true), reportText)
-    )
-    Toast.makeText(activity, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
+    activity.copyToClipboard(ReportShareContent.subject(crash = true), reportText)
   }
 }

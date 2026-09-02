@@ -113,23 +113,56 @@ object DiagnosticsReport {
 
   private fun appendSettings(out: StringBuilder, prefs: SharedPreferences) {
     out.appendLine(
-        settingLine(prefs, "Robot IP address", SettingsFragment.SK_HOST_ADDRESS, "192.168.77.1")
+        settingLine(
+            prefs,
+            "Robot IP address",
+            SettingsFragment.SK_HOST_ADDRESS,
+            SettingsFragment.DEFAULT_HOST_ADDRESS,
+        )
     )
-    out.appendLine(settingLine(prefs, "Robot TCP port", SettingsFragment.SK_HOST_PORT, "4444"))
+    out.appendLine(
+        settingLine(
+            prefs,
+            "Robot TCP port",
+            SettingsFragment.SK_HOST_PORT,
+            SettingsFragment.DEFAULT_HOST_PORT,
+        )
+    )
     out.appendLine(settingLine(prefs, "Video stream URI", SettingsFragment.SK_VIDEO_URI, ""))
     out.appendLine(
         settingLine(prefs, "Keep-alive timeout, ms", SettingsFragment.SK_KEEPALIVE, "5000")
     )
     out.appendLine(settingLine(prefs, "Keep screen on", SettingsFragment.SK_KEEP_SCREEN_ON, "true"))
-    out.appendLine(settingLine(prefs, "Arrow transparency", SettingsFragment.SK_SHOW_PADS, "100"))
+    out.appendLine(
+        settingLine(
+            prefs,
+            "Arrow transparency",
+            SettingsFragment.SK_SHOW_PADS,
+            SettingsFragment.DEFAULT_PADS_ALPHA.toString(),
+        )
+    )
     out.appendLine(
         settingLine(prefs, "Hide pads & buttons", SettingsFragment.SK_HIDE_CONTROLS, "false")
     )
     out.appendLine(settingLine(prefs, "Show FPS", SettingsFragment.SK_SHOW_FPS, "false"))
     out.appendLine(settingLine(prefs, "Wheel enabled", SettingsFragment.SK_WHEEL_ENABLED, "false"))
-    out.appendLine(settingLine(prefs, "Wheel sensitivity", SettingsFragment.SK_WHEEL_STEP, "7"))
+    out.appendLine(
+        settingLine(
+            prefs,
+            "Wheel sensitivity",
+            SettingsFragment.SK_WHEEL_STEP,
+            SettingsFragment.DEFAULT_WHEEL_STEP.toString(),
+        )
+    )
     out.appendLine(settingLine(prefs, "Swap sticks", SettingsFragment.SK_GAMEPAD_SWAP, "false"))
-    out.appendLine(settingLine(prefs, "Magic buttons", SettingsFragment.SK_MAGIC_BUTTON_COUNT, "3"))
+    out.appendLine(
+        settingLine(
+            prefs,
+            "Magic buttons",
+            SettingsFragment.SK_MAGIC_BUTTON_COUNT,
+            SettingsFragment.DEFAULT_MAGIC_BUTTON_COUNT.toString(),
+        )
+    )
     for (n in 1..SettingsFragment.MAX_MAGIC_BUTTONS) {
       val stored = prefs.all[SettingsFragment.magicSymbolKey(n)]?.toString()
       if (stored != null) {

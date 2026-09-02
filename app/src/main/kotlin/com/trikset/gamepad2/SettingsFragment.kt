@@ -1,8 +1,5 @@
 package com.trikset.gamepad2
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
@@ -58,13 +55,15 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val MAX_MAGIC_BUTTONS = 5
     /** Preference XML loaded by this fragment: app or robot/target settings. */
     const val ARG_PREFERENCE_XML = "preferenceXml"
-    private const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
-    private const val DEFAULT_HOST_PORT = "4444"
+    // Defaults mirror the pref_app.xml/pref_robot.xml defaultValue attributes (the XML is the
+    // source of truth); the runtime mirrors live here so the settings screen,
+    // MainActivitySettingsController and DiagnosticsReport never disagree about a default.
+    internal const val DEFAULT_HOST_ADDRESS = "192.168.77.1"
+    internal const val DEFAULT_HOST_PORT = "4444"
     private const val LOG_DIALOG_MAX_LINES = 200
-    // XML defaults for the seekbar settings (mirror pref_app.xml defaultValue).
-    private const val DEFAULT_WHEEL_STEP = 7
-    private const val DEFAULT_PADS_ALPHA = 100
-    private const val DEFAULT_MAGIC_BUTTON_COUNT = 3
+    internal const val DEFAULT_WHEEL_STEP = 7
+    internal const val DEFAULT_PADS_ALPHA = 100
+    internal const val DEFAULT_MAGIC_BUTTON_COUNT = 3
 
     fun magicSymbolKey(buttonNumber: Int): String = "magicSymbol$buttonNumber"
 
@@ -72,18 +71,19 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     /**
      * The effective video-stream URI: the stored value, else the URI derived from the configured
-     * host (`http://<host>:8080/?action=stream`). Empty = video disabled. Shared by the settings
-     * row (shows what will actually be used) and [MainActivitySettingsController] (uses it) so the
-     * two can never disagree — an "unset" field must not read as "no stream" while the app streams
-     * the derived default. [hostOverride] carries a freshly edited host value that is not yet
-     * persisted (the change listener fires before prefs are saved).
+     * host — `http://<host>:8080/?action=stream`, i.e. the Camera 1 preset ([VideoSourceChip] port
+     * table). Empty = video disabled. Shared by the settings row (shows what will actually be used)
+     * and [MainActivitySettingsController] (uses it) so the two can never disagree — an "unset"
+     * field must not read as "no stream" while the app streams the derived default. [hostOverride]
+     * carries a freshly edited host value that is not yet persisted (the change listener fires
+     * before prefs are saved).
      */
     fun effectiveVideoUri(prefs: SharedPreferences, hostOverride: String?): String {
       val host =
           hostOverride
               ?: prefs.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS)
               ?: DEFAULT_HOST_ADDRESS
-      val defaultUri = if (host.isBlank()) "" else "http://$host:8080/?action=stream"
+      val defaultUri = VideoSourceChips.targetFor(null, host, VideoSourceChip.CAMERA_1).orEmpty()
       return prefs.getString(SK_VIDEO_URI, defaultUri) ?: defaultUri
     }
 
@@ -112,14 +112,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     copy.onPreferenceClickListener = Preference.OnPreferenceClickListener {
       val prefs = copy.sharedPreferences
       val host = prefs?.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
-      val clipboard = myActivity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-      clipboard.setPrimaryClip(ClipData.newPlainText(SK_HOST_ADDRESS, host))
-      Toast.makeText(
-              myActivity.applicationContext,
-              getString(R.string.copied_to_clipboard),
-              Toast.LENGTH_SHORT,
-          )
-          .show()
+      myActivity.copyToClipboard(SK_HOST_ADDRESS, host)
       true
     }
   }
@@ -181,16 +174,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     // "About system" copies the SHORT device spec (the summary preview). "Copy report" stays the
     // row that copies the full diagnostics report (see DESIGN.md "About system vs Copy report").
     aboutSystem.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-      val clipboard = myActivity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-      clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.about_system), systemInfo))
-
-      Toast.makeText(
-              myActivity.applicationContext,
-              getString(R.string.copied_to_clipboard),
-              Toast.LENGTH_SHORT,
-          )
-          .show()
-
+      myActivity.copyToClipboard(getString(R.string.about_system), systemInfo)
       true
     }
   }
@@ -213,16 +197,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     val myActivity = activity ?: return
     val copy = findPreference<Preference>(SK_COPY_REPORT) ?: return
     copy.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-      val clipboard = myActivity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-      clipboard.setPrimaryClip(
-          ClipData.newPlainText(getString(R.string.copy_report), buildDiagnosticsReport())
-      )
-      Toast.makeText(
-              myActivity.applicationContext,
-              getString(R.string.copied_to_clipboard),
-              Toast.LENGTH_SHORT,
-          )
-          .show()
+      myActivity.copyToClipboard(getString(R.string.copy_report), buildDiagnosticsReport())
       true
     }
   }
