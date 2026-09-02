@@ -1,7 +1,7 @@
 package com.trikset.gamepad2
 
-import android.net.Uri
 import androidx.annotation.StringRes
+import androidx.core.net.toUri
 
 /**
  * The four video-source preset chips shown in Robot settings (Video category, below the video-URI
@@ -39,7 +39,7 @@ object VideoSourceChips {
    * `null` when the stored value carries no host to rewrite (falls back to [defaultStreamUri]).
    */
   internal fun rewritePort(storedUri: String, port: Int): String? {
-    val parsed = runCatching { Uri.parse(storedUri) }.getOrNull() ?: return null
+    val parsed = runCatching { storedUri.toUri() }.getOrNull() ?: return null
     val host = parsed.host
     if (host.isNullOrBlank()) return null
     // Uri.Builder has no port() setter, so rebuild the authority (userinfo@host:port) by hand.

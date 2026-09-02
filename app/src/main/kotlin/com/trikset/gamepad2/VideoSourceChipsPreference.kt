@@ -2,6 +2,7 @@ package com.trikset.gamepad2
 
 import android.content.Context
 import android.util.AttributeSet
+import androidx.core.content.res.ResourcesCompat
 import androidx.preference.Preference
 import androidx.preference.PreferenceViewHolder
 import com.trikset.gamepad2.glyphs.GlyphRow
@@ -45,7 +46,7 @@ constructor(
     // Visible pill chrome per chip; the glyph tint stays neutral so the chip reads as a button.
     for (i in 0 until row.childCount) {
       val chip = row.getChildAt(i)
-      chip.background = resources.getDrawable(R.drawable.hud_pill_bg, null)
+      chip.background = ResourcesCompat.getDrawable(resources, R.drawable.hud_pill_bg, null)
     }
   }
 
