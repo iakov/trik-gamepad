@@ -7,7 +7,7 @@
     <string name="keepalive_must_be_positive_decimal">Der Keep-alive-Timeout muss eine positive ganze Zahl sein</string>
     <string name="keepalive_must_be_not_less">Der Keep-alive-Timeout darf nicht kleiner als %d ms sein</string>
     <string name="tap_to_copy">Zum Kopieren tippen</string>
-    <string name="video_uri_reset">Video-URI auf Roboter-Standard zurückgesetzt</string>
+    <string name="video_source_chip_needs_host">Zuerst die Roboter-IP-Adresse festlegen</string>
     <string name="settings_button_description">Systemleisten ein-/ausblenden</string>
     <string name="left_pad_description">Linkes Pad</string>
     <string name="right_pad_description">Rechtes Pad</string>
@@ -70,8 +70,10 @@
     <string name="pref_host_port">Roboter-TCP-Port…</string>
     <string name="pref_category_video">Video</string>
     <string name="pref_video_uri">URI für den abzuspielenden Videostream…</string>
-    <string name="pref_reset_video_uri">Video-URI auf Roboter-Standard zurücksetzen</string>
-    <string name="pref_reset_video_uri_summary">Füllt die URI aus der Roboter-IP-Adresse oben</string>
+    <string name="video_chip_camera_1">Roboter-Kamera 1</string>
+    <string name="video_chip_camera_2">Roboter-Kamera 2</string>
+    <string name="video_chip_usb">USB-Videoquelle</string>
+    <string name="video_chip_none">Kein Video</string>
     <string name="pref_category_controls">Steuerung</string>
     <string name="pref_category_appearance">Darstellung</string>
     <string name="pref_hud_theme">HUD-Design</string>

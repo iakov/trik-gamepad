@@ -7,7 +7,7 @@
     <string name="keepalive_must_be_positive_decimal">Thời gian chờ keep-alive phải là số nguyên dương</string>
     <string name="keepalive_must_be_not_less">Thời gian chờ keep-alive không được nhỏ hơn %d ms</string>
     <string name="tap_to_copy">Chạm để sao chép</string>
-    <string name="video_uri_reset">Đã đặt lại URI video về mặc định của robot</string>
+    <string name="video_source_chip_needs_host">Đặt địa chỉ IP của robot trước</string>
     <string name="settings_button_description">Bật/tắt thanh hệ thống</string>
     <string name="left_pad_description">Bàn cảm ứng trái</string>
     <string name="right_pad_description">Bàn cảm ứng phải</string>
@@ -70,8 +70,10 @@
     <string name="pref_host_port">Cổng TCP robot…</string>
     <string name="pref_category_video">Video</string>
     <string name="pref_video_uri">URI của luồng video cần phát…</string>
-    <string name="pref_reset_video_uri">Đặt lại URI video về mặc định của robot</string>
-    <string name="pref_reset_video_uri_summary">Điền URI từ địa chỉ IP robot ở trên</string>
+    <string name="video_chip_camera_1">Camera 1 của robot</string>
+    <string name="video_chip_camera_2">Camera 2 của robot</string>
+    <string name="video_chip_usb">Nguồn video USB</string>
+    <string name="video_chip_none">Không có video</string>
     <string name="pref_category_controls">Điều khiển</string>
     <string name="pref_category_appearance">Giao diện</string>
     <string name="pref_hud_theme">Giao diện HUD</string>

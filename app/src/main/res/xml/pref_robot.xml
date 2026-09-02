@@ -34,10 +34,11 @@
             android:selectAllOnFocus="true"
             android:singleLine="true"
             android:title="@string/pref_video_uri" />
-        <Preference
-            android:key="resetVideoURI"
-            android:summary="@string/pref_reset_video_uri_summary"
-            android:title="@string/pref_reset_video_uri" />
+        <!-- Video-source preset chips: Camera 1 / Camera 2 / USB / No video. Each chip rewrites the
+             video URI's port (or fills it from the robot host when empty); "No video" clears it.
+             The row is populated by VideoSourceChipsPreference from the bundled smart-glyph core. -->
+        <com.trikset.gamepad2.VideoSourceChipsPreference
+            android:key="videoSourceChips" />
     </PreferenceCategory>
 
     <PreferenceCategory android:title="@string/pref_category_network">

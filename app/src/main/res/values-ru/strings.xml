@@ -9,7 +9,7 @@
     <string name="keepalive_must_be_positive_decimal">Таймаут keep-alive должен быть положительным целым числом</string>
     <string name="keepalive_must_be_not_less">Таймаут keep-alive не может быть меньше %d мс</string>
     <string name="tap_to_copy">Нажмите, чтобы скопировать</string>
-    <string name="video_uri_reset">URI видео сброшен к значению по умолчанию робота</string>
+    <string name="video_source_chip_needs_host">Сначала укажите IP-адрес робота</string>
     <string name="settings_button_description">Переключить системные панели</string>
     <string name="left_pad_description">Левая площадка</string>
     <string name="right_pad_description">Правая площадка</string>
@@ -72,8 +72,10 @@
     <string name="pref_host_port">TCP-порт робота…</string>
     <string name="pref_category_video">Видео</string>
     <string name="pref_video_uri">URI видеопотока для воспроизведения…</string>
-    <string name="pref_reset_video_uri">Сбросить URI видео к значению по умолчанию</string>
-    <string name="pref_reset_video_uri_summary">Заполнить URI из IP-адреса робота выше</string>
+    <string name="video_chip_camera_1">Камера 1 робота</string>
+    <string name="video_chip_camera_2">Камера 2 робота</string>
+    <string name="video_chip_usb">USB-источник видео</string>
+    <string name="video_chip_none">Без видео</string>
     <string name="pref_category_controls">Управление</string>
     <string name="pref_category_appearance">Внешний вид</string>
     <string name="pref_hud_theme">Тема HUD</string>

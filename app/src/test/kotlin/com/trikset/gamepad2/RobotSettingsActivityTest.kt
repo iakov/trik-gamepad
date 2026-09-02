@@ -63,25 +63,88 @@ class RobotSettingsActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun resetVideoUriClickShouldFillFromHost() {
+  fun videoChipCamera1FillsUriFromHostWhenEmpty() {
     val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
     prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
-    val reset = fragment.findPreference<Preference>(SettingsFragment.SK_RESET_VIDEO_URI)
-    assertNotNull(reset)
-    reset!!.onPreferenceClickListener!!.onPreferenceClick(reset)
+    prefs.edit().putString(SettingsFragment.SK_VIDEO_URI, "").commit()
+    tapChip(VideoSourceChip.CAMERA_1)
 
     assertEquals(
         "http://10.0.0.9:8080/?action=stream",
         prefs.getString(SettingsFragment.SK_VIDEO_URI, ""),
     )
-    // The action row's summary stays static; the videoURI row carries the current value.
-    assertEquals(
-        "Fill the URI from the robot IP address above",
-        reset.summary,
-    )
+    // The videoURI row shows the chip result in its summary.
     val videoUri = fragment.findPreference<Preference>(SettingsFragment.SK_VIDEO_URI)
     assertNotNull(videoUri)
-    assertTrue((videoUri!!.summary ?: "").toString().contains("http://10.0.0.9:8080"))
+    assertTrue((videoUri!!.summary ?: "").toString().contains("10.0.0.9:8080"))
+  }
+
+  @Test
+  fun videoChipRewritesOnlyPortOfStoredUri() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
+    prefs
+        .edit()
+        .putString(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.9:8081/stream?low=1")
+        .commit()
+    tapChip(VideoSourceChip.CAMERA_1)
+
+    assertEquals(
+        "http://10.0.0.9:8080/stream?low=1",
+        prefs.getString(SettingsFragment.SK_VIDEO_URI, ""),
+    )
+  }
+
+  @Test
+  fun videoChipUsbKeepsHostWhenStoredUriExists() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "192.168.1.9").commit()
+    prefs
+        .edit()
+        .putString(SettingsFragment.SK_VIDEO_URI, "http://192.168.1.9:8080/?action=stream")
+        .commit()
+    tapChip(VideoSourceChip.USB)
+
+    assertEquals(
+        "http://192.168.1.9:8082/?action=stream",
+        prefs.getString(SettingsFragment.SK_VIDEO_URI, ""),
+    )
+  }
+
+  @Test
+  fun videoChipNoneClearsUri() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "10.0.0.9").commit()
+    prefs
+        .edit()
+        .putString(SettingsFragment.SK_VIDEO_URI, "http://10.0.0.9:8080/?action=stream")
+        .commit()
+    tapChip(VideoSourceChip.NONE)
+
+    assertEquals("", prefs.getString(SettingsFragment.SK_VIDEO_URI, ""))
+  }
+
+  @Test
+  fun videoChipWithNoStoredUriAndNoHostShowsHintAndChangesNothing() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().putString(SettingsFragment.SK_HOST_ADDRESS, "").commit()
+    prefs.edit().putString(SettingsFragment.SK_VIDEO_URI, "").commit()
+    val rebuilt = buildFragment()
+    val chips = rebuilt.findPreference<VideoSourceChipsPreference>(SettingsFragment.SK_VIDEO_CHIPS)
+    assertNotNull(chips)
+    chips!!.onChipSelected!!.invoke(VideoSourceChip.CAMERA_2)
+
+    // Nothing was written and the row still shows the empty state.
+    assertEquals("", prefs.getString(SettingsFragment.SK_VIDEO_URI, ""))
+    val videoUri = rebuilt.findPreference<Preference>(SettingsFragment.SK_VIDEO_URI)
+    assertNotNull(videoUri)
+    assertEquals("No stream URI set", videoUri!!.summary)
+  }
+
+  private fun tapChip(chip: VideoSourceChip) {
+    val chips = fragment.findPreference<VideoSourceChipsPreference>(SettingsFragment.SK_VIDEO_CHIPS)
+    assertNotNull("video-source chips row must exist in the robot screen", chips)
+    chips!!.onChipSelected!!.invoke(chip)
   }
 
   @Test
@@ -99,9 +162,9 @@ class RobotSettingsActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun resetVideoUriClickWithoutActivityShouldBeSafe() {
+  fun videoChipsWithoutActivityShouldBeSafe() {
     val fragment = SettingsFragment()
-    val method = fragment.javaClass.getDeclaredMethod("initializeResetVideoUriField")
+    val method = fragment.javaClass.getDeclaredMethod("initializeVideoSourceChipsField")
     method.isAccessible = true
     method.invoke(fragment)
   }

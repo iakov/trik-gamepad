@@ -7,7 +7,7 @@
     <string name="keepalive_must_be_positive_decimal">Le délai de keep-alive doit être un entier positif</string>
     <string name="keepalive_must_be_not_less">Le délai de keep-alive ne peut pas être inférieur à %d ms</string>
     <string name="tap_to_copy">Toucher pour copier</string>
-    <string name="video_uri_reset">URI vidéo réinitialisée à la valeur par défaut du robot</string>
+    <string name="video_source_chip_needs_host">Définir d’abord l’adresse IP du robot</string>
     <string name="settings_button_description">Afficher/masquer les barres système</string>
     <string name="left_pad_description">Pad gauche</string>
     <string name="right_pad_description">Pad droit</string>
@@ -70,8 +70,10 @@
     <string name="pref_host_port">Port TCP du robot…</string>
     <string name="pref_category_video">Vidéo</string>
     <string name="pref_video_uri">URI du flux vidéo à lire…</string>
-    <string name="pref_reset_video_uri">Réinitialiser l’URI vidéo à la valeur par défaut</string>
-    <string name="pref_reset_video_uri_summary">Remplit l’URI à partir de l’adresse IP du robot ci-dessus</string>
+    <string name="video_chip_camera_1">Caméra 1 du robot</string>
+    <string name="video_chip_camera_2">Caméra 2 du robot</string>
+    <string name="video_chip_usb">Source vidéo USB</string>
+    <string name="video_chip_none">Pas de vidéo</string>
     <string name="pref_category_controls">Commandes</string>
     <string name="pref_category_appearance">Apparence</string>
     <string name="pref_hud_theme">Thème HUD</string>

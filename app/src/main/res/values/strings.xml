@@ -7,7 +7,7 @@
     <string name="keepalive_must_be_positive_decimal">Keep-alive timeout must be positive decimal integer</string>
     <string name="keepalive_must_be_not_less">Keep-alive timeout must be not less than %d ms</string>
     <string name="tap_to_copy">Tap to copy</string>
-    <string name="video_uri_reset">Video URI reset to robot default</string>
+    <string name="video_source_chip_needs_host">Set the robot IP address first</string>
     <string name="settings_button_description">Toggle system bars</string>
     <string name="left_pad_description">Left pad</string>
     <string name="right_pad_description">Right pad</string>
@@ -78,8 +78,12 @@
     <string name="pref_host_port">Robot TCP port…</string>
     <string name="pref_category_video">Video</string>
     <string name="pref_video_uri">URI for video stream to play…</string>
-    <string name="pref_reset_video_uri">Reset video URI to robot default</string>
-    <string name="pref_reset_video_uri_summary">Fill the URI from the robot IP address above</string>
+    <!-- Video-source preset chips (Robot settings > Video). Each contentDescription names the
+         stream the chip selects; the visible label is the glyph itself. -->
+    <string name="video_chip_camera_1">Robot camera 1</string>
+    <string name="video_chip_camera_2">Robot camera 2</string>
+    <string name="video_chip_usb">USB video source</string>
+    <string name="video_chip_none">No video</string>
     <string name="pref_category_controls">Controls</string>
     <string name="pref_keep_screen_on">Keep screen on</string>
     <string name="pref_keep_screen_on_on">Screen stays on while the gamepad is open</string>

@@ -29,11 +29,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val SK_TRANSPORT = "transport"
     const val SK_SHOW_PADS = "showPads"
     const val SK_VIDEO_URI = "videoURI"
+    const val SK_VIDEO_CHIPS = "videoSourceChips"
     const val SK_WHEEL_STEP = "wheelSens"
     const val SK_ABOUT_SYSTEM = "aboutSystem"
     const val SK_KEEPALIVE = "keepaliveTimeout"
     const val SK_CUSTOM_MESSAGE = "customMessage"
-    const val SK_RESET_VIDEO_URI = "resetVideoURI"
     const val SK_COPY_ROBOT_IP = "copyRobotIp"
     const val SK_WHEEL_ENABLED = "wheelEnabled"
     const val SK_KEEP_SCREEN_ON = "keepScreenOn"
@@ -125,26 +125,36 @@ class SettingsFragment : PreferenceFragmentCompat() {
     }
   }
 
-  /** Fills the video URI from the configured robot host; explicit, never implicit. */
-  private fun initializeResetVideoUriField() {
+  /**
+   * Wires the video-source preset chips ([SK_VIDEO_CHIPS]) to [VideoSourceChips]: tapping a chip
+   * rewrites the stored video URI's port (or fills it from the robot host when empty); the "No
+   * video" chip clears it. A chip that cannot resolve (no stored URI AND no host) shows a hint
+   * toast and changes nothing.
+   */
+  private fun initializeVideoSourceChipsField() {
+    val chips = findPreference<VideoSourceChipsPreference>(SK_VIDEO_CHIPS) ?: return
+    chips.onChipSelected = { chip -> applyVideoSourceChip(chip) }
+  }
+
+  private fun applyVideoSourceChip(chip: VideoSourceChip) {
     val myActivity = activity ?: return
-    val reset = findPreference<Preference>(SK_RESET_VIDEO_URI) ?: return
-    reset.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-      val prefs = reset.sharedPreferences
-      val host = prefs?.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
-      val uri = "http://$host:8080/?action=stream"
-      prefs?.edit { putString(SK_VIDEO_URI, uri) }
-      // The videoURI row shows the current value in its summary; refresh it so the reset is
-      // immediately visible (the row itself carries the value, not this action row).
-      findPreference<Preference>(SK_VIDEO_URI)?.summary = uri
+    val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
+    val storedUri = prefs.getString(SK_VIDEO_URI, "") ?: ""
+    val host = prefs.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
+    val targetUri = VideoSourceChips.targetFor(storedUri, host, chip)
+    if (targetUri == null) {
       Toast.makeText(
               myActivity.applicationContext,
-              getString(R.string.video_uri_reset),
+              getString(R.string.video_source_chip_needs_host),
               Toast.LENGTH_SHORT,
           )
           .show()
-      true
+      return
     }
+    prefs.edit { putString(SK_VIDEO_URI, targetUri) }
+    // The videoURI row shows the current value in its summary; refresh it so the chip tap is
+    // immediately visible (the row itself carries the value, not the chip row).
+    refreshVideoUriSummary()
   }
 
   private fun initializeAboutSystemField() {
@@ -520,7 +530,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     initializeAboutSystemField()
     initializeDynamicPreferenceSummary()
     initializeMagicSymbolsField()
-    initializeResetVideoUriField()
+    initializeVideoSourceChipsField()
     initializeCopyRobotIpField()
     initializeRobotPresets()
     initializeDiagnosticsLevelField()
