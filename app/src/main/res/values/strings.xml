@@ -46,7 +46,6 @@
     <string name="share_without_editing_on">Uncheck to share to editor app for review</string>
     <string name="report_editor_chooser_title">Choose a text editor to review and edit before sharing to developers</string>
     <string name="share_report">Share diagnostic report</string>
-    <string name="report_subject">TRIK Gamepad issue report</string>
     <string name="crash_dialog_title">TRIK Gamepad stopped unexpectedly</string>
     <string name="crash_dialog_message">A report with the crash details is ready. You can review and edit it before sending it to the developers.</string>
     <string name="review_and_share">Review &amp; share</string>

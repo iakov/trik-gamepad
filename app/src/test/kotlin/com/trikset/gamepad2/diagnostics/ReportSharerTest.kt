@@ -9,6 +9,7 @@ import com.trikset.gamepad2.RobolectricTestBase
 import com.trikset.gamepad2.SettingsFragment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -78,11 +79,29 @@ class ReportSharerTest : RobolectricTestBase() {
     // minSdk (23), so the deprecated single-arg form is the only one available.
     @Suppress("DEPRECATION")
     assertEquals(reportUri, inner.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
-    assertEquals("report", inner.getStringExtra(Intent.EXTRA_TEXT))
+    val subject = inner.getStringExtra(Intent.EXTRA_SUBJECT)
+    assertNotNull(subject)
+    assertTrue(subject!!.startsWith("[trik-gamepad][report] v"))
     assertEquals(
-        activity.getString(R.string.report_subject),
-        inner.getStringExtra(Intent.EXTRA_SUBJECT),
+        listOf(ReportShareContent.SUPPORT_EMAIL),
+        inner.getStringArrayExtra(Intent.EXTRA_EMAIL)?.toList(),
     )
+    // The body is the subject line followed by the bounded report head.
+    val body = inner.getStringExtra(Intent.EXTRA_TEXT)
+    assertTrue("body must lead with the subject", body!!.startsWith(subject + "\n\n"))
+    assertTrue("body must carry the report head", body.endsWith("\n\nreport"))
+  }
+
+  @Test
+  fun crashShareUsesCrashSubjectKind() {
+    PreferenceManager.getDefaultSharedPreferences(activity)
+        .edit()
+        .putBoolean(SettingsFragment.SK_SHARE_WITHOUT_EDITING, true)
+        .commit()
+    ReportSharer.share(activity, "report", reportUri, editorAvailable = true, crash = true)
+
+    val inner = startedInnerIntent()
+    assertTrue(inner.getStringExtra(Intent.EXTRA_SUBJECT)!!.startsWith("[trik-gamepad][crash] v"))
   }
 
   @Test

@@ -42,7 +42,7 @@ class CrashReportDialog(
         .setPositiveButton(
             if (shareWithoutEditing) R.string.share else R.string.review_and_share
         ) { _, _ ->
-          ReportSharer.share(activity, reportText)
+          ReportSharer.share(activity, reportText, crash = true)
         }
         .setNeutralButton(android.R.string.copy) { _, _ -> copyReport(reportText) }
         .setNegativeButton(R.string.dismiss, null)
@@ -92,7 +92,7 @@ class CrashReportDialog(
   private fun copyReport(reportText: String) {
     val clipboard = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(
-        ClipData.newPlainText(activity.getString(R.string.report_subject), reportText)
+        ClipData.newPlainText(ReportShareContent.subject(crash = true), reportText)
     )
     Toast.makeText(activity, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
   }

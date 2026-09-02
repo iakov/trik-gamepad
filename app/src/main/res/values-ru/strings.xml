@@ -42,7 +42,6 @@
     <string name="share_without_editing_on">Снимите отметку, чтобы открыть в редакторе для просмотра</string>
     <string name="report_editor_chooser_title">Выберите текстовый редактор для просмотра и редактирования перед отправкой разработчикам</string>
     <string name="share_report">Отправить диагностический отчёт</string>
-    <string name="report_subject">Отчёт о проблеме TRIK Gamepad</string>
     <string name="crash_dialog_title">TRIK Gamepad неожиданно остановился</string>
     <string name="crash_dialog_message">Отчёт с деталями сбоя готов. Вы можете просмотреть и отредактировать его перед отправкой разработчикам.</string>
     <string name="review_and_share">Просмотреть и отправить</string>

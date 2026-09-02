@@ -17,7 +17,7 @@ import com.trikset.gamepad2.SettingsFragment
  */
 object ReportSharer {
 
-  fun share(context: Context, reportText: String) {
+  fun share(context: Context, reportText: String, crash: Boolean = false) {
     val file = ReportDiagnosticsWriter.write(context, reportText)
     val uri =
         FileProvider.getUriForFile(
@@ -25,7 +25,7 @@ object ReportSharer {
             ReportDiagnosticsWriter.fileProviderAuthority(context),
             file,
         )
-    share(context, reportText, uri, editorAvailable = hasEditHandler(context))
+    share(context, reportText, uri, editorAvailable = hasEditHandler(context), crash = crash)
   }
 
   internal fun share(
@@ -33,13 +33,14 @@ object ReportSharer {
       reportText: String,
       uri: Uri,
       editorAvailable: Boolean,
+      crash: Boolean = false,
   ) {
     val prefs = PreferenceManager.getDefaultSharedPreferences(context)
     val shareWithoutEditing = prefs.getBoolean(SettingsFragment.SK_SHARE_WITHOUT_EDITING, true)
     val sendDirect = shareWithoutEditing || !editorAvailable
     val intent =
         if (sendDirect) {
-          sendIntent(context, reportText, uri)
+          sendIntent(context, reportText, uri, crash)
         } else {
           Intent(Intent.ACTION_EDIT).apply {
             setDataAndType(uri, "text/plain")
@@ -65,12 +66,13 @@ object ReportSharer {
     return context.packageManager.queryIntentActivities(probe, 0).isNotEmpty()
   }
 
-  private fun sendIntent(context: Context, reportText: String, uri: Uri): Intent =
+  private fun sendIntent(context: Context, reportText: String, uri: Uri, crash: Boolean): Intent =
       Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_STREAM, uri)
-        putExtra(Intent.EXTRA_TEXT, reportText)
-        putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.report_subject))
+        putExtra(Intent.EXTRA_EMAIL, arrayOf(ReportShareContent.SUPPORT_EMAIL))
+        putExtra(Intent.EXTRA_TEXT, ReportShareContent.messageBody(reportText, crash))
+        putExtra(Intent.EXTRA_SUBJECT, ReportShareContent.subject(crash))
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
       }
 }

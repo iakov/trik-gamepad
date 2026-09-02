@@ -40,7 +40,6 @@
     <string name="share_without_editing_on">Bỏ tích để mở trong trình soạn thảo xem lại trước khi chia sẻ</string>
     <string name="report_editor_chooser_title">Chọn trình soạn thảo văn bản để xem và chỉnh sửa trước khi gửi cho nhà phát triển</string>
     <string name="share_report">Chia sẻ báo cáo chẩn đoán</string>
-    <string name="report_subject">Báo cáo sự cố TRIK Gamepad</string>
     <string name="crash_dialog_title">TRIK Gamepad đã dừng bất ngờ</string>
     <string name="crash_dialog_message">Báo cáo chi tiết sự cố đã sẵn sàng. Bạn có thể xem và chỉnh sửa trước khi gửi cho nhà phát triển.</string>
     <string name="review_and_share">Xem và chia sẻ</string>
