@@ -109,6 +109,53 @@ class ShareReceiverActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun sharedImageViaClipDataPacksAndForwards() {
+    val uri = Uri.parse("content://com.trikset.gamepad2.test/share/clip.png")
+    registerImage(uri, "clip-bytes")
+    val intent =
+        Intent(Intent.ACTION_SEND).apply {
+          type = "image/png"
+          // On modern Android the system hands the target intent the URIs in ClipData rather
+          // than (only) EXTRA_STREAM — both must be honored. A URI-less clip item (an intent-only
+          // row) must be skipped, not crash the unpacking.
+          val uriItem = android.content.ClipData.Item(uri)
+          val intentOnlyItem = android.content.ClipData.Item(Intent())
+          clipData =
+              android.content.ClipData("share", arrayOf("image/png"), uriItem).apply {
+                addItem(intentOnlyItem)
+              }
+        }
+
+    val (_, zipFile) = capturedZipAfterPacking(intent)
+
+    val entries = zipEntries(zipFile)
+    assertEquals("clip-bytes", entries["attachments/clip.png"])
+  }
+
+  @Test
+  fun sameUriFromStreamAndClipDataIsPackedOnce() {
+    val uri = Uri.parse("content://com.trikset.gamepad2.test/share/dup.png")
+    registerImage(uri, "dup-bytes")
+    val intent =
+        Intent(Intent.ACTION_SEND).apply {
+          type = "image/png"
+          putExtra(Intent.EXTRA_STREAM, uri)
+          clipData =
+              android.content.ClipData.newUri(
+                  RuntimeEnvironment.getApplication().contentResolver,
+                  "share",
+                  uri,
+              )
+        }
+
+    val (_, zipFile) = capturedZipAfterPacking(intent)
+
+    val entries = zipEntries(zipFile)
+    assertEquals("a duplicated URI must attach once", 1, entries.size - 1)
+    assertEquals("dup-bytes", entries["attachments/dup.png"])
+  }
+
+  @Test
   fun incomingImageUrisReadsSingleStream() {
     val uri = Uri.parse("content://com.trikset.gamepad2.test/share/only.png")
     val intent = Intent(Intent.ACTION_SEND).apply { putExtra(Intent.EXTRA_STREAM, uri) }

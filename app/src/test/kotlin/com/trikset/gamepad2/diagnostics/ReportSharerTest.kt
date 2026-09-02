@@ -8,6 +8,7 @@ import com.trikset.gamepad2.R
 import com.trikset.gamepad2.RobolectricTestBase
 import com.trikset.gamepad2.SettingsFragment
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -120,6 +121,12 @@ class ReportSharerTest : RobolectricTestBase() {
 
     val inner = startedInnerIntent()
     assertEquals(Intent.ACTION_SEND, inner.action)
+  }
+
+  @Test
+  fun hasEditHandlerWithoutEditorReturnsFalse() {
+    // Robolectric resolves no ACTION_EDIT handler for the probe content URI.
+    assertFalse(ReportSharer.hasEditHandler(activity))
   }
 
   @Test
