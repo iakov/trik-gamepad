@@ -54,7 +54,7 @@ object ReportSharer {
   ) {
     context.startActivity(
         Intent.createChooser(
-            reportSendIntent(context, reportText, uri, crash, ZIP_MIME),
+            reportSendIntent(reportText, uri, crash, ZIP_MIME),
             context.getString(R.string.share_report),
         )
     )
@@ -72,7 +72,7 @@ object ReportSharer {
     val sendDirect = shareWithoutEditing || !editorAvailable
     val intent =
         if (sendDirect) {
-          reportSendIntent(context, reportText, uri, crash, TEXT_MIME)
+          reportSendIntent(reportText, uri, crash, TEXT_MIME)
         } else {
           Intent(Intent.ACTION_EDIT).apply {
             setDataAndType(uri, "text/plain")
@@ -100,7 +100,6 @@ object ReportSharer {
 
   /** The shared mail-cover attachment intent: [uri] as the stream plus the report cover extras. */
   private fun reportSendIntent(
-      context: Context,
       reportText: String,
       uri: Uri,
       crash: Boolean,

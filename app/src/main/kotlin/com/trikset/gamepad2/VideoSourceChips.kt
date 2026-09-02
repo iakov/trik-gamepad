@@ -19,9 +19,9 @@ enum class VideoSourceChip(
     val port: Int?,
     val glyph: String,
 ) {
-  CAMERA_1(R.string.video_chip_camera_1, 8080, "1"),
-  CAMERA_2(R.string.video_chip_camera_2, 8081, "2"),
-  USB(R.string.video_chip_usb, 8082, "\uDB81\uDD53"),
+  CAMERA_1(R.string.video_chip_camera_1, VideoSourceChips.PORT_CAMERA_1, "1"),
+  CAMERA_2(R.string.video_chip_camera_2, VideoSourceChips.PORT_CAMERA_2, "2"),
+  USB(R.string.video_chip_usb, VideoSourceChips.PORT_USB, "\uDB81\uDD53"),
   /** Explicitly disables the video stream (writes an empty URI), never "restores a default". */
   NONE(R.string.video_chip_none, null, "\uDB80\uDE09"),
 }
@@ -32,6 +32,10 @@ enum class VideoSourceChip(
  * AND blank host) - the caller surfaces the "Set the robot IP address first" notice.
  */
 object VideoSourceChips {
+  const val PORT_CAMERA_1 = 8080
+  const val PORT_CAMERA_2 = 8081
+  const val PORT_USB = 8082
+
   fun defaultStreamUri(host: String, port: Int): String = "http://$host:$port/?action=stream"
 
   /**
@@ -53,15 +57,10 @@ object VideoSourceChips {
   fun targetFor(storedUri: String?, host: String, chip: VideoSourceChip): String? {
     val port = chip.port
     if (port == null) {
+      // "No video": explicit disable (empty URI).
       return ""
     }
-    val stored = storedUri.orEmpty()
-    if (stored.isNotBlank()) {
-      rewritePort(stored, port)?.let {
-        return it
-      }
-      return if (host.isBlank()) null else defaultStreamUri(host, port)
-    }
-    return if (host.isBlank()) null else defaultStreamUri(host, port)
+    val rebuilt = storedUri.orEmpty().takeIf { it.isNotBlank() }?.let { rewritePort(it, port) }
+    return rebuilt ?: if (host.isBlank()) null else defaultStreamUri(host, port)
   }
 }
