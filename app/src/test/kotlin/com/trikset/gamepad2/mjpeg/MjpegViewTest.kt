@@ -1,7 +1,7 @@
 package com.trikset.gamepad2.mjpeg
 
 import com.trikset.gamepad2.RobolectricTestBase
-import com.trikset.gamepad2.VideoStreamLoader
+import com.trikset.gamepad2.video.MjpegVideoPlayer
 import java.io.ByteArrayInputStream
 import java.net.ServerSocket
 import java.net.Socket
@@ -104,7 +104,7 @@ class MjpegViewTest : RobolectricTestBase() {
     view.setOnFirstFrameListener { fired.incrementAndGet() }
     val url = URL("http://127.0.0.1:$port/?action=stream")
     try {
-      val stream = requireNotNull(VideoStreamLoader(view).openStream(url))
+      val stream = requireNotNull(MjpegVideoPlayer(view).openStream(url.toString()))
       view.setSource(stream)
       view.startPlayback()
       val deadline = System.currentTimeMillis() + 10000
@@ -114,7 +114,7 @@ class MjpegViewTest : RobolectricTestBase() {
       assertTrue("a decoded frame must report first-frame once", fired.get() >= 1)
       // A second playback cycle reports again (spinner re-shows on reconnect).
       view.stopPlayback()
-      view.setSource(requireNotNull(VideoStreamLoader(view).openStream(url)))
+      view.setSource(requireNotNull(MjpegVideoPlayer(view).openStream(url.toString())))
       view.startPlayback()
       assertTrue(
           "reconnect must open a fresh connection",

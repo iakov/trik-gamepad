@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import com.trikset.gamepad2.mjpeg.MjpegView
 import com.trikset.gamepad2.mjpeg.SyntheticMjpegServer
+import com.trikset.gamepad2.video.MjpegVideoPlayer
 import java.net.ServerSocket
 import java.net.URL
 import java.time.Duration
@@ -19,10 +20,10 @@ import org.robolectric.annotation.LooperMode
 import org.robolectric.annotation.LooperMode.Mode.PAUSED
 
 /**
- * End-to-end: a real [SyntheticMjpegServer] + [VideoStreamLoader] + [VideoRetryController]
+ * End-to-end: a real [SyntheticMjpegServer] + [MjpegVideoPlayer] + [VideoRetryController]
  * reproduces the user-visible regression (video stays black after the robot leaves wifi range and
  * comes back) and proves the bounded retry recovers it. Real sockets on the PAUSED main looper; the
- * retry tick and the onResult posts are driven deterministically via `idleFor`/`idle`.
+ * retry tick and the onPlayResult posts are driven deterministically via `idleFor`/`idle`.
  */
 @RunWith(RobolectricTestRunner::class)
 @LooperMode(PAUSED)
@@ -34,9 +35,9 @@ class VideoStreamSelfHealingTest : RobolectricTestBase() {
     val server = SyntheticMjpegServer(port = port, framesPerConnection = 10, frameIntervalMs = 10)
     val view = MjpegView(RuntimeEnvironment.getApplication())
     val executor = PausedExecutorService()
-    val loader = VideoStreamLoader(view, executor, Handler(Looper.getMainLooper()))
+    val player = MjpegVideoPlayer(view, executor, Handler(Looper.getMainLooper()))
     val (controller, _) =
-        retryController(view, loader, URL("http://127.0.0.1:$port/?action=stream"))
+        retryController(view, player, URL("http://127.0.0.1:$port/?action=stream"))
     controller.onResume()
 
     // Robot offline: the first tick's reload fails (connection refused), the view never plays.
@@ -71,9 +72,9 @@ class VideoStreamSelfHealingTest : RobolectricTestBase() {
     val port = server.start()
     val view = MjpegView(RuntimeEnvironment.getApplication())
     val executor = PausedExecutorService()
-    val loader = VideoStreamLoader(view, executor, Handler(Looper.getMainLooper()))
+    val player = MjpegVideoPlayer(view, executor, Handler(Looper.getMainLooper()))
     val (controller, reload) =
-        retryController(view, loader, URL("http://127.0.0.1:$port/?action=stream"))
+        retryController(view, player, URL("http://127.0.0.1:$port/?action=stream"))
     controller.onResume()
     try {
       reload()
@@ -99,18 +100,20 @@ class VideoStreamSelfHealingTest : RobolectricTestBase() {
   }
 
   /**
-   * Wires a short-interval retry controller to [loader] for [url] and returns it with its reload
-   * action (so the initial load in a test reuses the exact same load path as the retries).
+   * Wires a short-interval retry controller to [player] for [url] and returns it with its reload
+   * action (so the initial load in a test reuses the exact same play path as the retries). The
+   * result listener is set once and routes every play result to the controller.
    */
   private fun retryController(
       view: MjpegView,
-      loader: VideoStreamLoader,
+      player: MjpegVideoPlayer,
       url: URL,
   ): Pair<VideoRetryController, () -> Unit> {
     var controller: VideoRetryController? = null
-    val reloadAction = {
-      loader.load(url) { ok -> if (ok) controller?.onLoadSuccess() else controller?.onLoadFailed() }
+    player.onPlayResult = { ok ->
+      if (ok) controller?.onLoadSuccess() else controller?.onLoadFailed()
     }
+    val reloadAction = { player.play(url.toString()) }
     controller =
         VideoRetryController(
             mainHandler = Handler(Looper.getMainLooper()),

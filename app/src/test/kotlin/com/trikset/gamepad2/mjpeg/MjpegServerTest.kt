@@ -3,7 +3,7 @@ package com.trikset.gamepad2.mjpeg
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.trikset.gamepad2.RobolectricTestBase
-import com.trikset.gamepad2.VideoStreamLoader
+import com.trikset.gamepad2.video.MjpegVideoPlayer
 import java.io.IOException
 import java.net.URL
 import org.apache.commons.io.input.BoundedInputStream
@@ -21,7 +21,7 @@ import org.robolectric.annotation.GraphicsMode
  * the real HTTP + multipart + decode pipeline renders arbitrary-size photographic frames (not
  * synthetic solids), and covers the server's drop/reconnect behavior. Runs under
  * [GraphicsMode.Mode.NATIVE] so [BitmapFactory] does **real** JPEG decoding. The app's own
- * [VideoStreamLoader.openStream] is the client.
+ * [MjpegVideoPlayer.openStream] is the client.
  */
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -110,7 +110,7 @@ class MjpegServerTest : RobolectricTestBase() {
       }
       assertTrue("connection drop must surface as IOException", sawDrop)
 
-      // Restore: the app's reconnect path (VideoStreamLoader.openStream, same flow
+      // Restore: the app's reconnect path (MjpegVideoPlayer.openStream, same flow
       // as restartVideoStream) re-opens and decodes again.
       withStream(url) { stream ->
         val restored = readFrames(stream, expected = 1)
@@ -179,6 +179,6 @@ class MjpegServerTest : RobolectricTestBase() {
 
   private fun openStream(url: URL): MjpegInputStream {
     val view = MjpegView(RuntimeEnvironment.getApplication())
-    return requireNotNull(VideoStreamLoader(view).openStream(url))
+    return requireNotNull(MjpegVideoPlayer(view).openStream(url.toString()))
   }
 }
