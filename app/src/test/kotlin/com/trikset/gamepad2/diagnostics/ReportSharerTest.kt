@@ -43,6 +43,30 @@ class ReportSharerTest : RobolectricTestBase() {
     return chooser.getParcelableExtra(Intent.EXTRA_INTENT)!!
   }
 
+  /** The shared "addressed to support" mail cover asserted by the text-forward and zip tests. */
+  private fun assertMailCover(
+      inner: Intent,
+      expectedStream: Uri,
+      subjectPrefix: String,
+      expectedHead: String,
+  ) {
+    // The typed getParcelableExtra(String, Class) overload is API 33+; these tests run at
+    // minSdk (23), so the deprecated single-arg form is the only one available.
+    @Suppress("DEPRECATION")
+    assertEquals(expectedStream, inner.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
+    val subject = inner.getStringExtra(Intent.EXTRA_SUBJECT)
+    assertNotNull(subject)
+    assertTrue(subject!!.startsWith(subjectPrefix))
+    assertEquals(
+        listOf(ReportShareContent.SUPPORT_EMAIL),
+        inner.getStringArrayExtra(Intent.EXTRA_EMAIL)?.toList(),
+    )
+    // The body is the subject line followed by the bounded report head.
+    val body = inner.getStringExtra(Intent.EXTRA_TEXT)
+    assertTrue("body must lead with the subject", body!!.startsWith(subject + "\n\n"))
+    assertTrue("body must carry the report head", body.endsWith(expectedHead))
+  }
+
   @Test
   fun editingPathOpensTextEditorWithFileUri() {
     ReportSharer.share(activity, "report", reportUri, editorAvailable = true)
@@ -75,21 +99,7 @@ class ReportSharerTest : RobolectricTestBase() {
     val inner = startedInnerIntent()
     assertEquals(Intent.ACTION_SEND, inner.action)
     assertEquals("text/plain", inner.type)
-    // The typed getParcelableExtra(String, Class) overload is API 33+; these tests run at
-    // minSdk (23), so the deprecated single-arg form is the only one available.
-    @Suppress("DEPRECATION")
-    assertEquals(reportUri, inner.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
-    val subject = inner.getStringExtra(Intent.EXTRA_SUBJECT)
-    assertNotNull(subject)
-    assertTrue(subject!!.startsWith("[trik-gamepad][report] v"))
-    assertEquals(
-        listOf(ReportShareContent.SUPPORT_EMAIL),
-        inner.getStringArrayExtra(Intent.EXTRA_EMAIL)?.toList(),
-    )
-    // The body is the subject line followed by the bounded report head.
-    val body = inner.getStringExtra(Intent.EXTRA_TEXT)
-    assertTrue("body must lead with the subject", body!!.startsWith(subject + "\n\n"))
-    assertTrue("body must carry the report head", body.endsWith("\n\nreport"))
+    assertMailCover(inner, reportUri, "[trik-gamepad][report] v", "\n\nreport")
   }
 
   @Test
@@ -123,20 +133,7 @@ class ReportSharerTest : RobolectricTestBase() {
     val inner = startedInnerIntent()
     assertEquals(Intent.ACTION_SEND, inner.action)
     assertEquals("application/zip", inner.type)
-    // The typed getParcelableExtra(String, Class) overload is API 33+; these tests run at
-    // minSdk (23), so the deprecated single-arg form is the only one available.
-    @Suppress("DEPRECATION")
-    assertEquals(zipUri, inner.getParcelableExtra<Uri>(Intent.EXTRA_STREAM))
-    val subject = inner.getStringExtra(Intent.EXTRA_SUBJECT)
-    assertNotNull(subject)
-    assertTrue(subject!!.startsWith("[trik-gamepad][report] v"))
-    assertEquals(
-        listOf(ReportShareContent.SUPPORT_EMAIL),
-        inner.getStringArrayExtra(Intent.EXTRA_EMAIL)?.toList(),
-    )
-    val body = inner.getStringExtra(Intent.EXTRA_TEXT)
-    assertTrue("body must lead with the subject", body!!.startsWith(subject + "\n\n"))
-    assertTrue("body must carry the report head", body.endsWith("report head"))
+    assertMailCover(inner, zipUri, "[trik-gamepad][report] v", "report head")
   }
 
   @Test
