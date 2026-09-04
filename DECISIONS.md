@@ -1881,6 +1881,51 @@ ______________________________________________________________________
   insets frame. Pad-fit-to-capsule policy remains deferred (screenshot
   review). Screenshot proof: `.tmp/hud_corner_20260829-001908.png`.
 
+### [2026-09-04] Smart glyph alignment ships ON; chips ring-background centering fix
+
+- **Type:** design-clarifying (UX review feedback on the shipped glyph look) +
+  `Part:` problem-avoiding (the chips silently lost ink centering).
+
+- **Problem:** tester feedback on the compact ring chips: the 1/2/usb glyphs
+  looked cut/misaligned and the "No video" eye ring had ugly padding, while
+  flipping the then-"Re-center symbols" toggle (runtime ink-box centering) made
+  the HUD magic buttons "look very nice". Root cause (found while writing the
+  fresh-install regression test): the chips' ring chrome — an `InsetDrawable`
+  with intrinsic insets — was set as each button's background AFTER
+  `renderGlyph`, and `View.setBackground` re-applies the drawable's intrinsic
+  padding to the view, overwriting the glyph's asymmetric ink-centering padding
+  with the uniform inset. The chips silently fell back to plain gravity
+  line-box centering in BOTH alignment modes (the magic buttons were immune —
+  their circle drawable has no intrinsic padding).
+
+- **Alternatives considered:** (a) keep the metric-median default (rejected —
+  the tester-verified look is worse); (b) re-center the ink AFTER the ring via
+  `centerExistingGlyph` (implemented first, then rejected: the per-chip
+  `as? GlyphButton` cast added 8 coverage branches and dragged the jacoco ratio
+  under the 0.84 gate); (c) apply the ring/color chrome BEFORE the render via a
+  `GlyphRow.populate` hook, so the render's padding is applied last (chosen —
+  no new branches, one ordering rule).
+
+- **Chosen solution:** the runtime ink-box centering becomes the shipped mode —
+  renamed "Smart glyph alignment", **ON by default**
+  (`DEFAULT_RECENTER_GLYPHS = true` + XML `defaultValue="true"`), and the toggle
+  moved from Appearance into the Magic-buttons settings right after the
+  per-button symbol row. `GlyphRow.populate` gains a `chrome` hook invoked
+  pre-render; the chips row passes the ring + glyph color through it. HUD magic
+  buttons and video chips read the same default.
+
+- **Why:** the ink-box target was pixel-verified nicer by the tester on the HUD,
+  and the "default OFF / escape hatch" framing was backwards for the shipped
+  look; the ordering rule (chrome before render) keeps the centering padding
+  authoritative for every future row consumer.
+
+- **Out of scope / consequences:** the metric-median centering stays reachable
+  as the OFF mode (kept for comparison and for the geometry tests that verify
+  it); the fresh-install ON default is regression-locked by a chips bind test;
+  emulator pixel-census proof deferred (no device attached this session — do
+  before push). Supersedes the default framing of "[2026-09-01] Smart glyph
+  alignment"; DECISIONS index refreshed in the retrospective pass.
+
 ### [2026-09-01] Smart glyph alignment (reusable centered-glyph core)
 
 - **Type:** design-clarifying (how every centered HUD glyph renders is product visual design; `Part:` problem-avoiding — the initial implementation clipped glyphs).
