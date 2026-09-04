@@ -430,7 +430,12 @@ class MainActivity :
 
   override fun setMagicButtons(count: Int, symbols: List<String>) {
     val buttonsView = findViewById<ViewGroup>(R.id.buttons) ?: return
-    magicButtons.populate(buttonsView, count, symbols)
+    // The controller re-pushes the magic buttons on every preference change, so reading the
+    // "Re-center symbols" toggle here applies a flip immediately (no extra SettingsUi callback).
+    val recenter =
+        PreferenceManager.getDefaultSharedPreferences(this)
+            .getBoolean(SettingsFragment.SK_RECENTER_GLYPHS, false)
+    magicButtons.populate(buttonsView, count, symbols, recenter)
   }
 
   override fun setControlsVisible(visible: Boolean) {

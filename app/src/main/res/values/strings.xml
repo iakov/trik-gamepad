@@ -92,6 +92,9 @@
     <string name="pref_category_appearance">Appearance</string>
     <string name="pref_hud_theme">HUD theme</string>
     <string name="pref_hud_theme_summary">Type 1 · more themes coming</string>
+    <string name="pref_recenter_glyphs">Re-center symbols</string>
+    <string name="pref_recenter_glyphs_on">Symbols are nudged to the exact visual center of their button</string>
+    <string name="pref_recenter_glyphs_off">Symbols keep their default alignment</string>
     <string name="pref_advanced">Advanced settings</string>
     <string name="pref_advanced_summary">Wheel, pads, hardware gamepad, magic buttons, diagnostics</string>
     <string name="robot_settings">Robot settings</string>

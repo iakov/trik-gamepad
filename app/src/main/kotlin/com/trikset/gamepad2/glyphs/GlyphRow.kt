@@ -30,13 +30,19 @@ constructor(
   /**
    * Builds [items] as equal fixed-size cells, each glyph rendered at [targetVisualHeightPx] of
    * visual ink height (e.g. the reference glyph "1" measured on-device). [cellSizePx] is the square
-   * cell edge (the touch target); [gapPx] the inter-cell margin.
+   * cell edge (the touch target); [gapPx] the inter-cell margin. [recenter] is forwarded to each
+   * cell's [GlyphButton.renderGlyph] (see [GlyphRendering.render]).
+   *
+   * The cell's layoutParams are assigned BEFORE rendering so the shared fit-cap in
+   * [GlyphRendering.render] sees a fixed view height (rendering into a height-less cell skipped the
+   * cap, so at large font scales a row glyph could size past its cell and clip).
    */
   fun populate(
       items: List<Item>,
       targetVisualHeightPx: Float,
       cellSizePx: Int,
       gapPx: Int,
+      recenter: Boolean = false,
       onClick: (Int) -> Unit,
   ) {
     orientation = HORIZONTAL
@@ -44,14 +50,16 @@ constructor(
     items.forEachIndexed { index, item ->
       val button =
           GlyphButton(context).apply {
-            renderGlyph(item.glyph, targetVisualHeightPx)
             contentDescription = item.contentDescription
-            layoutParams =
-                MarginLayoutParams(cellSizePx, cellSizePx).apply {
-                  if (index > 0) marginStart = gapPx
-                }
+            // Fixed cell size BEFORE rendering: the shared fit-cap in GlyphRendering.render reads
+            // layoutParams.height, so a cap-skip here would let a row glyph size past its cell at
+            // large font scales and clip (the chips "invisible glyph" report).
+            layoutParams = ViewGroup.MarginLayoutParams(cellSizePx, cellSizePx)
+            renderGlyph(item.glyph, targetVisualHeightPx, recenter)
             setOnClickListener { onClick(index) }
           }
+      // Attach with the cell LayoutParams, then re-apply the margins the LinearLayout stores on
+      // the child (the inter-cell gap; mirrored from the proven two-step add below).
       addView(button, ViewGroup.LayoutParams(cellSizePx, cellSizePx))
       val lp = button.layoutParams as MarginLayoutParams
       if (index > 0) lp.marginStart = gapPx

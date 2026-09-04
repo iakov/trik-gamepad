@@ -149,6 +149,63 @@ class MagicButtonPanelTest : RobolectricTestBase() {
   }
 
   @Test
+  fun recenterModeShouldCenterKnownGlyphByPaintInkBoxPadding() {
+    // "Re-center symbols" ON: the centering target flips from the metric table's weighted median to
+    // the glyph's runtime ink-box center, but the vehicle stays asymmetric padding — the button
+    // (and its circular background) must not move (regression guard: recenter was once wired as a
+    // translation and shifted the circle instead of the ink — hit 2026-09-03).
+    val container = FrameLayout(context)
+    panel.populate(container, 1, symbols, recenter = true)
+    val btn = container.getChildAt(0) as Button
+    val metric = com.trikset.gamepad2.glyphs.GlyphMetrics.metricFor(btn.text.toString())
+    assertNotNull("default glyph ▲ must have metrics", metric)
+    assertEquals("recenter must never translate the button", 0f, btn.translationX, 0f)
+    assertEquals("recenter must never translate the button", 0f, btn.translationY, 0f)
+    val paint = btn.paint
+    val text = btn.text.toString()
+    val bounds = android.graphics.Rect()
+    paint.getTextBounds(text, 0, text.length, bounds)
+    val fm = paint.fontMetrics
+    // Ink-box center minus line-box center (the [recenter] target), NOT the metric median offset.
+    val inkOffsetY = (bounds.top + bounds.bottom) / 2f - (fm.ascent + fm.descent) / 2f
+    assertEquals(
+        "padding must cancel the paint ink-box offset in recenter mode",
+        0f,
+        btn.paddingTop - btn.paddingBottom + 2f * inkOffsetY,
+        0.5f,
+    )
+    // The ink-box target must differ from the metric median for this glyph (▲ carries most of its
+    // ink in its base, so its median sits well below its geometric box center) — otherwise the
+    // toggle would have nothing to change and the assertion above would be vacuous.
+    val medianOffsetY = -metric!!.medianBiasEm * btn.textSize
+    assertTrue(
+        "▲ ink-box offset must differ from its metric median offset",
+        kotlin.math.abs(inkOffsetY - medianOffsetY) > 0.5f,
+    )
+  }
+
+  @Test
+  fun recenterModeShouldUsePaintInkOffsetForUnknownGlyphs() {
+    val container = FrameLayout(context)
+    panel.populate(container, 1, listOf("Ω"), recenter = true) // Ω is absent from the metrics table
+    val btn = container.getChildAt(0) as Button
+    val paint = btn.paint
+    val text = btn.text.toString()
+    val bounds = android.graphics.Rect()
+    paint.getTextBounds(text, 0, text.length, bounds)
+    val fm = paint.fontMetrics
+    val offsetY = (bounds.top + bounds.bottom) / 2f - (fm.ascent + fm.descent) / 2f
+    assertEquals("recenter must never translate the button", 0f, btn.translationX, 0f)
+    assertEquals("recenter must never translate the button", 0f, btn.translationY, 0f)
+    assertEquals(
+        "padding must cancel the paint ink offset for unknown glyphs in recenter mode",
+        0f,
+        btn.paddingTop - btn.paddingBottom + 2f * offsetY,
+        0.5f,
+    )
+  }
+
+  @Test
   fun clickShouldSendBtnDownCommand() {
     val container = FrameLayout(context)
     panel.populate(container, 3, symbols)

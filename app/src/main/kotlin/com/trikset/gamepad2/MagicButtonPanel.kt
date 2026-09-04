@@ -27,7 +27,12 @@ class MagicButtonPanel(
 ) {
   private var container: ViewGroup? = null
 
-  fun populate(container: ViewGroup, count: Int, symbols: List<String>) {
+  /**
+   * Builds the buttons into [container]. [recenter] picks WHICH ink center is aimed at — the metric
+   * table's weighted median or the runtime ink box (the "Re-center symbols" setting; see
+   * [GlyphRendering.render]); both deliver via asymmetric padding.
+   */
+  fun populate(container: ViewGroup, count: Int, symbols: List<String>, recenter: Boolean = false) {
     this.container = container
     container.removeAllViews()
     val touchTarget = context.resources.getDimensionPixelSize(R.dimen.touch_target_min)
@@ -51,7 +56,7 @@ class MagicButtonPanel(
             setSingleLine(true)
             // Size + ink-center via the shared core: visual height = 60% of the circle diameter
             // (pictograms, sized in px so the ratio holds regardless of the system font scale).
-            renderGlyph(glyph, targetVisualHeight)
+            renderGlyph(glyph, targetVisualHeight, recenter)
             // Explicit light text on the dark fills (contrast verified by WcagContrastTest);
             // setAccent recolors the glyph to the connection-state accent afterwards.
             setTextColor(ContextCompat.getColor(context, R.color.magic_button_text))

@@ -58,8 +58,20 @@ object GlyphRendering {
    * carries little mass, so its band is ~0.45em while its box is ~0.6em) and a band-equalized size
    * alone would clip such glyphs (hit 2026-09-01: ▲ rendered zero ink, ■/● clipped to the lower
    * half).
+   *
+   * [recenter] selects WHICH center is aimed at (see the "Re-center symbols" setting,
+   * pref_app.xml): false = the metric table's weighted-ink median (the pixel-verified default);
+   * true = the glyph's actual runtime ink-box center, measured from the paint at render time (the
+   * same fallback already used for user-typed glyphs). Both modes deliver the offset as asymmetric
+   * padding (a translation would move the glyph's own circular background — hit 2026-08-15 and
+   * 2026-09-03), so flipping the toggle only changes the target, never the vehicle.
    */
-  fun render(view: TextView, glyph: String, targetVisualHeightPx: Float) {
+  fun render(
+      view: TextView,
+      glyph: String,
+      targetVisualHeightPx: Float,
+      recenter: Boolean = false,
+  ) {
     view.text = glyph
     configure(view)
     val metric = GlyphMetrics.metricFor(glyph)
@@ -70,35 +82,65 @@ object GlyphRendering {
       // The glyph must fit the fixed view at ANY font scale. Android lays out the LINE BOX
       // (ascent + descent), not the ink box, and a line box taller than the view clips even
       // when the ink alone would fit. So cap at viewHeight / (fontScale * (LINE_BOX_EM +
-      // 2*|medianBiasEm|)): line box + the 2*|bias| centering padding <= viewHeight. The
-      // 90%-mass band alone under-reports glyphs with thin tails (▲ renders zero ink,
-      // ■/● clip - hit 2026-09-01).
+      // 2*reserveEm)): line box + the 2*|offset| centering padding <= viewHeight. The reserve is
+      // the median bias when aiming at the weighted median, else the ink-box offset actually
+      // applied by [center] (measured here — bounds scale linearly, so the em value is
+      // size-invariant). The 90%-mass band alone under-reports glyphs with thin tails (▲ renders
+      // zero ink, ■/● clip - hit 2026-09-01).
       val fontScale = view.resources.configuration.fontScale
-      val maxFit =
-          viewHeight / (fontScale * (GlyphMetrics.LINE_BOX_EM + 2 * abs(metric.medianBiasEm)))
+      val reserveEm =
+          if (recenter) {
+            view.paint.textSize = textSizePx
+            val fitBounds = Rect()
+            view.paint.getTextBounds(glyph, 0, glyph.length, fitBounds)
+            val fitMetrics = view.paint.fontMetrics
+            abs(
+                    (fitBounds.top + fitBounds.bottom) / 2f -
+                        (fitMetrics.ascent + fitMetrics.descent) / 2f
+                )
+                .div(textSizePx)
+          } else {
+            abs(metric.medianBiasEm)
+          }
+      val maxFit = viewHeight / (fontScale * (GlyphMetrics.LINE_BOX_EM + 2 * reserveEm))
       if (textSizePx > maxFit) textSizePx = maxFit
     }
     view.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSizePx)
-    center(view, metric, textSizePx)
+    center(view, metric, textSizePx, recenter)
   }
 
   /**
    * Centers the glyph already set on [view] at its current text size (pill / gear / error text).
+   * [recenter] has the same meaning as in [render]; note the pill/gear chrome uses XML padding and
+   * never goes through this method, so only glyph-tile consumers use it today.
    */
-  fun centerExisting(view: TextView) {
+  fun centerExisting(view: TextView, recenter: Boolean = false) {
     configure(view)
     val glyph = view.text.toString()
     val metric = GlyphMetrics.metricFor(glyph)
-    center(view, metric, view.textSize)
+    center(view, metric, view.textSize, recenter)
   }
 
   /**
-   * Centers the glyph's ink on the view center with asymmetric padding. Vertical: cancels the
-   * weighted-ink median offset from the line-box center — [GlyphMetrics.medianBiasEm] when known,
-   * else the ink-box center measured from the paint. Horizontal: always the paint-measured ink box
-   * (the metric table is vertical-only; the mono advance is symmetric by construction).
+   * Centers the glyph's ink on the view center. Vertical: cancels the glyph's offset from the
+   * line-box center — the metric table's weighted-ink median ([GlyphMetrics.medianBiasEm]) when the
+   * glyph is bundled and [recenter] is false, else the ink-box center measured from the paint at
+   * render time (the [recenter] mode for bundled glyphs and the always-mode for user-typed glyphs,
+   * which have no metric). Horizontal: always the paint-measured ink box (the metric table is
+   * vertical-only; the mono advance is symmetric by construction).
+   *
+   * The offset is ALWAYS cancelled as asymmetric [android.view.View.setPaddingRelative] — never a
+   * view translation, which moves the glyph together with its own background and shifts the circle
+   * off-center instead of the ink (the magic-button regression from 2026-08-15 and again on
+   * 2026-09-03, when [recenter] was first wired as a translation). [recenter] only picks WHICH
+   * center is aimed at, never the vehicle.
    */
-  private fun center(view: TextView, metric: GlyphMetrics.GlyphMetric?, textSizePx: Float) {
+  private fun center(
+      view: TextView,
+      metric: GlyphMetrics.GlyphMetric?,
+      textSizePx: Float,
+      recenter: Boolean,
+  ) {
     val paint = view.paint
     val text = view.text.toString()
     val bounds = Rect()
@@ -111,7 +153,9 @@ object GlyphRendering {
     val inkCenterX = (bounds.left + bounds.right) / 2f
     // metric.medianBiasEm is positive when the median sits ABOVE the line center, so its
     // pixel offset is negative in the paint y-down frame (ink above -> smaller y).
-    val offsetY = if (metric != null) -metric.medianBiasEm * textSizePx else inkCenterY - lineCenter
+    val offsetY =
+        if (!recenter && metric != null) -metric.medianBiasEm * textSizePx
+        else inkCenterY - lineCenter
     val offsetX = inkCenterX - (paint.measureText(text) / 2f)
     // Round to the nearest int (not truncate): truncation leaves up to a full px of un-cancelled
     // offset, which a 0.5-tolerance centering test would see.

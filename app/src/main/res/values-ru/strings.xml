@@ -81,6 +81,9 @@
     <string name="pref_category_appearance">Внешний вид</string>
     <string name="pref_hud_theme">Тема HUD</string>
     <string name="pref_hud_theme_summary">Тип 1 · скоро появятся новые темы</string>
+    <string name="pref_recenter_glyphs">Перецентрировать символы</string>
+    <string name="pref_recenter_glyphs_on">Символы сдвигаются точно в визуальный центр своей кнопки</string>
+    <string name="pref_recenter_glyphs_off">Символы сохраняют стандартное выравнивание</string>
     <string name="pref_keep_screen_on">Не выключать экран</string>
     <string name="pref_keep_screen_on_on">Экран остаётся включённым, пока открыт геймпад</string>
     <string name="pref_keep_screen_on_off">Экран может засыпать, пока открыт геймпад</string>

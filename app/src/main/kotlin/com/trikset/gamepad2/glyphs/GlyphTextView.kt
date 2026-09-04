@@ -20,13 +20,20 @@ constructor(
     defStyleAttr: Int = 0,
 ) : AppCompatTextView(context, attrs, defStyleAttr) {
 
-  /** Sets [glyph] sized to [targetVisualHeightPx] of visual ink height, then centers it. */
-  fun renderGlyph(glyph: String, targetVisualHeightPx: Float) {
-    GlyphRendering.render(this, glyph, targetVisualHeightPx)
+  /**
+   * Sets [glyph] sized to [targetVisualHeightPx] of visual ink height, then centers it. [recenter]
+   * picks WHICH center is aimed at — the metric table's weighted median or the runtime ink box —
+   * never the vehicle (both deliver via asymmetric padding; see [GlyphRendering.render]).
+   */
+  fun renderGlyph(glyph: String, targetVisualHeightPx: Float, recenter: Boolean = false) {
+    GlyphRendering.render(this, glyph, targetVisualHeightPx, recenter)
   }
 
-  /** Centers the already-set text at its current size (single-glyph pill / gear). */
-  fun centerExistingGlyph() {
-    GlyphRendering.centerExisting(this)
+  /**
+   * Centers the already-set text at its current size (single-glyph pill / gear). [recenter] has the
+   * same meaning as in [render] (see [GlyphRendering.centerExisting]).
+   */
+  fun centerExistingGlyph(recenter: Boolean = false) {
+    GlyphRendering.centerExisting(this, recenter)
   }
 }

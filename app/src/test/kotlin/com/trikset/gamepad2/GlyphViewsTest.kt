@@ -133,4 +133,24 @@ class GlyphViewsTest : RobolectricTestBase() {
     val only = row.getChildAt(0)
     assertEquals(0, (only.layoutParams as ViewGroup.MarginLayoutParams).marginStart)
   }
+
+  @Test
+  fun glyphRowCellCapsTextSizeWhenCellIsSmall() {
+    // A GlyphRow cell (fixed square set BEFORE renderGlyph) must hit the same fit-cap as any
+    // other fixed-height glyph. Regression guard: populate used to render into a height-less
+    // cell, so the cap never fired and a large-font-scale row glyph could size past its cell and
+    // clip (the video-chip "invisible glyph" report).
+    val row = GlyphRow(context)
+    row.populate(listOf(GlyphRow.Item("▲", "triangle")), 100f, 48, 0) {}
+    val cell = row.getChildAt(0) as GlyphButton
+    val metric = GlyphMetrics.metricFor("▲")
+    assertNotNull(metric)
+    assertTrue(
+        "row cell text must be capped below the uncapped equalized size",
+        cell.textSize < 100f / metric!!.visualHeightEm,
+    )
+    val contentHeight =
+        cell.paddingTop + cell.paddingBottom + cell.textSize * GlyphMetrics.LINE_BOX_EM
+    assertTrue("glyph content must fit the cell", contentHeight <= 48f + 1f)
+  }
 }
