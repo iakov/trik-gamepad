@@ -2,7 +2,6 @@ package com.trikset.gamepad2
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.graphics.drawable.InsetDrawable
 import android.util.AttributeSet
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
@@ -19,11 +18,13 @@ import kotlin.math.roundToInt
  * target URI + refreshing the video-URI row) lives in SettingsFragment, which keeps this preference
  * dumb and the behavior testable without a bound list row.
  *
- * Geometry: each chip's tappable cell stays [CHIP_CELL_DP] wide (the Android touch-target floor);
- * the visible circle chrome is smaller ([CHIP_CIRCLE_DP]) and centered in the cell, so the chip
- * reads as a compact ring hugging its glyph with a transparent 8dp tap halo on each side. Cells
- * abut (no inter-cell gap): the two halos between neighbours produce 16dp of visible air between
- * the rings, and the layout centers the whole cluster in the row.
+ * Geometry: each chip is a [CHIP_CELL_DP]-square button whose visible chrome is a border-only ring
+ * drawn over the ENTIRE cell (no inset halo): the ring IS the tap target. The ring drawable carries
+ * no intrinsic padding, so it cannot disturb the glyph's asymmetric ink-centering padding; chrome
+ * is still applied before the render (the [GlyphRow.populate] ordering contract). The glyph's
+ * VISUAL ink height is [CHIP_GLYPH_RATIO] of the ring diameter (the same ratio the magic buttons
+ * use), and the real inter-cell margin ([CHIP_GAP_DP]) is the visible air between neighbouring
+ * rings.
  *
  * Live re-render: the glyph alignment follows the global "Smart glyph alignment" toggle, which
  * lives on the App-settings screen (a sibling activity). That screen can sit on top of Robot
@@ -105,28 +106,26 @@ constructor(
                 SettingsFragment.SK_RECENTER_GLYPHS,
                 SettingsFragment.DEFAULT_RECENTER_GLYPHS,
             )
-    // Visible ring chrome per chip: a [CHIP_CIRCLE_DP] ring centered in the [CHIP_CELL_DP] cell
-    // (the InsetDrawable insets the ring by half the difference), plus an explicit glyph color. The
-    // glyph color must be set explicitly (not the themed Button default): the chips sit on the
-    // DayNight settings list, where an inherited color is never contrast-verified and can vanish on
-    // one theme (the tester's "no glyph visible" report). WcagContrastTest covers the chip_glyph
-    // day/night pairs.
-    val ringInsetPx = ((CHIP_CELL_DP - CHIP_CIRCLE_DP) / 2f * density).roundToInt()
+    // Visible ring chrome per chip: the border-only ring fills the whole cell (no InsetDrawable),
+    // so it has no intrinsic insets for the View to apply as padding and cannot clobber the glyph's
+    // ink-centering padding. The glyph color must be set explicitly (not the themed Button
+    // default):
+    // the chips sit on the DayNight settings list, where an inherited color is never
+    // contrast-verified
+    // and can vanish on one theme (the tester's "no glyph visible" report). WcagContrastTest covers
+    // the chip_glyph day/night pairs.
     val ring = ResourcesCompat.getDrawable(resources, R.drawable.hud_chip_ring, null)
     val glyphColor = ContextCompat.getColor(row.context, R.color.chip_glyph)
     row.populate(
         items = chips.map { GlyphRow.Item(it.glyph, resources.getString(it.descriptionRes)) },
-        targetVisualHeightPx = CHIP_GLYPH_DP * density,
+        targetVisualHeightPx = CHIP_GLYPH_RATIO * CHIP_CELL_DP * density,
         cellSizePx = (CHIP_CELL_DP * density).roundToInt(),
-        gapPx = 0,
+        gapPx = (CHIP_GAP_DP * density).roundToInt(),
         recenter = recenter,
-        // The ring is an InsetDrawable whose intrinsic insets the View applies as padding, so the
-        // chrome must be set BEFORE renderGlyph — a background applied afterwards wipes the glyph's
-        // asymmetric ink-centering padding with the uniform inset and the chips fall back to plain
-        // line-box centering (hit 2026-09-04: the tester's "chips look off / bad padding" report;
-        // the magic buttons are immune because their circle drawable has no intrinsic padding).
+        // The ring is set BEFORE renderGlyph (GlyphRow.populate applies chrome before rendering) so
+        // the render's asymmetric ink-centering padding lands last; see the class doc.
         chrome = { chip ->
-          chip.background = ring?.let { InsetDrawable(it, ringInsetPx) }
+          chip.background = ring
           chip.setTextColor(glyphColor)
         },
         onClick = { index -> onChipSelected?.invoke(chips[index]) },
@@ -134,11 +133,14 @@ constructor(
   }
 
   companion object {
-    /** Glyph VISUAL ink height inside the ring (≈63% of [CHIP_CIRCLE_DP]). */
-    private const val CHIP_GLYPH_DP = 20f
-    /** Tappable cell edge (touch-target floor); the ring inside it is smaller. */
+    /**
+     * Glyph VISUAL ink height as a fraction of the ring (= cell) diameter (60%, like the magic
+     * buttons).
+     */
+    private const val CHIP_GLYPH_RATIO = 0.6f
+    /** Tappable cell edge AND the visible ring diameter: the border ring fills the cell. */
     private const val CHIP_CELL_DP = 48f
-    /** Visible ring diameter (the cell minus the two 8dp tap halos). */
-    private const val CHIP_CIRCLE_DP = 32f
+    /** Real margin between neighbouring cells = the visible air between the rings. */
+    private const val CHIP_GAP_DP = 16f
   }
 }
