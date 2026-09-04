@@ -24,5 +24,10 @@ class App : Application() {
     Thread.setDefaultUncaughtExceptionHandler(
         CrashHandler(CrashLogStore(this), Thread.getDefaultUncaughtExceptionHandler())
     )
+    // Process-wide Wi-Fi tracker: the ONE network callback is registered here (not per connect
+    // attempt or per video player) so the app stays under Android's per-app callback cap — the
+    // unbounded per-construction registration is what ended in a
+    // ConnectivityManager$TooManyRequestsException crash (see WifiNetworkTracker).
+    WifiNetworkTracker.initialize(this)
   }
 }

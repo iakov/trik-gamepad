@@ -1,7 +1,5 @@
 package com.trikset.gamepad2
 
-import android.content.Context
-import android.net.ConnectivityManager
 import android.net.Network
 import java.net.Socket
 import org.junit.Assert.assertFalse
@@ -10,7 +8,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.shadows.ShadowNetwork
 
@@ -24,14 +21,9 @@ import org.robolectric.shadows.ShadowNetwork
 @RunWith(RobolectricTestRunner::class)
 class SocketBinderTest : RobolectricTestBase() {
 
-  private val context: Context = RuntimeEnvironment.getApplication()
-
-  private fun connectivityManager(): ConnectivityManager =
-      context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-
   @Test
   fun noWifiProviderFallsBackToTheGivenSocket() {
-    val binder = WifiSocketBinder(context) { null }
+    val binder = WifiSocketBinder { null }
     val socket = Socket()
     // No Wi-Fi network -> the socket is returned untouched (default-network fallback).
     assertSame(socket, binder.bind(socket))
@@ -41,7 +33,7 @@ class SocketBinderTest : RobolectricTestBase() {
   @Test
   fun wifiProviderBindsTheSocketToTheWifiNetwork() {
     val wifi = ShadowNetwork.newInstance(nextNetworkId())
-    val binder = WifiSocketBinder(context) { wifi }
+    val binder = WifiSocketBinder { wifi }
     val socket = binder.bind(Socket())
     assertTrue(shadowOf(wifi).isSocketBound(socket))
     socket.close()
@@ -50,36 +42,24 @@ class SocketBinderTest : RobolectricTestBase() {
   @Test
   fun nullProviderAfterWifiLostLeavesTheSocketUnbound() {
     val wifi = ShadowNetwork.newInstance(nextNetworkId())
-    val binder = WifiSocketBinder(context) { null }
+    val binder = WifiSocketBinder { null }
     val socket = binder.bind(Socket())
     assertFalse(shadowOf(wifi).isSocketBound(socket))
     socket.close()
   }
 
   @Test
-  fun trackerRegistersACallbackAndTracksWifiAvailability() {
-    val binder = WifiSocketBinder(context)
-    val callback =
-        shadowOf(connectivityManager()).getNetworkCallbacks().first {
-          it is ConnectivityManager.NetworkCallback
-        }
-    val wifi = ShadowNetwork.newInstance(nextNetworkId())
-
-    callback.onAvailable(wifi)
-    val bound = binder.bind(Socket())
-    assertTrue(shadowOf(wifi).isSocketBound(bound))
-    bound.close()
-
-    // onLost for an untracked network must not clear the tracked one.
-    callback.onLost(ShadowNetwork.newInstance(nextNetworkId()))
-    val stillBound = binder.bind(Socket())
-    assertTrue(shadowOf(wifi).isSocketBound(stillBound))
-    stillBound.close()
-
-    callback.onLost(wifi)
-    val fallback = binder.bind(Socket())
-    assertFalse(shadowOf(wifi).isSocketBound(fallback))
-    fallback.close()
+  fun defaultBinderRoutesThroughTheAppSharedTracker() {
+    // The default Wi-Fi provider is the process-wide WifiNetworkTracker registered once by
+    // App.onCreate — never a per-binder tracker (the old per-construction trackers accumulated
+    // network callbacks until ConnectivityManager$TooManyRequestsException crashed the connect
+    // path). The callback-driving body is shared with the datagram twin in
+    // assertDefaultBinderFollowsAppTracker.
+    val binder = WifiSocketBinder()
+    assertDefaultBinderFollowsAppTracker(
+        bind = { binder.bind(Socket()) },
+        isBound = { socket, wifi -> shadowOf(wifi).isSocketBound(socket) },
+    )
   }
 
   private companion object {

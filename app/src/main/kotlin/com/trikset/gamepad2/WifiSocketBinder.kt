@@ -1,6 +1,5 @@
 package com.trikset.gamepad2
 
-import android.content.Context
 import android.net.Network
 import com.trikset.gamepad2.diagnostics.AppLog
 import java.io.IOException
@@ -14,13 +13,14 @@ import java.net.Socket
  * Requires `ACCESS_NETWORK_STATE`.
  *
  * The Wi-Fi lookup is injected as [wifiNetworkProvider] so tests can supply a fixed [Network] (or
- * null) instead of faking `ConnectivityManager` capabilities; the production provider is
- * [WifiNetworkTracker] (the non-deprecated callback flow — `allNetworks()` is deprecated since API
- * 33 and is deliberately not used).
+ * null) instead of faking `ConnectivityManager` capabilities; the production provider is the
+ * process-wide [WifiNetworkTracker] registered once by [App] (the non-deprecated callback flow —
+ * `allNetworks()` is deprecated since API 33 and is deliberately not used). This binder never
+ * constructs a tracker itself: a per-binder tracker (the old default) registered a fresh network
+ * callback on every construction and exhausted the app's callback budget (see WifiNetworkTracker).
  */
 class WifiSocketBinder(
-    context: Context,
-    private val wifiNetworkProvider: () -> Network? = WifiNetworkTracker(context)::current,
+    private val wifiNetworkProvider: () -> Network? = { WifiNetworkTracker.instance()?.current() },
 ) : SocketBinder {
 
   override fun bind(socket: Socket): Socket {

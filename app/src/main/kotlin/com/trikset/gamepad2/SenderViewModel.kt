@@ -9,18 +9,25 @@ import kotlinx.coroutines.flow.StateFlow
  * and keepalive timer are not torn down and rebuilt on rotation, and closes the socket in
  * [onCleared] instead of relying on the Activity's onDestroy. Settings already live in
  * SharedPreferences, so a process death re-derives the target for free. No DI framework: the
- * service is created here and injected into the views by [MainActivity]. The [AndroidViewModel]
- * [Application] gives the [SenderService] the `ACCESS_NETWORK_STATE`-backed [WifiSocketBinder] so
- * sockets route over the robot's Wi-Fi even when cellular is the system default network (A2).
+ * service is created here and injected into the views by [MainActivity].
+ *
+ * One [WifiSocketBinder]/[WifiDatagramBinder] per transport mode, created lazily and reused for the
+ * ViewModel's whole lifetime. Binders are stateless wrappers over the process-wide
+ * [WifiNetworkTracker], so building a fresh one per connect attempt was pure waste — and it is what
+ * used to register a fresh network callback every attempt, accumulating until Android's per-app
+ * callback cap threw (see WifiNetworkTracker).
  */
 class SenderViewModel(application: Application) : AndroidViewModel(application) {
+
+  private val tcpSocketBinder by lazy { WifiSocketBinder() }
+  private val udpDatagramBinder by lazy { WifiDatagramBinder() }
 
   var sender: SenderService =
       SenderService(
           transportFactory = { mode ->
             when (mode) {
-              TransportMode.TCP -> TcpTransport(socketBinder = WifiSocketBinder(application))
-              TransportMode.UDP -> UdpTransport(datagramBinder = WifiDatagramBinder(application))
+              TransportMode.TCP -> TcpTransport(socketBinder = tcpSocketBinder)
+              TransportMode.UDP -> UdpTransport(datagramBinder = udpDatagramBinder)
             }
           }
       )

@@ -1,6 +1,5 @@
 package com.trikset.gamepad2
 
-import android.content.Context
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -13,7 +12,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.RuntimeEnvironment
 import org.robolectric.shadows.ShadowNetwork
 
 /**
@@ -26,8 +24,6 @@ import org.robolectric.shadows.ShadowNetwork
 @RunWith(RobolectricTestRunner::class)
 class WifiConnectionOpenerTest : RobolectricTestBase() {
 
-  private val context: Context = RuntimeEnvironment.getApplication()
-
   private fun fakeConnection(): URLConnection =
       object : URLConnection(URL("https://127.0.0.1:1/fake")) {
         override fun connect() {}
@@ -39,7 +35,6 @@ class WifiConnectionOpenerTest : RobolectricTestBase() {
     var defaultOpened = 0
     val opener =
         WifiConnectionOpener(
-            context,
             wifiNetworkProvider = { null },
             defaultOpen = { url ->
               assertEquals("https://127.0.0.1:1/x", url.toString())
@@ -58,7 +53,6 @@ class WifiConnectionOpenerTest : RobolectricTestBase() {
     var networkOpened = 0
     val opener =
         WifiConnectionOpener(
-            context,
             wifiNetworkProvider = { wifi },
             networkOpen = { network, url ->
               assertSame(wifi, network)
@@ -77,7 +71,6 @@ class WifiConnectionOpenerTest : RobolectricTestBase() {
     val fake = fakeConnection()
     val opener =
         WifiConnectionOpener(
-            context,
             wifiNetworkProvider = { wifi },
             networkOpen = { _, _ -> throw IOException("network vanished") },
             defaultOpen = { fake },
@@ -87,7 +80,7 @@ class WifiConnectionOpenerTest : RobolectricTestBase() {
 
   @Test
   fun httpsConnectionGetsTheTrustAllTlsConfig() {
-    val opener = WifiConnectionOpener(context, wifiNetworkProvider = { null })
+    val opener = WifiConnectionOpener(wifiNetworkProvider = { null })
     val connection = opener.open(URL("https://127.0.0.1:1/x"))
     assertTrue(connection is HttpsURLConnection)
     assertSame(
@@ -99,7 +92,7 @@ class WifiConnectionOpenerTest : RobolectricTestBase() {
 
   @Test
   fun httpConnectionIsLeftUntouched() {
-    val opener = WifiConnectionOpener(context, wifiNetworkProvider = { null })
+    val opener = WifiConnectionOpener(wifiNetworkProvider = { null })
     val connection = opener.open(URL("http://127.0.0.1:1/x"))
     assertTrue(connection is HttpURLConnection)
     assertFalse(connection is HttpsURLConnection)

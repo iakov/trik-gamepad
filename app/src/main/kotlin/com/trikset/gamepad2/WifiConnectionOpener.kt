@@ -1,6 +1,5 @@
 package com.trikset.gamepad2
 
-import android.content.Context
 import android.net.Network
 import com.trikset.gamepad2.diagnostics.AppLog
 import java.io.IOException
@@ -27,11 +26,12 @@ import javax.net.ssl.X509TrustManager
  *
  * The network-open and default-open calls are injectable seams so tests can assert the routing
  * decision without a real [Network] (Robolectric's `ShadowNetwork` shadows only `bindSocket`, not
- * `openConnection`).
+ * `openConnection`). The Wi-Fi lookup is likewise injectable ([wifiNetworkProvider]); the
+ * production provider is the process-wide [WifiNetworkTracker] registered once by [App] — never a
+ * per-opener tracker (see WifiNetworkTracker).
  */
 class WifiConnectionOpener(
-    context: Context,
-    private val wifiNetworkProvider: () -> Network? = WifiNetworkTracker(context)::current,
+    private val wifiNetworkProvider: () -> Network? = { WifiNetworkTracker.instance()?.current() },
     private val networkOpen: (Network, URL) -> URLConnection = { network, url ->
       network.openConnection(url)
     },

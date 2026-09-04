@@ -33,7 +33,7 @@ class HttpsVideoStreamTest : RobolectricTestBase() {
       val player =
           MjpegVideoPlayer(
               MjpegView(context),
-              connectionOpener = WifiConnectionOpener(context, wifiNetworkProvider = { null }),
+              connectionOpener = WifiConnectionOpener(wifiNetworkProvider = { null }),
           )
       val stream = player.openStream("https://127.0.0.1:$port/?action=stream")
       assertNotNull("the self-signed https stream must open (trust-all)", stream)

@@ -1,7 +1,6 @@
 package com.trikset.gamepad2
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.net.Network
 import android.os.Build
 import com.trikset.gamepad2.diagnostics.AppLog
@@ -13,11 +12,12 @@ import java.net.DatagramSocket
  * `TRANSPORT_WIFI` network is available, [bind] calls [Network.bindSocket] so the datagram socket's
  * traffic goes out over the robot AP even when cellular is the system default network (S13 / A2).
  * Falls back to the default network when no Wi-Fi transport is available. Requires
- * `ACCESS_NETWORK_STATE`.
+ * `ACCESS_NETWORK_STATE`. The Wi-Fi lookup is injectable ([wifiNetworkProvider]); the production
+ * provider is the process-wide [WifiNetworkTracker] registered once by [App] — never a per-binder
+ * tracker (see WifiNetworkTracker).
  */
 class WifiDatagramBinder(
-    context: Context,
-    private val wifiNetworkProvider: () -> Network? = WifiNetworkTracker(context)::current,
+    private val wifiNetworkProvider: () -> Network? = { WifiNetworkTracker.instance()?.current() },
     private val isSdkAtLeast22: () -> Boolean = { Build.VERSION.SDK_INT >= API_22 },
 ) : DatagramBinder {
 
