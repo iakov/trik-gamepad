@@ -36,6 +36,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val SK_HIDE_CONTROLS = "hideControls"
     const val SK_SHOW_FPS = "showFps"
     const val SK_VIDEO_CROP = "videoCropToFill"
+    const val SK_RECENTER_GLYPHS = "recenterGlyphs"
     const val SK_GAMEPAD_SWAP = "gamepadSwap"
     const val SK_ADVANCED = "advancedSettings"
     const val SK_MAGIC_BUTTON_COUNT = "magicButtonCount"
@@ -243,9 +244,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
   private fun initializeDynamicPreferenceSummary() {
     val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
 
-    // Root screen: host/port/keepalive all resolve; the Advanced sub-screen only contains
-    // keepalive, so missing prefs are skipped (findPreference is null-safe).
-    for (preferenceKey in arrayOf(SK_HOST_ADDRESS, SK_HOST_PORT, SK_KEEPALIVE)) {
+    // Root screen: host/port all resolve; keepalive gets its own validating listener below (the
+    // row must reject out-of-range input at edit time so its summary never shows a stored value the
+    // controller would immediately rewrite — see initializeKeepaliveSummary). Missing prefs are
+    // skipped (findPreference is null-safe, e.g. the Advanced sub-screen).
+    for (preferenceKey in arrayOf(SK_HOST_ADDRESS, SK_HOST_PORT)) {
       val preference = findPreference<Preference>(preferenceKey) ?: continue
       preference.summary = prefs.getString(preferenceKey, "").orEmpty()
       preference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
@@ -259,6 +262,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
         true
       }
     }
+
+    initializeKeepaliveSummary()
 
     refreshVideoUriSummary()
 
@@ -297,6 +302,44 @@ class SettingsFragment : PreferenceFragmentCompat() {
       preference.summary = getString(formatRes, readSeekBarValue(prefs, preferenceKey, default))
       preference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
         pref.summary = getString(formatRes, value)
+        true
+      }
+    }
+  }
+
+  /**
+   * Wires the Keep-alive timeout row (Robot settings > Network): shows the current value and
+   * REJECTS out-of-range input at edit time. The row is the single gate for this value — an invalid
+   * value (below [SenderService.MINIMAL_KEEPALIVE], or not a whole number) must never reach the
+   * shared prefs, otherwise the row summary (which mirrors the stored value) desyncs from what the
+   * gamepad actually runs. The rejection mirrors the controller's own guard so the two can never
+   * disagree about a stored value.
+   */
+  private fun initializeKeepaliveSummary() {
+    val keepalive = findPreference<Preference>(SK_KEEPALIVE) ?: return
+    val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
+    keepalive.summary = prefs.getString(SK_KEEPALIVE, SenderService.DEFAULT_KEEPALIVE.toString())
+    keepalive.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { pref, value ->
+      val typed = value.toString()
+      val timeout = typed.toIntOrNull()
+      if (timeout == null) {
+        Toast.makeText(
+                requireContext(),
+                R.string.keepalive_must_be_positive_decimal,
+                Toast.LENGTH_SHORT,
+            )
+            .show()
+        false
+      } else if (timeout < SenderService.MINIMAL_KEEPALIVE) {
+        Toast.makeText(
+                requireContext(),
+                getString(R.string.keepalive_must_be_not_less, SenderService.MINIMAL_KEEPALIVE),
+                Toast.LENGTH_SHORT,
+            )
+            .show()
+        false
+      } else {
+        pref.summary = typed
         true
       }
     }
