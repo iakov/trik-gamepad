@@ -39,10 +39,10 @@ touch one.
 | Build & toolchain | AGP/Gradle, config-cache, versioning, keystore, lint baseline, coverage gate, cross-platform dev tooling | [2026-08-27] jdk.compiler module in the Gradle daemon (ktfmt apply-path) |
 | Testing | Robolectric determinism, emulator prerequisites, coverage strategy | [2026-08-14] CC0 test images replace in-memory JPEG fixtures + theme screenshot test |
 | CI & emulator | aosp_atd image, focus pre-empt, no-macOS runner, publish job | [2026-08-08] Phase 1 experiment 2: aosp_atd PASSES |
-| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral, ScaleMode FIT/CROP, color rename, FPS integer+hysteresis, thread-safety audit, video-source preset chips, share-in images ZIP, VideoStreamLoader deletion | [2026-09-02] Share-in images ZIP receiver + VideoStreamLoader deletion |
+| Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral, ScaleMode FIT/CROP, color rename, FPS integer+hysteresis, thread-safety audit, video-source preset chips, share-in images ZIP, VideoStreamLoader deletion | [2026-09-05] Wi-Fi network tracker is a single app-scoped instance (TooManyRequests crash) |
 | Workflows | fork-only, releases | [2026-08-22] Release via signed tags + GH releases |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
-| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-09-01] Smart glyph alignment (reusable centered-glyph core) |
+| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-09-05] Video-source preset chips: ring = full 48dp cell border (Option B) |
 | Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-20] Device-identifier pre-commit hook + gate step |
 | Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-27] run_bounded hang-proof redesign |
 | Build & versioning | package naming, minSdk, versionCode formula, release signing | [2026-08-22] Package rename to com.trikset.gamepad2 |
@@ -878,6 +878,49 @@ ______________________________________________________________________
 ______________________________________________________________________
 
 ## Architecture
+
+### [2026-09-05] Wi-Fi network tracker is a single app-scoped instance (TooManyRequests crash)
+
+- **Type:** problem-avoiding (a field crash from unbounded resource
+  registration).
+- **Problem:** crash report (2026-09-05, Android 16, releaseDebug build):
+  `android.net.ConnectivityManager$TooManyRequestsException` from
+  `registerNetworkCallback`, on the connect path. Root cause: `WifiNetworkTracker`
+  registered a `NetworkCallback` in its constructor and nothing ever unregistered
+  it; it was constructed per `WifiSocketBinder`/`WifiDatagramBinder`/
+  `WifiConnectionOpener` default AND per `MjpegVideoPlayer` (two per player), and
+  the binders were rebuilt on every connect attempt (the `SenderViewModel`
+  `transportFactory`), so registrations accumulated process-lifetime to Android's
+  per-app callback cap. The exception is a `RuntimeException`; `connectToTRIK`
+  catches only `IOException`, so it crashed the executor thread uncaught.
+- **Alternatives considered:** (a) one tracker for the control path only
+  (rejected — players still constructed their own); (b) full lifecycle
+  unregister on every consumer (rejected — the tracker is genuinely
+  process-lifetime, and unregister sites are teardown-ordering hazards);
+  (c) register ONCE in `App`, expose the single instance, and make every
+  construction site cheap (chosen).
+- **Chosen solution:** `WifiNetworkTracker` gets a private constructor and a
+  single instance initialized by `App.onCreate` (idempotent, keyed to the
+  application-context identity — a real process registers exactly once, while
+  Robolectric's fresh-Application-per-test environment re-initializes against the
+  current test's `ConnectivityManager`). Binders/opener/MjpegVideoPlayer defaults
+  read `WifiNetworkTracker.instance()`; the binders/opener no longer take a
+  `Context` (they own no tracker); `SenderViewModel` builds its TCP/UDP binders
+  once (`by lazy`) instead of per connect; a registration failure (budget
+  already exhausted, missing permission) degrades to default-network routing
+  instead of throwing.
+- **Why:** one registration point at process start removes the accumulation
+  class entirely (a single process-wide callback, no per-construction
+  allocation), and the harden-the-registration fallback keeps even a
+  budget-exhausted device usable.
+- **Out of scope / consequences:** no unregister — the one registration lives
+  for the process by design. Two resource-ownership siblings found in the same
+  audit were fixed as a separate commit for clean reverts: (1)
+  `MjpegVideoPlayer.release()` shuts down only the executor it created
+  (caller-injected executors stay caller-owned), and (2) `MainActivity.setVideoUrl`
+  releases the replaced player — the settings controller re-applies the video URI
+  on every settings change, so a single settings session used to leak several
+  players (each a non-daemon executor thread).
 
 ### [2026-09-02] Delete VideoStreamLoader (superseded by MjpegVideoPlayer)
 
@@ -1880,6 +1923,41 @@ ______________________________________________________________________
   rewritten to assert the container keeps zero padding under a dispatched
   insets frame. Pad-fit-to-capsule policy remains deferred (screenshot
   review). Screenshot proof: `.tmp/hud_corner_20260829-001908.png`.
+
+### [2026-09-05] Video-source preset chips: ring = full 48dp cell border (Option B)
+
+- **Type:** design-clarifying (the chips' visible geometry is product visual
+  design).
+- **Problem:** the compact ring chips (32dp ring centred in a 48dp tap cell via
+  an `InsetDrawable`) had a structural flaw the 2026-09-04 fix only patched
+  around: the ring chrome carried intrinsic insets that compete with the glyph's
+  asymmetric ink-centering padding (chrome-before-render ordering is load-bearing
+  for it), and the visible "air" between rings came from the inset halo rather
+  than real layout. User direction: rethink the button — the ring should read as
+  the chip's border, with all circles exactly equal and top/bottom-aligned, and
+  the glyph resized/centered to fit; a wrong look is a defect.
+- **Alternatives considered:** (a) keep the compact 32dp ring but render it as a
+  padding-free centred layer-list (same geometry, honours the zero-intrinsic-
+  padding invariant — rollback target); (b) make the ring the FULL 48dp cell
+  outline and give the row a real gap (chosen); (c) chrome as a sibling view
+  under the glyph (cleanest decoupling, but changes `GlyphRow`'s child contract
+  for a settings row).
+- **Chosen solution:** the chips' chrome is the border-only `hud_chip_ring`
+  (oval stroke, transparent fill) drawn over the entire 48dp cell — no
+  `InsetDrawable` at all. The glyph's VISUAL ink height is 60% of the ring
+  diameter (28.8dp — the same ratio as the HUD magic buttons), and the visible
+  air between rings is a real 16dp `GlyphRow` inter-cell margin. Implemented as a
+  single isolated commit so the variant can be swapped (rollback = revert that
+  one commit and rebuild).
+- **Why:** when the ring IS the cell, the four rings are equal and aligned by
+  construction (equal 48dp cells + fixed gap), the chrome has zero intrinsic
+  padding so it can never clobber the glyph's ink-centering padding again, the
+  glyph weight matches the magic buttons the tester liked, and the touch target
+  is unchanged (48dp).
+- **Out of scope / consequences:** the glyph stays at 60% (tie to magic
+  buttons); the [2026-09-04] chrome-before-render ordering rule remains the
+  authoritative contract for future `GlyphRow` consumers; on-device pixel proof
+  (equal/aligned rings) is part of the same batch's screenshot phase.
 
 ### [2026-09-04] Smart glyph alignment ships ON; chips ring-background centering fix
 
