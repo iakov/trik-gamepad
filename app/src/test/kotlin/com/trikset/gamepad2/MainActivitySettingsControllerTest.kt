@@ -356,8 +356,41 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     AppLog.minBufferLevel = Log.DEBUG
     AppLog.clearForTest()
     prefs.edit().putString(SettingsFragment.SK_CUSTOM_MESSAGE, "hello").commit()
-    controller.onPreferenceChanged(prefs)
+    // A real change event carries the changed key (the register sweep passes null).
+    controller.onPreferenceChanged(prefs, SettingsFragment.SK_CUSTOM_MESSAGE)
     val logs = AppLog.tail(100)
     assertTrue(logs.any { it.contains("Sending 'custom hello'") })
+  }
+
+  @Test
+  fun unrelatedPrefChangeShouldNotResendCustomCommand() {
+    AppLog.minBufferLevel = Log.DEBUG
+    AppLog.clearForTest()
+    prefs.edit().putString(SettingsFragment.SK_CUSTOM_MESSAGE, "hello").commit()
+    prefs.edit().putBoolean(SettingsFragment.SK_SHOW_FPS, true).commit()
+    // The custom command is an edge on ITS key change only: an unrelated setting (here FPS) must
+    // not re-send `custom <message>` to the robot (the old code re-sent it on every pref change).
+    controller.onPreferenceChanged(prefs, SettingsFragment.SK_SHOW_FPS)
+    assertTrue(
+        "an unrelated pref change must not re-send the custom message",
+        AppLog.tail(100).none { it.contains("Sending 'custom hello'") },
+    )
+  }
+
+  @Test
+  fun registerSweepShouldNotSendCustomCommand() {
+    AppLog.minBufferLevel = Log.DEBUG
+    AppLog.clearForTest()
+    prefs.edit().putString(SettingsFragment.SK_CUSTOM_MESSAGE, "hello").commit()
+    // register() applies the stored prefs without a changed key -> the custom edge must not fire.
+    controller.register()
+    try {
+      assertTrue(
+          "the register sweep must not re-send the custom message",
+          AppLog.tail(100).none { it.contains("Sending 'custom hello'") },
+      )
+    } finally {
+      controller.unregister()
+    }
   }
 }

@@ -53,8 +53,8 @@ class MainActivitySettingsController(
   // Private so the listener cannot be registered anywhere else (a leak footgun);
   // register()/unregister() are the only entry points and are idempotent.
   private val listener: SharedPreferences.OnSharedPreferenceChangeListener =
-      SharedPreferences.OnSharedPreferenceChangeListener { prefs, _ ->
-        onPreferenceChanged(prefs)
+      SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+        onPreferenceChanged(prefs, key)
       }
 
   fun register() {
@@ -74,7 +74,13 @@ class MainActivitySettingsController(
     preferences.unregisterOnSharedPreferenceChangeListener(listener)
   }
 
-  fun onPreferenceChanged(sharedPreferences: SharedPreferences) {
+  /**
+   * Re-applies every runtime setting from [sharedPreferences]. [changedKey] is the preference that
+   * actually changed (null on the initial [register] sweep): the custom message is sent to the
+   * robot ONLY when its own key changed — `custom <message>` is an edge (the robot's user program
+   * reacts to each delivery), so unrelated setting changes or a register sweep must not re-send it.
+   */
+  fun onPreferenceChanged(sharedPreferences: SharedPreferences, changedKey: String? = null) {
     val addr =
         sharedPreferences.getString(
             SettingsFragment.SK_HOST_ADDRESS,
@@ -196,7 +202,7 @@ class MainActivitySettingsController(
     }
 
     val customMessage = sharedPreferences.getString(SettingsFragment.SK_CUSTOM_MESSAGE, null)
-    if (customMessage != null) {
+    if (changedKey == SettingsFragment.SK_CUSTOM_MESSAGE && customMessage != null) {
       sender.send("custom $customMessage")
     }
   }
