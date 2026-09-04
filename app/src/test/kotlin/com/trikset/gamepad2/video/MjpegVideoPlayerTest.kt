@@ -3,9 +3,12 @@ package com.trikset.gamepad2.video
 import com.trikset.gamepad2.RobolectricTestBase
 import com.trikset.gamepad2.mjpeg.MjpegView
 import com.trikset.gamepad2.mjpeg.SyntheticMjpegServer
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -52,6 +55,32 @@ class MjpegVideoPlayerTest : RobolectricTestBase() {
     player.setOnFirstFrameListener {}
     player.release()
     ShadowLooper.runUiThreadTasksIncludingDelayedTasks()
+  }
+
+  @Test
+  fun releaseShutsDownTheOwnedExecutor() {
+    // The player's default single-thread executor is non-daemon: release() must shut it down, or
+    // every discarded player leaks its thread for the process lifetime.
+    val player = MjpegVideoPlayer(MjpegView(RuntimeEnvironment.getApplication()))
+    val executor = field(player, "executor") as ExecutorService
+    assertFalse(executor.isShutdown)
+    player.release()
+    assertTrue("release() must shut down the executor this player created", executor.isShutdown)
+  }
+
+  @Test
+  fun releaseDoesNotShutdownACallerInjectedExecutor() {
+    // Ownership rule: an injected executor is the caller's to manage; release() must not kill it
+    // (the reconnect tests share one PausedExecutorService across the controller's reloads).
+    val injected = Executors.newSingleThreadExecutor()
+    try {
+      val player = MjpegVideoPlayer(MjpegView(RuntimeEnvironment.getApplication()), injected)
+      assertSame(injected, field(player, "executor"))
+      player.release()
+      assertFalse("a caller-injected executor stays caller-owned", injected.isShutdown)
+    } finally {
+      injected.shutdownNow()
+    }
   }
 
   @Test

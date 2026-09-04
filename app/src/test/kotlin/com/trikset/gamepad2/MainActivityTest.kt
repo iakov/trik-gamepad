@@ -6,10 +6,12 @@ import com.trikset.gamepad2.mjpeg.MjpegView
 import com.trikset.gamepad2.mjpeg.ScaleMode
 import com.trikset.gamepad2.video.MjpegVideoPlayer
 import com.trikset.gamepad2.video.VideoPlayer
+import java.util.concurrent.ExecutorService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -685,6 +687,25 @@ class MainActivityTest : RobolectricTestBase() {
   fun setShowFpsWithoutVideoShouldBeSafe() {
     setField(activity, "video", null)
     activity.setShowFps(true)
+  }
+
+  @Test
+  fun setVideoUrlShouldReleaseThePreviousPlayer() {
+    // A video-URI replacement must return the previous player's resources (its non-daemon executor
+    // thread + live stream); the settings controller re-applies the URI on every settings change,
+    // so without the release one settings session could leak several players.
+    val old = MjpegVideoPlayer(MjpegView(activity))
+    val oldExecutor = field(old, "executor") as ExecutorService
+    setField(activity, "video", old)
+    activity.setVideoUrl("http://10.0.0.7:8080/?action=stream")
+    assertTrue("replacing the player must release the previous one", oldExecutor.isShutdown)
+    assertNotSame(old, field(activity, "video"))
+    // A second replacement releases the first new player too (no leak on repeated URI changes).
+    val first = requireNotNull(field(activity, "video"))
+    val firstExecutor = field(first, "executor") as ExecutorService
+    activity.setVideoUrl(null)
+    assertTrue("each replacement must release its predecessor", firstExecutor.isShutdown)
+    assertNotSame(first, field(activity, "video"))
   }
 
   @Test

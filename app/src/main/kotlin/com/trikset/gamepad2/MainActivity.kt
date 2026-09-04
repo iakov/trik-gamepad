@@ -413,6 +413,19 @@ class MainActivity :
 
   override fun setVideoUrl(url: String?) {
     videoUrl = url
+    // Replace the running player: stop + release the previous one before building the new one. A
+    // player owns a non-daemon executor thread and (while streaming) a live connection, and
+    // release() is the only thing that returns them — without it, every replacement leaked the old
+    // player (the settings controller re-applies the video URI on every settings change, so a
+    // single settings session could leak several players).
+    val previous = video
+    video = null
+    if (previous != null) {
+      previous.stop()
+      previous.setOnStreamErrorListener(null)
+      previous.setOnFirstFrameListener(null)
+      previous.release()
+    }
     findViewById<android.widget.TextView>(R.id.videoPlaceholder)?.visibility =
         if (url == null) View.VISIBLE else View.GONE
     robotChip.setVideoStatus(if (url == null) VideoStatus.DISABLED else VideoStatus.LOADING)

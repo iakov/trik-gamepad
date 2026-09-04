@@ -15,15 +15,24 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URI
 import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class MjpegVideoPlayer(
     private val view: MjpegView,
-    private val executor: Executor = Executors.newSingleThreadExecutor(),
+    injectedExecutor: Executor? = null,
     private val mainHandler: Handler = Handler(Looper.getMainLooper()),
-    private val socketBinder: SocketBinder = WifiSocketBinder(view.context),
-    private val connectionOpener: ConnectionOpener = WifiConnectionOpener(view.context),
+    private val socketBinder: SocketBinder = WifiSocketBinder(),
+    private val connectionOpener: ConnectionOpener = WifiConnectionOpener(),
 ) : VideoPlayer {
+
+  /**
+   * The executor this player runs its open/play work on (own one unless the caller injected it).
+   */
+  private val executor: Executor = injectedExecutor ?: Executors.newSingleThreadExecutor()
+
+  /** Whether [release] must shut down [executor]; a caller-injected executor stays caller-owned. */
+  private val ownsExecutor: Boolean = injectedExecutor == null
 
   override val isPlaying: Boolean
     get() = view.isPlaying
@@ -77,6 +86,13 @@ class MjpegVideoPlayer(
     setOnStreamErrorListener(null)
     setOnFirstFrameListener(null)
     view.stopPlayback()
+    // Shut down only the executor this player created (an injected executor is owned by the
+    // caller). The default single-thread executor is NON-daemon, so without the shutdown every
+    // discarded player leaked its thread forever — players are recreated on each video-URI change
+    // and on every activity recreation, so the leaks accumulated process-lifetime.
+    if (ownsExecutor) {
+      (executor as? ExecutorService)?.shutdown()
+    }
   }
 
   internal fun openStream(url: String?): MjpegInputStream? {
