@@ -8,6 +8,9 @@
     <color name="white">#FFFFFF</color>
     <color name="magic_button_text">#FFFFFF</color>
     <color name="magic_button_fill_default">#555555</color>
+    <!-- Video-source preset chip glyphs sit on the DayNight settings list: near-black in the light
+         theme (contrast-verified vs white in WcagContrastTest), a white override in values-night. -->
+    <color name="chip_glyph">#212121</color>
     <color name="video_placeholder_text">#BDBDBD</color>
 
     <!-- Type 1 HUD theme (see DESIGN.md "HUD themes"). The connection-state accent set:

@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Robot-settings row hosting the four video-source preset chips. The chips are populated at
      bind time by VideoSourceChipsPreference (glyph strings/sizes live in code so the row can reuse
-     the bundled smart-glyph core); this layout only provides the GlyphRow container. -->
+     the bundled smart-glyph core); this layout only provides the GlyphRow container. The cluster
+     is centered horizontally in the row (gravity center_horizontal) rather than flush-left. -->
 <com.trikset.gamepad2.glyphs.GlyphRow
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/videoSourceChipsRow"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:gravity="center_horizontal"
     android:orientation="horizontal" />

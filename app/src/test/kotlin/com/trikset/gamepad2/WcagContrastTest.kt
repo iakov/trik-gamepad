@@ -91,4 +91,13 @@ class WcagContrastTest : RobolectricTestBase() {
       assertTrue("chip glyph $res vs black must be >= 3.0:1 (was $ratio)", ratio >= 3.0)
     }
   }
+
+  @Test
+  fun videoSourceChipGlyphOnWhiteMeetsAa() {
+    // The video-source preset chips sit on the DayNight settings list (transparent pill fill over
+    // the list background). The light-theme glyph is near-black on white; its values-night twin is
+    // white-on-dark, so the day pair (the Robolectric default) is the assertion here.
+    val ratio = contrast(color(R.color.chip_glyph), androidColor(android.R.color.white))
+    assertTrue("video-source chip glyph vs white must be >= 4.5:1 (was $ratio)", ratio >= 4.5)
+  }
 }
