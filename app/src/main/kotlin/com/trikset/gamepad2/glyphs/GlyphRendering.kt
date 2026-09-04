@@ -59,7 +59,7 @@ object GlyphRendering {
    * alone would clip such glyphs (hit 2026-09-01: ▲ rendered zero ink, ■/● clipped to the lower
    * half).
    *
-   * [recenter] selects WHICH center is aimed at (see the "Re-center symbols" setting,
+   * [recenter] selects WHICH center is aimed at (see the "Smart glyph alignment" setting,
    * pref_app.xml): false = the metric table's weighted-ink median (the pixel-verified default);
    * true = the glyph's actual runtime ink-box center, measured from the paint at render time (the
    * same fallback already used for user-typed glyphs). Both modes deliver the offset as asymmetric

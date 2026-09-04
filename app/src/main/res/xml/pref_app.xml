@@ -22,15 +22,6 @@
             android:selectable="false"
             android:summary="@string/pref_hud_theme_summary"
             android:title="@string/pref_hud_theme" />
-        <!-- Bundled-symbol alignment escape hatch (default OFF = the metric-table median centering
-             the geometry tests verify). Flipping it re-centers glyph tiles (magic buttons, video
-             preset chips) on the runtime ink-box center instead; see GlyphRendering. -->
-        <SwitchPreference
-            android:defaultValue="false"
-            android:key="recenterGlyphs"
-            android:summaryOff="@string/pref_recenter_glyphs_off"
-            android:summaryOn="@string/pref_recenter_glyphs_on"
-            android:title="@string/pref_recenter_glyphs" />
     </PreferenceCategory>
 
     <!-- Cross-link: the robot/target settings are a separate screen (chip on the gamepad also
@@ -113,6 +104,16 @@
             <Preference
                 android:key="magicSymbols"
                 android:title="@string/pref_magic_symbols" />
+            <!-- "Smart glyph alignment" (default ON): how each bundled symbol sits inside its tile.
+                 ON centers the glyph on its runtime ink box (the uniform normalized look — magic
+                 buttons + video-source chips); OFF falls back to the metric-table median centering.
+                 See GlyphRendering. -->
+            <SwitchPreference
+                android:defaultValue="true"
+                android:key="recenterGlyphs"
+                android:summaryOff="@string/pref_recenter_glyphs_off"
+                android:summaryOn="@string/pref_recenter_glyphs_on"
+                android:title="@string/pref_recenter_glyphs" />
         </PreferenceCategory>
 
         <PreferenceCategory android:title="@string/pref_category_about">

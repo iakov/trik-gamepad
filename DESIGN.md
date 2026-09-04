@@ -316,13 +316,17 @@ import by `scripts/glyph_metrics.py`):
   90%-mass band): `textSize = target / visualHeightEm`, so a row of different
   glyphs all render at the same visual ink height. The magic buttons target 60%
   of the circle diameter; the chips equalize across digits/eye/usb.
-- **Ink centering by weighted-ink median** (`medianBiasEm`): the renderer
-  cancels the median's offset from the line-box center with asymmetric padding,
-  never a view translation — a translation would move the background too
-  (regression: 2026-08-15).
+- **Ink centering on the glyph's true visual center**: the renderer cancels the
+  ink's offset from the line-box center with asymmetric padding, never a view
+  translation — a translation would move the background too (regression:
+  2026-08-15). The shipped mode (the "Smart glyph alignment" setting, **ON by
+  default**) aims at the runtime ink box measured from the paint at render time;
+  OFF falls back to the metric table's weighted-ink median (`medianBiasEm`).
 - **Never clip**: Android lays out the glyph's LINE box (ascent+descent,
   `LINE_BOX_EM ≈ 1.16em`), so `textSize` is capped at
-  `viewHeight / (fontScale × (LINE_BOX_EM + 2·|medianBiasEm|))`. The 90% band
+  `viewHeight / (fontScale × (LINE_BOX_EM + 2·|reserveEm|))`, where `reserveEm`
+  is the centering offset actually applied (the median bias in the OFF mode, the
+  measured ink-box offset in the default Smart mode). The 90% band
   alone under-reports thin-tailed glyphs (a triangle's point carries little
   mass) and an uncapped equalized size rendered ▲ with zero ink and clipped
   ■/● to the lower half of the magic button (hit 2026-09-01).

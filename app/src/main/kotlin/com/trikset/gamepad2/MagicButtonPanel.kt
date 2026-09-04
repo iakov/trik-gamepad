@@ -29,7 +29,7 @@ class MagicButtonPanel(
 
   /**
    * Builds the buttons into [container]. [recenter] picks WHICH ink center is aimed at — the metric
-   * table's weighted median or the runtime ink box (the "Re-center symbols" setting; see
+   * table's weighted median or the runtime ink box (the "Smart glyph alignment" setting; see
    * [GlyphRendering.render]); both deliver via asymmetric padding.
    */
   fun populate(container: ViewGroup, count: Int, symbols: List<String>, recenter: Boolean = false) {

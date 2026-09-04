@@ -119,61 +119,23 @@ class MagicButtonPanelTest : RobolectricTestBase() {
     // paint ink-box center. padTop - padBottom + 2*offsetY == 0 with offsetY =
     // -medianBiasEm * textSizePx.
     assertNotNull("default glyph ▲ must have metrics", metric)
-    val offsetY = -metric!!.medianBiasEm * btn.textSize
-    assertEquals(
-        "vertical padding must cancel the metric median offset",
-        0f,
-        btn.paddingTop - btn.paddingBottom + 2f * offsetY,
-        0.5f,
-    )
-  }
-
-  @Test
-  fun centerGlyphShouldUsePaintInkBoxForUnknownGlyphs() {
-    val container = FrameLayout(context)
-    panel.populate(container, 1, listOf("Ω")) // Ω is absent from the metrics table
-    val btn = container.getChildAt(0) as Button
-    val paint = btn.paint
-    val text = btn.text.toString()
-    val bounds = android.graphics.Rect()
-    paint.getTextBounds(text, 0, text.length, bounds)
-    val fm = paint.fontMetrics
-    // Ink-box center minus line-box center (the fallback offset when no metric exists).
-    val offsetY = (bounds.top + bounds.bottom) / 2f - (fm.ascent + fm.descent) / 2f
-    assertEquals(
-        "vertical padding must cancel the ink offset for unknown glyphs",
-        0f,
-        btn.paddingTop - btn.paddingBottom + 2f * offsetY,
-        0.5f,
-    )
+    assertCenteringPadding(btn, -metric!!.medianBiasEm * btn.textSize)
   }
 
   @Test
   fun recenterModeShouldCenterKnownGlyphByPaintInkBoxPadding() {
-    // "Re-center symbols" ON: the centering target flips from the metric table's weighted median to
-    // the glyph's runtime ink-box center, but the vehicle stays asymmetric padding — the button
-    // (and its circular background) must not move (regression guard: recenter was once wired as a
-    // translation and shifted the circle instead of the ink — hit 2026-09-03).
+    // "Smart glyph alignment" ON: the centering target flips from the metric table's weighted
+    // median to the glyph's runtime ink-box center, but the vehicle stays asymmetric padding — the
+    // button (and its circular background) must not move (regression guard: recenter was once wired
+    // as a translation and shifted the circle instead of the ink — hit 2026-09-03).
     val container = FrameLayout(context)
     panel.populate(container, 1, symbols, recenter = true)
     val btn = container.getChildAt(0) as Button
+    assertNeverTranslated(btn)
     val metric = com.trikset.gamepad2.glyphs.GlyphMetrics.metricFor(btn.text.toString())
     assertNotNull("default glyph ▲ must have metrics", metric)
-    assertEquals("recenter must never translate the button", 0f, btn.translationX, 0f)
-    assertEquals("recenter must never translate the button", 0f, btn.translationY, 0f)
-    val paint = btn.paint
-    val text = btn.text.toString()
-    val bounds = android.graphics.Rect()
-    paint.getTextBounds(text, 0, text.length, bounds)
-    val fm = paint.fontMetrics
-    // Ink-box center minus line-box center (the [recenter] target), NOT the metric median offset.
-    val inkOffsetY = (bounds.top + bounds.bottom) / 2f - (fm.ascent + fm.descent) / 2f
-    assertEquals(
-        "padding must cancel the paint ink-box offset in recenter mode",
-        0f,
-        btn.paddingTop - btn.paddingBottom + 2f * inkOffsetY,
-        0.5f,
-    )
+    val inkOffsetY = paintInkOffsetY(btn)
+    assertCenteringPadding(btn, inkOffsetY)
     // The ink-box target must differ from the metric median for this glyph (▲ carries most of its
     // ink in its base, so its median sits well below its geometric box center) — otherwise the
     // toggle would have nothing to change and the assertion above would be vacuous.
@@ -185,24 +147,41 @@ class MagicButtonPanelTest : RobolectricTestBase() {
   }
 
   @Test
-  fun recenterModeShouldUsePaintInkOffsetForUnknownGlyphs() {
-    val container = FrameLayout(context)
-    panel.populate(container, 1, listOf("Ω"), recenter = true) // Ω is absent from the metrics table
-    val btn = container.getChildAt(0) as Button
+  fun unknownGlyphShouldCenterOnPaintInkBoxInBothModes() {
+    // A glyph absent from the metrics table (Ω) always centers on its paint ink box — in both the
+    // default mode and "Smart glyph alignment" ON (the metric-median path does not apply to it).
+    for (recenter in arrayOf(false, true)) {
+      val container = FrameLayout(context)
+      panel.populate(container, 1, listOf("Ω"), recenter = recenter)
+      val btn = container.getChildAt(0) as Button
+      assertNeverTranslated(btn)
+      assertCenteringPadding(btn, paintInkOffsetY(btn))
+    }
+  }
+
+  /** Paint ink-box center minus line-box center (px) — the fallback centering target. */
+  private fun paintInkOffsetY(btn: Button): Float {
     val paint = btn.paint
     val text = btn.text.toString()
     val bounds = android.graphics.Rect()
     paint.getTextBounds(text, 0, text.length, bounds)
     val fm = paint.fontMetrics
-    val offsetY = (bounds.top + bounds.bottom) / 2f - (fm.ascent + fm.descent) / 2f
-    assertEquals("recenter must never translate the button", 0f, btn.translationX, 0f)
-    assertEquals("recenter must never translate the button", 0f, btn.translationY, 0f)
+    return (bounds.top + bounds.bottom) / 2f - (fm.ascent + fm.descent) / 2f
+  }
+
+  /** Asymmetric padding must cancel [offsetY] so the ink sits centered on the button (0.5px). */
+  private fun assertCenteringPadding(btn: Button, offsetY: Float) {
     assertEquals(
-        "padding must cancel the paint ink offset for unknown glyphs in recenter mode",
+        "vertical padding must cancel the ink offset",
         0f,
         btn.paddingTop - btn.paddingBottom + 2f * offsetY,
         0.5f,
     )
+  }
+
+  private fun assertNeverTranslated(btn: Button) {
+    assertEquals("recenter must never translate the button", 0f, btn.translationX, 0f)
+    assertEquals("recenter must never translate the button", 0f, btn.translationY, 0f)
   }
 
   @Test

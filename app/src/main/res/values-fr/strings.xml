@@ -79,9 +79,9 @@
     <string name="pref_category_appearance">Apparence</string>
     <string name="pref_hud_theme">Thème HUD</string>
     <string name="pref_hud_theme_summary">Type 1 · d’autres thèmes arrivent</string>
-    <string name="pref_recenter_glyphs">Recentrer les symboles</string>
-    <string name="pref_recenter_glyphs_on">Les symboles sont décalés au centre visuel exact de leur bouton</string>
-    <string name="pref_recenter_glyphs_off">Les symboles gardent leur alignement par défaut</string>
+    <string name="pref_recenter_glyphs">Alignement intelligent des symboles</string>
+    <string name="pref_recenter_glyphs_on">Les symboles sont centrés sur leur centre visuel exact</string>
+    <string name="pref_recenter_glyphs_off">Les symboles gardent l’alignement de base</string>
     <string name="pref_keep_screen_on">Garder l’écran allumé</string>
     <string name="pref_keep_screen_on_on">L’écran reste allumé pendant que le gamepad est ouvert</string>
     <string name="pref_keep_screen_on_off">L’écran peut s’éteindre pendant que le gamepad est ouvert</string>

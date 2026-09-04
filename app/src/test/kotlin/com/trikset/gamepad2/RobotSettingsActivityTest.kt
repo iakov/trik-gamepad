@@ -12,6 +12,7 @@ import androidx.preference.PreferenceViewHolder
 import com.trikset.gamepad2.glyphs.GlyphRow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
@@ -68,45 +69,25 @@ class RobotSettingsActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun keepaliveBelowMinimumShouldBeRejectedAtTheRow() {
+  fun keepaliveRowShouldRejectInvalidInputAtEditTime() {
     // The keepalive row must reject out-of-range input at edit time (return false, keep the stored
     // summary) — otherwise the row summary desyncs from the stored value the controller enforces.
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
-    prefs.edit().putString(SettingsFragment.SK_KEEPALIVE, "5000").commit()
-    val rebuilt = buildFragment()
-    val keepalive = rebuilt.findPreference<Preference>(SettingsFragment.SK_KEEPALIVE)
-    assertNotNull("keepalive row must exist in the robot screen", keepalive)
+    for (badInput in arrayOf<Any>(SenderService.MINIMAL_KEEPALIVE - 1, "abc")) {
+      val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+      prefs.edit().putString(SettingsFragment.SK_KEEPALIVE, "5000").commit()
+      val rebuilt = buildFragment()
+      val keepalive = rebuilt.findPreference<Preference>(SettingsFragment.SK_KEEPALIVE)
+      assertNotNull("keepalive row must exist in the robot screen", keepalive)
 
-    val accepted =
-        keepalive!!
-            .onPreferenceChangeListener!!
-            .onPreferenceChange(
-                keepalive,
-                SenderService.MINIMAL_KEEPALIVE - 1,
-            )
-    assertFalse("a below-minimum keepalive must be rejected", accepted)
-    assertEquals(
-        "the summary must keep the stored value after a rejected edit",
-        "5000",
-        keepalive.summary,
-    )
-  }
-
-  @Test
-  fun keepaliveNonNumericShouldBeRejectedAtTheRow() {
-    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
-    prefs.edit().putString(SettingsFragment.SK_KEEPALIVE, "5000").commit()
-    val rebuilt = buildFragment()
-    val keepalive = rebuilt.findPreference<Preference>(SettingsFragment.SK_KEEPALIVE)
-    assertNotNull("keepalive row must exist in the robot screen", keepalive)
-
-    val accepted = keepalive!!.onPreferenceChangeListener!!.onPreferenceChange(keepalive, "abc")
-    assertFalse("a non-numeric keepalive must be rejected", accepted)
-    assertEquals(
-        "the summary must keep the stored value after a rejected edit",
-        "5000",
-        keepalive.summary,
-    )
+      val accepted =
+          keepalive!!.onPreferenceChangeListener!!.onPreferenceChange(keepalive, badInput)
+      assertFalse("an out-of-range or non-numeric keepalive must be rejected", accepted)
+      assertEquals(
+          "the summary must keep the stored value after a rejected edit",
+          "5000",
+          keepalive.summary,
+      )
+    }
   }
 
   @Test
@@ -274,7 +255,8 @@ class RobotSettingsActivityTest : RobolectricTestBase() {
 
   @Test
   fun chipsRowShouldRepopulateWhenRecenterPrefChanges() {
-    // The chips' glyph alignment follows the global "Re-center symbols" pref, which lives on the
+    // The chips' glyph alignment follows the global "Smart glyph alignment" pref, which lives on
+    // the
     // App-settings screen. That screen can sit on top of Robot settings in the back stack, so the
     // chips row must re-render itself when the pref flips (a settings RecyclerView does not re-bind
     // rows on resume).
@@ -283,44 +265,97 @@ class RobotSettingsActivityTest : RobolectricTestBase() {
     val chips = fragment.findPreference<VideoSourceChipsPreference>(SettingsFragment.SK_VIDEO_CHIPS)
     assertNotNull("video-source chips row must exist in the robot screen", chips)
     chips!!.onAttached()
+    try {
+      val row = bindChipsRow(chips)
+      val cellBefore = row.getChildAt(0)
+      assertTrue(
+          "the chips row must render four cells",
+          row.childCount == VideoSourceChip.entries.size,
+      )
+      assertEquals(
+          "recenter must never translate a chip",
+          0f,
+          (cellBefore as Button).translationX,
+          0f,
+      )
 
+      prefs.edit().putBoolean(SettingsFragment.SK_RECENTER_GLYPHS, true).commit()
+      idleLooper()
+
+      val cellAfter = row.getChildAt(0)
+      assertNotSame(
+          "flipping the recenter pref must repopulate the bound chips row",
+          cellBefore,
+          cellAfter,
+      )
+      assertEquals(
+          "the repopulated row must keep the four chips",
+          VideoSourceChip.entries.size,
+          row.childCount,
+      )
+      assertEquals(
+          "recenter must never translate a chip after a re-render",
+          0f,
+          (cellAfter as Button).translationX,
+          0f,
+      )
+    } finally {
+      chips.onDetached()
+    }
+  }
+
+  @Test
+  fun chipsRowShouldDefaultToSmartGlyphAlignment() {
+    // "Smart glyph alignment" ships ON (ink-box centering): a fresh install with no stored pref
+    // must
+    // render exactly as an explicit ON and visibly differ from the OFF mode — a regression guard
+    // against the fallback silently flipping the shipped look back to metric-median alignment.
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    prefs.edit().remove(SettingsFragment.SK_RECENTER_GLYPHS).commit()
+    val chips = fragment.findPreference<VideoSourceChipsPreference>(SettingsFragment.SK_VIDEO_CHIPS)
+    assertNotNull("video-source chips row must exist in the robot screen", chips)
+    chips!!.onAttached()
+    try {
+      val row = bindChipsRow(chips)
+      val padsAtDefault = chipsPadding(row)
+      prefs.edit().putBoolean(SettingsFragment.SK_RECENTER_GLYPHS, true).commit()
+      idleLooper()
+      val padsAtOn = chipsPadding(row)
+      prefs.edit().putBoolean(SettingsFragment.SK_RECENTER_GLYPHS, false).commit()
+      idleLooper()
+      val padsAtOff = chipsPadding(row)
+      assertEquals(
+          "an unset pref must render the ON (ink-box) alignment, not the OFF mode",
+          padsAtOn,
+          padsAtDefault,
+      )
+      assertNotEquals(
+          "the OFF mode must be a visibly different alignment from the shipped ON default",
+          padsAtOff,
+          padsAtDefault,
+      )
+    } finally {
+      chips.onDetached()
+    }
+  }
+
+  /**
+   * Inflates + binds the chips row against [chips] (see
+   * chipsRowShouldRepopulateWhenRecenterPrefChanges).
+   */
+  private fun bindChipsRow(chips: VideoSourceChipsPreference): GlyphRow {
     val row =
         LayoutInflater.from(activity).inflate(R.layout.pref_video_source_chips, null) as GlyphRow
     chips.onBindViewHolder(PreferenceViewHolder.createInstanceForTests(row))
-    val cellBefore = row.getChildAt(0)
-    assertTrue(
-        "the chips row must render four cells",
-        row.childCount == VideoSourceChip.entries.size,
-    )
-    assertEquals(
-        "recenter must never translate a chip",
-        0f,
-        (cellBefore as Button).translationX,
-        0f,
-    )
-
-    prefs.edit().putBoolean(SettingsFragment.SK_RECENTER_GLYPHS, true).commit()
-    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
-
-    val cellAfter = row.getChildAt(0)
-    assertNotSame(
-        "flipping the recenter pref must repopulate the bound chips row",
-        cellBefore,
-        cellAfter,
-    )
-    assertEquals(
-        "the repopulated row must keep the four chips",
-        VideoSourceChip.entries.size,
-        row.childCount,
-    )
-    assertEquals(
-        "recenter must never translate a chip after a re-render",
-        0f,
-        (cellAfter as Button).translationX,
-        0f,
-    )
-    chips.onDetached()
+    return row
   }
+
+  private fun idleLooper() {
+    org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+  }
+
+  private fun chipsPadding(row: GlyphRow): List<Int> =
+      (0 until row.childCount).map { (row.getChildAt(it) as Button).paddingTop }
 
   private fun presetRows(): List<Preference> {
     val category = fragment.findPreference<PreferenceCategory>(SettingsFragment.SK_ROBOT_PRESETS)

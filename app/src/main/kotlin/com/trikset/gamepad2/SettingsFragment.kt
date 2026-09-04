@@ -65,6 +65,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
     internal const val DEFAULT_WHEEL_STEP = 7
     internal const val DEFAULT_PADS_ALPHA = 100
     internal const val DEFAULT_MAGIC_BUTTON_COUNT = 3
+    /** "Smart glyph alignment" ships ON: bundled glyphs center on their runtime ink box. */
+    internal const val DEFAULT_RECENTER_GLYPHS = true
 
     fun magicSymbolKey(buttonNumber: Int): String = "magicSymbol$buttonNumber"
 

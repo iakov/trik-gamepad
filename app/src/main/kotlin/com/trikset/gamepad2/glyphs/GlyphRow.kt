@@ -33,6 +33,12 @@ constructor(
    * cell edge (the touch target); [gapPx] the inter-cell margin. [recenter] is forwarded to each
    * cell's [GlyphButton.renderGlyph] (see [GlyphRendering.render]).
    *
+   * [chrome] applies per-cell visual chrome to each freshly created [GlyphButton] BEFORE its glyph
+   * renders: the caller may set a background or text color here. Order matters — applying a
+   * background AFTER the render would wipe the glyph's asymmetric ink-centering padding with the
+   * drawable's intrinsic padding (an inset ring clobbers it with the uniform inset; hit
+   * 2026-09-04), while chrome-before-render leaves the render's padding applied last.
+   *
    * The cell's layoutParams are assigned BEFORE rendering so the shared fit-cap in
    * [GlyphRendering.render] sees a fixed view height (rendering into a height-less cell skipped the
    * cap, so at large font scales a row glyph could size past its cell and clip).
@@ -43,6 +49,7 @@ constructor(
       cellSizePx: Int,
       gapPx: Int,
       recenter: Boolean = false,
+      chrome: (GlyphButton) -> Unit = {},
       onClick: (Int) -> Unit,
   ) {
     orientation = HORIZONTAL
@@ -55,6 +62,7 @@ constructor(
             // layoutParams.height, so a cap-skip here would let a row glyph size past its cell at
             // large font scales and clip (the chips "invisible glyph" report).
             layoutParams = ViewGroup.MarginLayoutParams(cellSizePx, cellSizePx)
+            chrome(this)
             renderGlyph(item.glyph, targetVisualHeightPx, recenter)
             setOnClickListener { onClick(index) }
           }
