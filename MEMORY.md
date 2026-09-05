@@ -63,6 +63,11 @@ versions risk collisions with the `minSdk*10000 + ...` formula).
   and live in the Gradle wrapper + `gradle/libs.versions.toml`; the toolchain
   rationale (incl. the Android Studio 3-release compatibility floor) is in
   `DECISIONS.md` "AGP 9.2.1 — Android Studio 3-release compatibility floor".
+- The **pre-commit `spotless apply` hook launches Gradle**, so the shell running
+  `git commit` needs `JAVA_HOME` set to JDK 21 too: without it the daemon spawns
+  under the default JRE and dies (`Module jdk.compiler not found`), failing the
+  commit (hit 2026-09-05). Commit hooks validate the same JDK21 contract as
+  every other Gradle invocation.
 - Local emulator acceleration (Windows): AEHD (Android Emulator Hypervisor
   Driver 2.2) is installed; verify with `emulator -accel-check`. Installer
   lives in the SDK:
@@ -227,6 +232,18 @@ compile failures — ~15 local runs before reading the shadow's real API.
 Rule (in TESTING.md): **3 identical failures → stop and read the shadow source,
 not tweak-and-rerun.**
 
+**Process-wide main-source singletons are aliased across Robolectric tests unless
+keyed to the Application (2026-09-05):** Robolectric boots a FRESH Application
+per test method, so a `companion`/`object` holding one instance survives across
+methods in the same JVM and points at a *previous* test's context and
+ConnectivityManager — stale-state failures that look random (the app-scoped
+`WifiNetworkTracker` singleton hit this: its static was set in test #1's app and
+never re-registered in test #2's). Key the shared instance to the
+`applicationContext` IDENTITY and re-create when it differs; a real process has
+one Application for life, so on-device single-registration behavior is
+unchanged. (This is why App-registered-callback tests must not assume a fixed
+`instance()` across tests.)
+
 **Haptic assertions:** `shadowOf(view).lastHapticFeedbackPerformed()` returns the
 haptic constant fired by `view.performHapticFeedback(...)` or \*\*`-1** when none (KEYBOARD_TAP = 3, LONG_PRESS = 0). The `ShadowView`hook records the call regardless of attach state, so Robolectric can assert haptic policy (pad: TICK on ACTION_DOWN, CLICK on ACTION_UP; none on MOVE/CANCEL/send). It is a Java getter — call it with`()\` in Kotlin. The unit suite runs under **SDK 23** (see the `[23]` test qualifier), so assert the **semantic level** (`Haptics.constant(Haptics.Level.X)`) in interaction tests, never a raw API-30+ constant — the exact generic-constant mapping is pinned in `HapticsTest`.
 
@@ -313,6 +330,26 @@ under representative load (the app connected + streaming + periodic taps).
 Emulator (Swiftshader) CPU profiles are useful, but its **gfxinfo frame timing
 is NOT comparable** (software GPU: p50 50 ms+, GPU p99 pinned) — judge frame
 timing on real hardware only.
+
+**Emulator state-CPU sampler (2026-09-05, app CPU is flat — reconnecting video
+is NOT a hotspot):** cheap per-state app-CPU measurement that needs no
+simpleperf: drive the app's robot/video prefs by writing the SharedPreferences
+file over adb (`adb push` a prefs XML, then
+`run-as <pkg> sh -c 'cp /data/local/tmp/prefs.xml shared_prefs/<pkg>_preferences.xml'`),
+`am force-stop` + relaunch the activity, then
+`adb shell top -b -n <N> -d 1` and parse the app's row — `top` columns are
+`PID USER PR NI VIRT RES SHR S %CPU %MEM TIME+ ARGS`, so %CPU is whitespace
+token 8. Live-MJPEG and server-flap states use a host-side python MJPEG server
+(PIL frames, `multipart/x-mixed-replace; boundary=...`, a heartbeat printing
+served-frame counts to prove the app is actually consuming); the emulator
+reaches the host at `10.0.2.2`, reconnect churn to a *closed* `10.0.2.2` port
+drives the bounded retry directly. Measured on the fixed build (one app-scoped
+tracker + released players): mean app CPU ≈ 6–7% in EVERY state — idle 6.8,
+live MJPEG 5.7, dead-endpoint retry 7.2, server-flap 6.4 (transient max ~14%) —
+i.e. the suspected "reconnecting video" path is cheap; the CPU-visible cost of
+churn was the now-fixed per-connect tracker/executor accumulation, not the retry
+logic. `top` on an emulator is coarse; the flat-across-states pattern repeated
+across three runs is the signal, not the absolute %.
 
 ## App protocol
 
