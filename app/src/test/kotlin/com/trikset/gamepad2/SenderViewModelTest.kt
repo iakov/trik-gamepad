@@ -42,4 +42,20 @@ class SenderViewModelTest : RobolectricTestBase() {
       sender.disconnect("test done")
     }
   }
+
+  @Test
+  fun tcpModeFactoryBuildsAWifiBoundTcpTransport() {
+    // The TCP twin: the ViewModel's default sender also carries the lazily-built Wi-Fi-bound TCP
+    // binder, exercised over a real TCP connect to a local server (the TCP branch of the factory).
+    TestTcpServer().use { server ->
+      val viewModel = SenderViewModel(RuntimeEnvironment.getApplication())
+      val sender = viewModel.sender
+      sender.setTarget("127.0.0.1", server.port)
+      sender.keepaliveTimeout = 10000000 // disable keepalive noise
+      sender.send("pad 1 0 0")
+      val drain = { org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle() }
+      assertTrue("TCP command must reach the server", server.awaitReceived("pad 1 0 0", drain))
+      sender.disconnect("test done")
+    }
+  }
 }

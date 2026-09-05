@@ -83,6 +83,14 @@ class WifiNetworkTracker private constructor(context: Context) {
     /** The process-wide tracker, or null before [App] initialized it. */
     fun instance(): WifiNetworkTracker? = shared
 
+    /**
+     * Test-only: drops the cached instance so a test can exercise the not-yet-initialized path (a
+     * Robolectric test boots a fresh Application per method, whose App.onCreate re-initializes it).
+     */
+    internal fun resetForTest() {
+      shared = null
+    }
+
     private const val TAG = "WifiNetworkTracker"
   }
 }

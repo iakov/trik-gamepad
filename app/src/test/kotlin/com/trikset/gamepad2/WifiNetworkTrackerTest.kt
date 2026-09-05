@@ -4,7 +4,10 @@ import android.content.Context
 import android.net.ConnectivityManager
 import com.trikset.gamepad2.mjpeg.MjpegView
 import com.trikset.gamepad2.video.MjpegVideoPlayer
+import java.net.DatagramSocket
+import java.net.Socket
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertSame
 import org.junit.Test
@@ -12,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowNetwork
 
 /**
  * Regression lock for the ConnectivityManager$TooManyRequestsException crash (2026-09-05, seen in
@@ -61,5 +65,35 @@ class WifiNetworkTrackerTest : RobolectricTestBase() {
         1,
         networkCallbackCount(),
     )
+  }
+
+  @Test
+  fun defaultProvidersFallBackBeforeTheAppInitializesTheTracker() {
+    // Before App.onCreate ran (simulated by the test-only reset), the default Wi-Fi provider has no
+    // tracker to read and every binder falls back to the default network instead of throwing.
+    WifiNetworkTracker.resetForTest()
+    assertEquals(null, WifiNetworkTracker.instance())
+    val wifi = ShadowNetwork.newInstance(1)
+    WifiSocketBinder().bind(Socket()).let { s ->
+      assertFalse(shadowOf(wifi).isSocketBound(s))
+      s.close()
+    }
+    WifiDatagramBinder().bind(DatagramSocket()).let { s ->
+      assertFalse(shadowOf(wifi).isSocketBound(s))
+      s.close()
+    }
+    // The opener's default provider is the same shared tracker; assert it routes to defaultOpen.
+    var defaultOpened = 0
+    val opener =
+        WifiConnectionOpener(
+            defaultOpen = { url ->
+              defaultOpened++
+              object : java.net.URLConnection(url) {
+                override fun connect() {}
+              }
+            }
+        )
+    opener.open(java.net.URL("http://127.0.0.1:1/x"))
+    assertEquals(1, defaultOpened)
   }
 }

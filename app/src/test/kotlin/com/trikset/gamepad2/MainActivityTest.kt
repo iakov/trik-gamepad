@@ -709,6 +709,15 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun setVideoUrlWithoutPreviousPlayerIsSafeAndStartsFresh() {
+    // The register sweep can run before a player exists (or after onDestroy cleared it): the
+    // replace must skip the release of a null predecessor and still install a working player.
+    setField(activity, "video", null)
+    activity.setVideoUrl("http://10.0.0.7:8080/?action=stream")
+    assertTrue("a fresh player must be installed", field(activity, "video") is VideoPlayer)
+  }
+
+  @Test
   fun setControlsVisibleShouldHideAndShowPads() {
     activity.setControlsVisible(false)
     assertEquals(View.GONE, activity.findViewById<View>(R.id.controlsOverlay)?.visibility)
