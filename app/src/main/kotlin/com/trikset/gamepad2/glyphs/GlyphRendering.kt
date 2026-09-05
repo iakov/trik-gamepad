@@ -22,10 +22,10 @@ import kotlin.math.roundToInt
  *   visualHeightEm`, so a row of different glyphs all render at the SAME visual ink height (the
  *   magic buttons' ▲ and the chips' eye look the same size despite very different em-fills);
  * * ink **centering via asymmetric padding, never a translation** (moving the whole view would
- *   shift its background off-center — the magic-button regression from 2026-08-15). The padding
- *   cancels the glyph's weighted-ink median offset from the line-box center, taken from
- *   [GlyphMetrics.medianBiasEm] when the glyph is bundled, else measured at runtime from the
- *   paint's ink bounds (the fallback for user-typed magic symbols).
+ *   shift its background/ring off-center — regressions 2026-08-15 and 2026-09-03). The smart "Smart
+ *   glyph alignment" mode (recenter=true) pads the ink-box offset measured from the paint at render
+ *   time; the OFF baseline mode (recenter=false) applies no padding and leaves the glyph where
+ *   default centering puts it.
  *
  * Consumers are thin [GlyphTextView] / [GlyphButton] views that just forward to [render]; a
  * [GlyphRow] composes them into an equalized, aligned row. This core is deliberately Every centered
@@ -59,12 +59,13 @@ object GlyphRendering {
    * alone would clip such glyphs (hit 2026-09-01: ▲ rendered zero ink, ■/● clipped to the lower
    * half).
    *
-   * [recenter] selects WHICH center is aimed at (see the "Smart glyph alignment" setting,
-   * pref_app.xml): false = the metric table's weighted-ink median (the pixel-verified default);
-   * true = the glyph's actual runtime ink-box center, measured from the paint at render time (the
-   * same fallback already used for user-typed glyphs). Both modes deliver the offset as asymmetric
-   * padding (a translation would move the glyph's own circular background — hit 2026-08-15 and
-   * 2026-09-03), so flipping the toggle only changes the target, never the vehicle.
+   * [recenter] selects the centering (see the "Smart glyph alignment" setting, pref_app.xml): false
+   * = the OFF baseline look — the glyph stays where default gravity centering puts it (no ink
+   * correction, no padding); true = the glyph's actual runtime ink-box center, measured from the
+   * paint at render time, is aimed at the view center via asymmetric padding. The ring/chrome (the
+   * view's background) covers the padded area, so only the ink moves (a translation would move the
+   * background too — hit 2026-08-15 and 2026-09-03); [recenter] only picks which centering is used,
+   * never the vehicle.
    */
   fun render(
       view: TextView,
@@ -83,10 +84,10 @@ object GlyphRendering {
       // (ascent + descent), not the ink box, and a line box taller than the view clips even
       // when the ink alone would fit. So cap at viewHeight / (fontScale * (LINE_BOX_EM +
       // 2*reserveEm)): line box + the 2*|offset| centering padding <= viewHeight. The reserve is
-      // the median bias when aiming at the weighted median, else the ink-box offset actually
-      // applied by [center] (measured here — bounds scale linearly, so the em value is
-      // size-invariant). The 90%-mass band alone under-reports glyphs with thin tails (▲ renders
-      // zero ink, ■/● clip - hit 2026-09-01).
+      // the ink-box offset actually applied by [center] (measured here — bounds scale linearly,
+      // so the em value is size-invariant) in the smart (ON) mode; the OFF baseline mode pads
+      // nothing, so its reserve is 0 and only the line box must fit. The 90%-mass band alone
+      // under-reports glyphs with thin tails (▲ renders zero ink, ■/● clip - hit 2026-09-01).
       val fontScale = view.resources.configuration.fontScale
       val reserveEm =
           if (recenter) {
@@ -100,13 +101,13 @@ object GlyphRendering {
                 )
                 .div(textSizePx)
           } else {
-            abs(metric.medianBiasEm)
+            0f
           }
       val maxFit = viewHeight / (fontScale * (GlyphMetrics.LINE_BOX_EM + 2 * reserveEm))
       if (textSizePx > maxFit) textSizePx = maxFit
     }
     view.setTextSize(TypedValue.COMPLEX_UNIT_PX, textSizePx)
-    center(view, metric, textSizePx, recenter)
+    center(view, recenter)
   }
 
   /**
@@ -116,31 +117,25 @@ object GlyphRendering {
    */
   fun centerExisting(view: TextView, recenter: Boolean = false) {
     configure(view)
-    val glyph = view.text.toString()
-    val metric = GlyphMetrics.metricFor(glyph)
-    center(view, metric, view.textSize, recenter)
+    center(view, recenter)
   }
 
   /**
-   * Centers the glyph's ink on the view center. Vertical: cancels the glyph's offset from the
-   * line-box center — the metric table's weighted-ink median ([GlyphMetrics.medianBiasEm]) when the
-   * glyph is bundled and [recenter] is false, else the ink-box center measured from the paint at
-   * render time (the [recenter] mode for bundled glyphs and the always-mode for user-typed glyphs,
-   * which have no metric). Horizontal: always the paint-measured ink box (the metric table is
-   * vertical-only; the mono advance is symmetric by construction).
+   * Positions the glyph content: the smart (ON) mode aims the glyph's ink-box center, measured from
+   * the paint at render time, at the view center; the OFF baseline mode leaves the glyph exactly
+   * where default gravity-CENTER places it and clears any padding from an earlier render.
    *
    * The offset is ALWAYS cancelled as asymmetric [android.view.View.setPaddingRelative] — never a
    * view translation, which moves the glyph together with its own background and shifts the circle
    * off-center instead of the ink (the magic-button regression from 2026-08-15 and again on
-   * 2026-09-03, when [recenter] was first wired as a translation). [recenter] only picks WHICH
-   * center is aimed at, never the vehicle.
+   * 2026-09-03, when [recenter] was first wired as a translation). The ring/background covers the
+   * padded area, so padding moves only the ink.
    */
-  private fun center(
-      view: TextView,
-      metric: GlyphMetrics.GlyphMetric?,
-      textSizePx: Float,
-      recenter: Boolean,
-  ) {
+  private fun center(view: TextView, recenter: Boolean) {
+    if (!recenter) {
+      view.setPaddingRelative(0, 0, 0, 0)
+      return
+    }
     val paint = view.paint
     val text = view.text.toString()
     val bounds = Rect()
@@ -151,11 +146,7 @@ object GlyphRendering {
     val lineCenter = (fm.ascent + fm.descent) / 2f
     val inkCenterY = (bounds.top + bounds.bottom) / 2f
     val inkCenterX = (bounds.left + bounds.right) / 2f
-    // metric.medianBiasEm is positive when the median sits ABOVE the line center, so its
-    // pixel offset is negative in the paint y-down frame (ink above -> smaller y).
-    val offsetY =
-        if (!recenter && metric != null) -metric.medianBiasEm * textSizePx
-        else inkCenterY - lineCenter
+    val offsetY = inkCenterY - lineCenter
     val offsetX = inkCenterX - (paint.measureText(text) / 2f)
     // Round to the nearest int (not truncate): truncation leaves up to a full px of un-cancelled
     // offset, which a 0.5-tolerance centering test would see.

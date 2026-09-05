@@ -21,8 +21,9 @@ constructor(
 
   /**
    * Sets [glyph] sized to [targetVisualHeightPx] of visual ink height, then centers it. [recenter]
-   * picks WHICH center is aimed at — the metric table's weighted median or the runtime ink box —
-   * never the vehicle (both deliver via asymmetric padding; see [GlyphRendering.render]).
+   * picks the centering: false = the plain baseline look (default centering, no ink correction),
+   * true = aim the runtime ink box at the view center (see [GlyphRendering.render]). The chrome
+   * ring/background is never moved — centering shifts only the ink.
    */
   fun renderGlyph(glyph: String, targetVisualHeightPx: Float, recenter: Boolean = false) {
     GlyphRendering.render(this, glyph, targetVisualHeightPx, recenter)

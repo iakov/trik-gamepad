@@ -108,26 +108,25 @@ class MagicButtonPanelTest : RobolectricTestBase() {
   }
 
   @Test
-  fun centerGlyphShouldCancelTheMetricMedianOffsetViaPadding() {
+  fun baselineModeShouldLeavePlainCenteredTextWithoutPadding() {
+    // "Smart glyph alignment" OFF = the plain baseline look: default gravity centering only, no
+    // ink correction, so no asymmetric padding at all (the button itself must not move either).
     val container = FrameLayout(context)
     panel.populate(container, 1, symbols)
     val btn = container.getChildAt(0) as Button
-    val glyph = btn.text.toString()
-    val metric = com.trikset.gamepad2.glyphs.GlyphMetrics.metricFor(glyph)
-    // The default glyph ▲ is in the metrics table, so its vertical centering cancels the
-    // weighted-ink median offset from the line-box center (medianBiasEm * textSize), NOT the
-    // paint ink-box center. padTop - padBottom + 2*offsetY == 0 with offsetY =
-    // -medianBiasEm * textSizePx.
-    assertNotNull("default glyph ▲ must have metrics", metric)
-    assertCenteringPadding(btn, -metric!!.medianBiasEm * btn.textSize)
+    assertNeverTranslated(btn)
+    assertEquals("baseline mode must not pad top", 0, btn.paddingTop)
+    assertEquals("baseline mode must not pad bottom", 0, btn.paddingBottom)
+    assertEquals("baseline mode must not pad start", 0, btn.paddingStart)
+    assertEquals("baseline mode must not pad end", 0, btn.paddingEnd)
   }
 
   @Test
   fun recenterModeShouldCenterKnownGlyphByPaintInkBoxPadding() {
-    // "Smart glyph alignment" ON: the centering target flips from the metric table's weighted
-    // median to the glyph's runtime ink-box center, but the vehicle stays asymmetric padding — the
-    // button (and its circular background) must not move (regression guard: recenter was once wired
-    // as a translation and shifted the circle instead of the ink — hit 2026-09-03).
+    // "Smart glyph alignment" ON: the glyph's runtime ink-box center is aimed at the view center,
+    // but the vehicle stays asymmetric padding — the button (and its circular background) must not
+    // move (regression guard: recenter was once wired as a translation and shifted the circle
+    // instead of the ink — hit 2026-09-03).
     val container = FrameLayout(context)
     panel.populate(container, 1, symbols, recenter = true)
     val btn = container.getChildAt(0) as Button
@@ -138,7 +137,7 @@ class MagicButtonPanelTest : RobolectricTestBase() {
     assertCenteringPadding(btn, inkOffsetY)
     // The ink-box target must differ from the metric median for this glyph (▲ carries most of its
     // ink in its base, so its median sits well below its geometric box center) — otherwise the
-    // toggle would have nothing to change and the assertion above would be vacuous.
+    // padding assertion above would be vacuous.
     val medianOffsetY = -metric!!.medianBiasEm * btn.textSize
     assertTrue(
         "▲ ink-box offset must differ from its metric median offset",
@@ -147,15 +146,21 @@ class MagicButtonPanelTest : RobolectricTestBase() {
   }
 
   @Test
-  fun unknownGlyphShouldCenterOnPaintInkBoxInBothModes() {
-    // A glyph absent from the metrics table (Ω) always centers on its paint ink box — in both the
-    // default mode and "Smart glyph alignment" ON (the metric-median path does not apply to it).
+  fun unknownGlyphShouldPadOnlyInSmartMode() {
+    // A glyph absent from the metrics table (Ω) has no centering metadata: it centers on its paint
+    // ink box in the smart (ON) mode and is left plain-centered (no padding) in the baseline (OFF)
+    // mode.
     for (recenter in arrayOf(false, true)) {
       val container = FrameLayout(context)
       panel.populate(container, 1, listOf("Ω"), recenter = recenter)
       val btn = container.getChildAt(0) as Button
       assertNeverTranslated(btn)
-      assertCenteringPadding(btn, paintInkOffsetY(btn))
+      if (recenter) {
+        assertCenteringPadding(btn, paintInkOffsetY(btn))
+      } else {
+        assertEquals("baseline mode must not pad top", 0, btn.paddingTop)
+        assertEquals("baseline mode must not pad bottom", 0, btn.paddingBottom)
+      }
     }
   }
 

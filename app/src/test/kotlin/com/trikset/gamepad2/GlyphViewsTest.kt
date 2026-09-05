@@ -1,5 +1,6 @@
 package com.trikset.gamepad2
 
+import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import com.trikset.gamepad2.glyphs.GlyphButton
@@ -8,6 +9,7 @@ import com.trikset.gamepad2.glyphs.GlyphRendering
 import com.trikset.gamepad2.glyphs.GlyphRow
 import com.trikset.gamepad2.glyphs.GlyphTextView
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -61,9 +63,10 @@ class GlyphViewsTest : RobolectricTestBase() {
 
   @Test
   fun renderCapsTextSizeWhenGlyphWouldClip() {
-    // A fixed 48dp-square cell is too small for the triangle's line box + bias padding at an
-    // equalized size; the cap must shrink the text size so the glyph stays inside the cell
-    // (regression guard — hit 2026-09-01: ▲ rendered zero ink, ■/● clipped).
+    // A fixed 48dp-square cell is too small for the triangle's line box at an equalized size; the
+    // cap must shrink the text size so the glyph stays inside the cell. Regression guard — hit
+    // 2026-09-01: ▲ rendered zero ink, ■/● clipped. The plain OFF mode pads nothing, so only the
+    // line box (no bias reserve) must fit.
     val view = GlyphTextView(context)
     view.layoutParams = ViewGroup.MarginLayoutParams(48, 48)
     view.renderGlyph("▲", 100f)
@@ -152,5 +155,72 @@ class GlyphViewsTest : RobolectricTestBase() {
     val contentHeight =
         cell.paddingTop + cell.paddingBottom + cell.textSize * GlyphMetrics.LINE_BOX_EM
     assertTrue("glyph content must fit the cell", contentHeight <= 48f + 1f)
+  }
+
+  @Test
+  fun glyphRowCellsShareOneTopLine() {
+    // Regression guard (hit 2026-09-05): a horizontal LinearLayout baseline-aligns its equal-height
+    // cells, so cells whose glyphs have different baselines (different equalized text sizes /
+    // centering padding) were shifted vertically and their full-cell ring backgrounds ended on
+    // different top lines — the chips "circles not in a row" report.
+    val row = GlyphRow(context)
+    row.populate(
+        listOf(GlyphRow.Item("1", "a"), GlyphRow.Item("2", "b"), GlyphRow.Item("▲", "c")),
+        targetVisualHeightPx = 20f,
+        cellSizePx = 120,
+        gapPx = 12,
+        recenter = false,
+    ) {}
+    assertFalse("a glyph row must not baseline-align its cells", row.isBaselineAligned)
+
+    val spec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+    row.measure(spec, spec)
+    row.layout(0, 0, row.measuredWidth, row.measuredHeight)
+    val tops = (0 until row.childCount).map { row.getChildAt(it).top }
+    assertTrue(
+        "equal fixed cells must share one top line so the rings form a row (got tops=$tops)",
+        tops.all { it == tops.first() },
+    )
+  }
+
+  @Test
+  fun recenterOffLeavesPlainCenteredTextWithoutPadding() {
+    // OFF ("Smart glyph alignment" off, baseline mode): no ink correction — default gravity
+    // centering only, so every cell keeps zero padding even after an earlier render.
+    val view = GlyphTextView(context)
+    view.layoutParams = ViewGroup.MarginLayoutParams(100, 100)
+    view.renderGlyph("1", 60f, recenter = false)
+    assertEquals(0, view.paddingTop)
+    assertEquals(0, view.paddingBottom)
+    assertEquals(0, view.paddingStart)
+    assertEquals(0, view.paddingEnd)
+  }
+
+  @Test
+  fun recenterOnPadsOnlyTheNeededSideWithTheMeasuredOffset() {
+    // The smart (ON) mode must aim the runtime ink box at the view center via asymmetric padding:
+    // exactly one vertical side gets the paint-measured offset and the other stays 0 (never a
+    // translation — a translation would move the cell's ring too). The expected magnitude is the
+    // paint's own measurement, so the assertions are conditional on that measurement, not a copy of
+    // the production math.
+    val view = GlyphTextView(context)
+    view.layoutParams = ViewGroup.MarginLayoutParams(100, 100)
+    view.renderGlyph("1", 60f, recenter = true)
+    val paint = view.paint
+    val bounds = android.graphics.Rect()
+    paint.getTextBounds("1", 0, 1, bounds)
+    val fm = paint.fontMetrics
+    val lineCenter = (fm.ascent + fm.descent) / 2f
+    val inkCenter = (bounds.top + bounds.bottom) / 2f
+    val offsetY = inkCenter - lineCenter
+    val padsOnlyOneSide = view.paddingTop == 0 || view.paddingBottom == 0
+    assertTrue("asymmetric padding must keep one side at 0", padsOnlyOneSide)
+    if (offsetY > 0.25f) {
+      assertTrue("ink below center must pad the bottom side", view.paddingBottom >= 1)
+      assertEquals(0, view.paddingTop)
+    } else if (offsetY < -0.25f) {
+      assertTrue("ink above center must pad the top side", view.paddingTop >= 1)
+      assertEquals(0, view.paddingBottom)
+    }
   }
 }

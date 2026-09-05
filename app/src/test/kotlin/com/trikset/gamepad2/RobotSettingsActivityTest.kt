@@ -12,7 +12,6 @@ import androidx.preference.PreferenceViewHolder
 import com.trikset.gamepad2.glyphs.GlyphRow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
@@ -307,9 +306,8 @@ class RobotSettingsActivityTest : RobolectricTestBase() {
   @Test
   fun chipsRowShouldDefaultToSmartGlyphAlignment() {
     // "Smart glyph alignment" ships ON (ink-box centering): a fresh install with no stored pref
-    // must
-    // render exactly as an explicit ON and visibly differ from the OFF mode — a regression guard
-    // against the fallback silently flipping the shipped look back to metric-median alignment.
+    // must render exactly as an explicit ON — a regression guard against the fallback silently
+    // flipping the shipped look back to the baseline mode.
     val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
     prefs.edit().remove(SettingsFragment.SK_RECENTER_GLYPHS).commit()
     val chips = fragment.findPreference<VideoSourceChipsPreference>(SettingsFragment.SK_VIDEO_CHIPS)
@@ -317,22 +315,29 @@ class RobotSettingsActivityTest : RobolectricTestBase() {
     chips!!.onAttached()
     try {
       val row = bindChipsRow(chips)
+      assertTrue(
+          "the chips row must carry vertical breathing room so rings clear the list divider",
+          row.paddingTop > 0 && row.paddingBottom == row.paddingTop,
+      )
       val padsAtDefault = chipsPadding(row)
       prefs.edit().putBoolean(SettingsFragment.SK_RECENTER_GLYPHS, true).commit()
       idleLooper()
       val padsAtOn = chipsPadding(row)
-      prefs.edit().putBoolean(SettingsFragment.SK_RECENTER_GLYPHS, false).commit()
-      idleLooper()
-      val padsAtOff = chipsPadding(row)
       assertEquals(
           "an unset pref must render the ON (ink-box) alignment, not the OFF mode",
-          padsAtOn,
-          padsAtDefault,
+          padsAtOn.map { it.toList() },
+          padsAtDefault.map { it.toList() },
       )
-      assertNotEquals(
-          "the OFF mode must be a visibly different alignment from the shipped ON default",
-          padsAtOff,
-          padsAtDefault,
+      prefs.edit().putBoolean(SettingsFragment.SK_RECENTER_GLYPHS, false).commit()
+      idleLooper()
+      // OFF = the plain baseline mode: no ink correction, so every cell keeps zero asymmetric
+      // padding (default gravity centering only).
+      val padsAtOff = chipsPadding(row)
+      assertTrue(
+          "the OFF baseline mode must not pad any cell (got ${
+              padsAtOff.map { it.toList() }
+          })",
+          padsAtOff.all { it.all { p -> p == 0 } },
       )
     } finally {
       chips.onDetached()
@@ -354,8 +359,12 @@ class RobotSettingsActivityTest : RobolectricTestBase() {
     org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
   }
 
-  private fun chipsPadding(row: GlyphRow): List<Int> =
-      (0 until row.childCount).map { (row.getChildAt(it) as Button).paddingTop }
+  /** Per-cell asymmetric paddings ([paddingStart, paddingTop, paddingEnd, paddingBottom]). */
+  private fun chipsPadding(row: GlyphRow): List<IntArray> =
+      (0 until row.childCount).map {
+        val b = row.getChildAt(it) as Button
+        intArrayOf(b.paddingStart, b.paddingTop, b.paddingEnd, b.paddingBottom)
+      }
 
   private fun presetRows(): List<Preference> {
     val category = fragment.findPreference<PreferenceCategory>(SettingsFragment.SK_ROBOT_PRESETS)

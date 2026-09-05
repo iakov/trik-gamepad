@@ -316,12 +316,18 @@ import by `scripts/glyph_metrics.py`):
   90%-mass band): `textSize = target / visualHeightEm`, so a row of different
   glyphs all render at the same visual ink height. The magic buttons target 60%
   of the circle diameter; the chips equalize across digits/eye/usb.
-- **Ink centering on the glyph's true visual center**: the renderer cancels the
-  ink's offset from the line-box center with asymmetric padding, never a view
-  translation — a translation would move the background too (regression:
-  2026-08-15). The shipped mode (the "Smart glyph alignment" setting, **ON by
-  default**) aims at the runtime ink box measured from the paint at render time;
-  OFF falls back to the metric table's weighted-ink median (`medianBiasEm`).
+- **Ink centering**: the "Smart glyph alignment" setting (**ON by default**)
+  cancels the ink's offset from the line-box center with asymmetric padding,
+  never a view translation — a translation would move the ring/background too
+  (regressions 2026-08-15 and 2026-09-03). The smart mode aims the glyph's
+  runtime ink box (measured from the paint at render time) at the ring center;
+  **OFF is the plain baseline look** — no ink correction at all, the glyph sits
+  where default TextView centering puts it.
+- **Rows top-align their cells** (`GlyphRow` disables LinearLayout baseline
+  alignment): equal fixed cells share one top line, so the full-cell rings form
+  a true row (hit 2026-09-05 — baseline alignment staggered the chips' circles
+  in OFF, and overflow cells clipped at the row's bottom divider). The chips
+  row also carries vertical padding so the rings stay clear of the list divider.
 - **Never clip**: Android lays out the glyph's LINE box (ascent+descent,
   `LINE_BOX_EM ≈ 1.16em`), so `textSize` is capped at
   `viewHeight / (fontScale × (LINE_BOX_EM + 2·|reserveEm|))`, where `reserveEm`

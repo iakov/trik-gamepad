@@ -13,14 +13,16 @@ package com.trikset.gamepad2.glyphs
  * visualHeightEm - central 90%-mass band of the glyph's ink / em. A glyph's VISUAL height at
  * textSize T is T * visualHeightEm, so a row equalizes glyphs by setting textSize =
  * targetVisualHeight / visualHeightEm. medianBiasEm - signed offset of the weighted-ink median from
- * the line-box center (positive = median above center), / em. Cancelled via asymmetric padding
- * (GlyphRendering), never a translation. inkBoxEm - full ink-box height (thin tails included) / em.
- * Larger than visualHeightEm for glyphs with thin tails (a triangle's point carries little mass, so
- * the band under-reports its true box).
+ * the line-box center (positive = median above center), / em. inkBoxEm - full ink-box height (thin
+ * tails included) / em; larger than visualHeightEm for glyphs with thin tails (a triangle's point
+ * carries little mass, so the band under-reports its true box). medianBiasEm/inkBoxEm are currently
+ * NOT consumed by GlyphRendering (the OFF baseline mode no longer aims at the weighted median) —
+ * retained by the generator for optical/regression comparison.
  *
  * LINE_BOX_EM caps the renderer's textSize: Android lays out the glyph's line box (ascent +
- * descent), so textSize * (LINE_BOX_EM + 2*|medianBiasEm|) must fit the fixed view or the glyph
- * clips even when its ink box alone would fit.
+ * descent), so textSize * (LINE_BOX_EM + 2*|reserve|) must fit the fixed view or the glyph clips
+ * even when its ink box alone would fit, where reserve is the centering offset the smart mode
+ * actually pads (0 in the plain OFF mode).
  */
 object GlyphMetrics {
   const val LINE_BOX_EM = 1.1650f

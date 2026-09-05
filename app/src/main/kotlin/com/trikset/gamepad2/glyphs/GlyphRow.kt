@@ -6,7 +6,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 
 /**
- * A horizontal row of [GlyphButton]s that share ONE visual center line and ONE target ink height:
+ * A horizontal row of [GlyphButton]s that share ONE target ink height and ONE visual center line:
  * every cell gets the same fixed size, and each glyph's text size is derived from its own
  * [GlyphMetrics.visualHeightEm] so different glyphs (the digits 1/2, the eye, the usb icon) render
  * at the same VISUAL height - the "glyphs in a row must be visually aligned" rule (DECISIONS.md
@@ -17,6 +17,12 @@ import android.widget.LinearLayout
  * Cells are configured via [Item] (glyph, contentDescription); the tap action is per-cell
  * [onClick]. Use for the video-source preset chips (Settings > Video) and anywhere else a row of
  * tappable glyphs must stay aligned.
+ *
+ * Baseline alignment is disabled ([baselineAligned] = false): a horizontal LinearLayout otherwise
+ * shifts equal-height cells vertically to line up their text baselines, so the cells' full-size
+ * ring backgrounds end up on different top lines (the chips row "circles not in a row" report,
+ * 2026-09-05, visible when per-glyph centering offsets differ, e.g. the OFF mode). Top-aligned
+ * cells keep every ring on one shared line.
  */
 class GlyphRow
 @JvmOverloads
@@ -53,6 +59,10 @@ constructor(
       onClick: (Int) -> Unit,
   ) {
     orientation = HORIZONTAL
+    // Equal fixed cells must share one top line: with baseline alignment a LinearLayout shifts
+    // each cell vertically to line up its text baseline, staggering the full-cell ring
+    // backgrounds (see the class doc — hit 2026-09-05).
+    isBaselineAligned = false
     removeAllViews()
     items.forEachIndexed { index, item ->
       val button =

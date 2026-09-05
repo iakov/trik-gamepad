@@ -42,7 +42,7 @@ touch one.
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral, ScaleMode FIT/CROP, color rename, FPS integer+hysteresis, thread-safety audit, video-source preset chips, share-in images ZIP, VideoStreamLoader deletion | [2026-09-05] Wi-Fi network tracker is a single app-scoped instance (TooManyRequests crash) |
 | Workflows | fork-only, releases | [2026-08-22] Release via signed tags + GH releases |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
-| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-09-05] Video-source preset chips: ring = full 48dp cell border (Option B) |
+| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-09-05] Chips circles in a row + OFF = plain baseline centering |
 | Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-20] Device-identifier pre-commit hook + gate step |
 | Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-27] run_bounded hang-proof redesign |
 | Build & versioning | package naming, minSdk, versionCode formula, release signing | [2026-08-22] Package rename to com.trikset.gamepad2 |
@@ -1846,6 +1846,61 @@ ______________________________________________________________________
   not state").
 
 ## UX & accessibility & i18n
+
+### [2026-09-05] Chips circles in a row + OFF = plain baseline centering
+
+- **Type:** problem-avoiding (device-pixel verified: the video-chip circles were
+  not in a row in OFF mode) with a `Part:` design-clarifying change to the OFF
+  mode semantics.
+
+- **Problem:** on the physical device (Galaxy S10e, API 36), the robot-settings
+  chips row looked broken with the "Smart glyph alignment" toggle OFF: the four
+  green circles were not vertically aligned (ring tops at y = 58/54/52/53, a ~6px
+  stagger) and the lower circles' bottom arcs were clipped flush at the row's
+  divider line ("lower bound of the circle cut by the list low line"). The glyphs
+  inside were fine. Root cause (found by pixel analysis, not code reading): a
+  `LinearLayout` baseline-aligns its children by default, and `GlyphRow` never
+  disabled it — equal fixed-size cells were shifted vertically to line up their
+  per-glyph text baselines (different equalized text sizes + asymmetric padding),
+  so the full-cell ring backgrounds landed on different top lines; cells that
+  overflowed the row height were clipped at the item's bottom boundary. The OFF
+  mode exposed it because its per-glyph offsets spread baselines wider (~6px) than
+  the ON mode's measured offsets (~2px). Separately, the OFF mode's centering
+  target (the static metric-table weighted median) mismatched the user's mental
+  model of "off = simple centered text".
+
+- **Alternatives considered:** (a) keep the median-target OFF and only fix the
+  stagger (rejected — user explicitly wants OFF to be plain centered text, and the
+  median target is what made digits look off-center in the first place); (b) a
+  physical two-view split per glyph (ring view + inner glyph view) to isolate the
+  glyph (rejected — pixel-identical to the existing single-view asymmetric-padding
+  model, just more plumbing); (c) the chosen fix.
+
+- **Chosen solution:** three coordinated changes in the shared glyph core and the
+  chips row: (1) `GlyphRow.populate` disables baseline alignment
+  (`isBaselineAligned = false`) so equal cells share one top line and never
+  overflow the row bottom; (2) the chips preference row (`pref_video_source_chips`)
+  gains 12dp vertical padding so the rings keep clear of the list divider; (3) the
+  OFF (`recenter = false`) mode becomes the **plain baseline look** — `center()`
+  applies no asymmetric padding at all (zero offsets, `reserveEm` 0), leaving the
+  glyph exactly where default gravity centering puts it; ON (`recenter = true`)
+  keeps the measured ink-box centering. `medianBiasEm`/`inkBoxEm` in the generated
+  `GlyphMetrics` table are retained but no longer consumed by `GlyphRendering`.
+
+- **Why:** the stagger was a layout-level alignment bug (the HUD magic-button row
+  already set `baselineAligned=false`; the chips row did not); disabling it fixes
+  the circles in both modes by construction. The OFF redefinition matches the
+  setting's own summary strings ("baseline alignment") and the user's requirement,
+  and removes the weighted-median target that never matched the runtime ink box.
+
+- **Out of scope / consequences:** on-device pixel proof (both modes): all four
+  rings share one line — ON tops/bottoms 686–811, OFF 684–809, top & bottom spread
+  0px; divider gap 33px (~12dp); ON glyph ink-box centers within 1px of the ring
+  centers, OFF glyphs sit at plain line-box centering. The earlier "[2026-09-04]
+  Smart glyph alignment ships ON" framing of OFF = "metric median reachable as the
+  OFF mode" is superseded. Robolectric can't raster glyph pixels, so the
+  alignment/centering contract is guarded structurally (OFF = zero padding; ON =
+  asymmetric padding derived from the paint) plus the on-device measurement.
 
 ### [2026-08-27] Display-cutout full-bleed window (HONOR dead-band bug)
 

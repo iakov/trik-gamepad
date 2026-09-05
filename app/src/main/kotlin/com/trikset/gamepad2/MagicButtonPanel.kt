@@ -28,9 +28,9 @@ class MagicButtonPanel(
   private var container: ViewGroup? = null
 
   /**
-   * Builds the buttons into [container]. [recenter] picks WHICH ink center is aimed at — the metric
-   * table's weighted median or the runtime ink box (the "Smart glyph alignment" setting; see
-   * [GlyphRendering.render]); both deliver via asymmetric padding.
+   * Builds the buttons into [container]. [recenter] picks the glyph centering (the "Smart glyph
+   * alignment" setting; see [GlyphRendering.render]): false = the plain baseline look (default
+   * centering, no ink correction); true = aim the runtime ink box at the circle center.
    */
   fun populate(container: ViewGroup, count: Int, symbols: List<String>, recenter: Boolean = false) {
     this.container = container
