@@ -15,6 +15,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -589,10 +590,13 @@ class MainActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun createPadWithUnknownIdShouldBeSafe() {
+  fun createPadWithUnknownIdShouldThrow() {
     val m = method(activity, "createPad", Int::class.javaPrimitiveType!!, String::class.java)
-    m.invoke(activity, 999999, "1")
-    // No pad with that id -> the null branch is safe.
+    val e =
+        assertThrows(java.lang.reflect.InvocationTargetException::class.java) {
+          m.invoke(activity, 999999, "1")
+        }
+    assertNotNull("root cause must be the requireNotNull failure", e.cause)
   }
 
   @Test

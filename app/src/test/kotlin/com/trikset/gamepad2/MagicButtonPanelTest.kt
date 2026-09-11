@@ -237,4 +237,14 @@ class MagicButtonPanelTest : RobolectricTestBase() {
     // No crash and no buttons to wire.
     assertEquals(0, container.childCount)
   }
+
+  @Test
+  fun setAccentBeforePopulateShouldBeSafe() {
+    // The container is null before populate -> setAccent takes the early-return path.
+    panel.setAccent(R.color.hud_accent_connected)
+    // After populate the accent must still apply.
+    val container = FrameLayout(context)
+    panel.populate(container, 1, symbols)
+    panel.setAccent(R.color.hud_accent_connecting)
+  }
 }

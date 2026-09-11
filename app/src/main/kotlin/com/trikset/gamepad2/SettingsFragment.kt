@@ -93,12 +93,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
      * before prefs are saved).
      */
     fun effectiveVideoUri(prefs: SharedPreferences, hostOverride: String?): String {
-      val host =
-          hostOverride
-              ?: prefs.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS)
-              ?: DEFAULT_HOST_ADDRESS
+      val host = hostOverride ?: prefs.readString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS)
       val defaultUri = VideoSourceChips.targetFor(null, host, VideoSourceChip.CAMERA_1).orEmpty()
-      return prefs.getString(SK_VIDEO_URI, defaultUri) ?: defaultUri
+      return prefs.readString(SK_VIDEO_URI, defaultUri)
     }
 
     /** Builds a fragment for the app settings (pref_app.xml) or robot settings (pref_robot.xml). */
@@ -121,11 +118,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
   /** One-tap copy of the configured robot IP (debugging convenience). */
   private fun initializeCopyRobotIpField() {
-    val myActivity = activity ?: return
+    val myActivity = requireActivity()
     val copy = findPreference<Preference>(SK_COPY_ROBOT_IP) ?: return
     copy.onPreferenceClickListener = Preference.OnPreferenceClickListener {
       val prefs = copy.sharedPreferences
-      val host = prefs?.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
+      val host = prefs?.readString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
       myActivity.copyToClipboard(SK_HOST_ADDRESS, host)
       true
     }
@@ -143,10 +140,10 @@ class SettingsFragment : PreferenceFragmentCompat() {
   }
 
   private fun applyVideoSourceChip(chip: VideoSourceChip) {
-    val myActivity = activity ?: return
+    val myActivity = requireActivity()
     val prefs = PreferenceManager.getDefaultSharedPreferences(requireContext())
-    val storedUri = prefs.getString(SK_VIDEO_URI, "") ?: ""
-    val host = prefs.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
+    val storedUri = prefs.readString(SK_VIDEO_URI, "")
+    val host = prefs.readString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS)
     val targetUri = VideoSourceChips.targetFor(storedUri, host, chip)
     if (targetUri == null) {
       Toast.makeText(
@@ -164,7 +161,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
   }
 
   private fun initializeAboutSystemField() {
-    val myActivity = activity ?: return
+    val myActivity = requireActivity()
     // Only present in the app-settings screen (not the robot/target screen).
     val aboutSystem = findPreference<Preference>(SK_ABOUT_SYSTEM) ?: return
     // Resources.getDisplayMetrics() is the non-deprecated source of the default
@@ -198,7 +195,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
    * "Share without editing" is set / no editor exists).
    */
   private fun initializeReportIssueField() {
-    val myActivity = activity ?: return
+    val myActivity = requireActivity()
     val report = findPreference<Preference>(SK_REPORT_ISSUE) ?: return
     report.onPreferenceClickListener = Preference.OnPreferenceClickListener {
       ReportSharer.share(myActivity, buildDiagnosticsReport())
@@ -208,7 +205,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
   /** "Copy report": clipboard copy of the full report text. */
   private fun initializeCopyReportField() {
-    val myActivity = activity ?: return
+    val myActivity = requireActivity()
     val copy = findPreference<Preference>(SK_COPY_REPORT) ?: return
     copy.onPreferenceClickListener = Preference.OnPreferenceClickListener {
       myActivity.copyToClipboard(getString(R.string.copy_report), buildDiagnosticsReport())
@@ -218,7 +215,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
   /** "View log": in-app read-only dialog with the recent AppLog tail for self-diagnosis. */
   private fun initializeViewLogField() {
-    val myActivity = activity ?: return
+    val myActivity = requireActivity()
     val viewLog = findPreference<Preference>(SK_VIEW_LOG) ?: return
     viewLog.onPreferenceClickListener = Preference.OnPreferenceClickListener {
       val lines = AppLog.tail(LOG_DIALOG_MAX_LINES)
@@ -235,7 +232,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
   /** "Open-source licenses": read-only dialog with the bundled font/license texts (res/raw). */
   private fun initializeOpenSourceLicensesField() {
-    val myActivity = activity ?: return
+    val myActivity = requireActivity()
     val licenses = findPreference<Preference>(SK_OPEN_SOURCE_LICENSES) ?: return
     licenses.onPreferenceClickListener = Preference.OnPreferenceClickListener {
       val texts =
@@ -377,7 +374,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
   /** "Button symbols…": dialog to edit the 5 glyphs; summary = the resolved glyphs joined. */
   private fun initializeMagicSymbolsField() {
-    val myActivity = activity ?: return
+    val myActivity = requireActivity()
     val symbols = findPreference<Preference>(SK_MAGIC_SYMBOLS) ?: return
     val store = MagicSymbolsStore(PreferenceManager.getDefaultSharedPreferences(requireContext()))
     symbols.summary = store.readAll().joinToString(" ")
@@ -406,9 +403,9 @@ class SettingsFragment : PreferenceFragmentCompat() {
         Toast.makeText(requireContext(), R.string.preset_name_required, Toast.LENGTH_SHORT).show()
         false
       } else {
-        val host = prefs.getString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS) ?: DEFAULT_HOST_ADDRESS
-        val port = prefs.getString(SK_HOST_PORT, DEFAULT_HOST_PORT) ?: DEFAULT_HOST_PORT
-        val videoUri = prefs.getString(SK_VIDEO_URI, "") ?: ""
+        val host = prefs.readString(SK_HOST_ADDRESS, DEFAULT_HOST_ADDRESS)
+        val port = prefs.readString(SK_HOST_PORT, DEFAULT_HOST_PORT)
+        val videoUri = prefs.readString(SK_VIDEO_URI, "")
         store.save(name, host, port, videoUri)
         refreshPresetRows(category, store)
         Toast.makeText(
@@ -423,7 +420,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
     val delete = findPreference<Preference>(SK_DELETE_PRESET)
     delete?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-      val myActivity = activity ?: return@OnPreferenceClickListener true
+      val myActivity = requireActivity()
       val names = store.all().values.map { it.name }.sorted()
       if (names.isEmpty()) {
         Toast.makeText(requireContext(), R.string.no_presets_saved, Toast.LENGTH_SHORT).show()
@@ -456,7 +453,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         category.removePreference(pref)
       }
     }
-    val myActivity = activity ?: return
+    val myActivity = requireActivity()
     for (preset in store.all().values.sortedBy { it.name }) {
       val row = Preference(myActivity)
       row.title = preset.name
@@ -529,7 +526,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
    * screen gets an "App settings" row (the gamepad's IP chip is the other robot-settings entry).
    */
   private fun initializeScreenLinks() {
-    val myActivity = activity ?: return
+    val myActivity = requireActivity()
     val openRobot = findPreference<Preference>(SK_OPEN_ROBOT_SETTINGS)
     openRobot?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
       myActivity.startActivity(

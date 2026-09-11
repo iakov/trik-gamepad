@@ -14,6 +14,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -197,11 +198,13 @@ class RobotSettingsActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun copyRobotIpClickWithoutActivityShouldBeSafe() {
+  fun copyRobotIpClickWithoutActivityShouldThrow() {
     val fragment = SettingsFragment()
     val method = fragment.javaClass.getDeclaredMethod("initializeCopyRobotIpField")
     method.isAccessible = true
-    method.invoke(fragment)
+    assertThrows(java.lang.reflect.InvocationTargetException::class.java) {
+      method.invoke(fragment)
+    }
   }
 
   @Test

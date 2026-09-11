@@ -719,6 +719,40 @@ ______________________________________________________________________
   `isLoggable` defaults to `level >= INFO`, so the DEBUG-gate false branches
   were already covered — the test forces the true side.
 
+### [2026-09-11] Branch gate 85% — idiomatic-nullability refactor
+
+- **Type:** problem-avoiding (silent branch-coverage drift; dead null-branch
+  tax on the ratio).
+- **Problem:** the BRANCH gate sat at 0.83 (C36) to absorb the ±1 CI jitter,
+  but the absolute ratio was dragged down by ~40 structurally-dead null branches
+  (`?: default` after `getString(key, nonNullDefault)`, defensive `activity ?:
+  return` in fragment init helpers, `if (btnSettings != null)` on
+  layout-guaranteed views). These branches were never coverable and inflated
+  the total branch count.
+- **Alternatives considered:** keep 0.83 and ignore the dead-branch tax (leaves
+  the ratio an unreliable metric for the real code); add tests for the dead
+  branches via reflection (perpetuates the noise, not the signal); refactor the
+  null branches away via typed guarantees.
+- **Chosen solution:** idiomatic-Kotlin refactor: (a) `SharedPreferences.readString()`
+  helper returning `String` (non-null-contract, drops the un-coverable `?: default`),
+  (b) `requireActivity()` in SettingsFragment init methods (safe — called only
+  during `onCreatePreferences` where the fragment is always attached),
+  (c) `requireNotNull(findViewById(...))` for layout-guaranteed chrome views
+  (btnSettings, targetChip, leftPad, rightPad), (d) `View.doOnLayout` replacing
+  the manual `post{post{}}` retry guard, (e) then targeted new tests (`metricFor`
+  empty/unknown paths, `newFile` dir-exists path, `setAccent` early-return) to
+  bring the ratio from 84.94% to 85.19%.
+- **WHY:** total branches dropped from 1261→1215 (−46), covered branches from
+  1060→1035 (−25), but the ratio went from 84.06%→85.19%. The absolute drop is
+  healthy — 21 un-coverable branches removed. The new ratio has 2 margin over
+  0.85, absorbing the ±1 CI jitter.
+- **Out of scope / consequences:** the LINE gate stays at 0.95 (measured 0.964);
+  the `?.:` dead branches intentionally remain where they guard genuinely nullable
+  values (findViewById of views conditionally absent across settings screens,
+  `findPreference` which can return null on the other screen's XML). Three tests
+  changed from "should be safe without activity" to "should throw" reflecting the
+  new fail-fast contract.
+
 ______________________________________________________________________
 
 ## CI & emulator

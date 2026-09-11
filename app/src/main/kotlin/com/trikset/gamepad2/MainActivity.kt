@@ -20,6 +20,7 @@ import android.widget.Toast
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.WindowCompat
+import androidx.core.view.doOnLayout
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -117,11 +118,9 @@ class MainActivity :
   private var previousConnectionState: ConnectionState? = null
 
   private fun createPad(id: Int, strId: String) {
-    val pad = findViewById<SquareTouchPadLayout>(id)
-    if (pad != null) {
-      pad.padName = "pad $strId"
-      pad.sender = senderService
-    }
+    val pad = requireNotNull(findViewById<SquareTouchPadLayout>(id))
+    pad.padName = "pad $strId"
+    pad.sender = senderService
   }
 
   override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
@@ -182,50 +181,46 @@ class MainActivity :
         runOnUiThread { connectionFeedback.error(message) }
       }
     }
-    val btnSettings = findViewById<Button>(R.id.btnSettings)
-    if (btnSettings != null) {
-      btnSettings.isHapticFeedbackEnabled = true
-      btnSettings.setOnClickListener {
-        btnSettings.haptic(Haptics.Level.HEAVY)
-        startActivity(Intent(this, SettingsActivity::class.java))
-      }
-      // Offset the gear button and target chip past the display cutout (punch-hole camera on the
-      // left edge in landscape). safeInsetLeft is the pixel width of the camera notch.
-      // Only increases the left margin — never reduces it below the XML layout default.
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-        val mainView = findViewById<View>(R.id.main)
-        mainView.setOnApplyWindowInsetsListener { _, insets ->
-          val cutoutPx = insets.displayCutout?.safeInsetLeft ?: 0
-          val halfGlyph = resources.getDimensionPixelSize(R.dimen.hud_half_glyph)
-          val requiredMargin = cutoutPx + halfGlyph
-          val gearLp = btnSettings.layoutParams as ViewGroup.MarginLayoutParams
-          val newGearMargin = maxOf(gearLp.marginStart, requiredMargin)
-          if (gearLp.marginStart != newGearMargin) {
-            gearLp.marginStart = newGearMargin
-            btnSettings.layoutParams = gearLp
-          }
-          findViewById<View>(R.id.targetChip)?.let { chip ->
-            val chipLp = chip.layoutParams as ViewGroup.MarginLayoutParams
-            val newChipMargin = maxOf(chipLp.marginStart, requiredMargin)
-            if (chipLp.marginStart != newChipMargin) {
-              chipLp.marginStart = newChipMargin
-              chip.layoutParams = chipLp
-            }
-          }
-          insets
+    val btnSettings = requireNotNull(findViewById<Button>(R.id.btnSettings))
+    btnSettings.isHapticFeedbackEnabled = true
+    btnSettings.setOnClickListener {
+      btnSettings.haptic(Haptics.Level.HEAVY)
+      startActivity(Intent(this, SettingsActivity::class.java))
+    }
+    // Offset the gear button and target chip past the display cutout (punch-hole camera on the
+    // left edge in landscape). safeInsetLeft is the pixel width of the camera notch.
+    // Only increases the left margin — never reduces it below the XML layout default.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+      val mainView = findViewById<View>(R.id.main)
+      mainView.setOnApplyWindowInsetsListener { _, insets ->
+        val cutoutPx = insets.displayCutout?.safeInsetLeft ?: 0
+        val halfGlyph = resources.getDimensionPixelSize(R.dimen.hud_half_glyph)
+        val requiredMargin = cutoutPx + halfGlyph
+        val gearLp = btnSettings.layoutParams as ViewGroup.MarginLayoutParams
+        val newGearMargin = maxOf(gearLp.marginStart, requiredMargin)
+        if (gearLp.marginStart != newGearMargin) {
+          gearLp.marginStart = newGearMargin
+          btnSettings.layoutParams = gearLp
         }
-        mainView.requestApplyInsets()
+        findViewById<View>(R.id.targetChip)?.let { chip ->
+          val chipLp = chip.layoutParams as ViewGroup.MarginLayoutParams
+          val newChipMargin = maxOf(chipLp.marginStart, requiredMargin)
+          if (chipLp.marginStart != newChipMargin) {
+            chipLp.marginStart = newChipMargin
+            chip.layoutParams = chipLp
+          }
+        }
+        insets
       }
+      mainView.requestApplyInsets()
     }
 
-    val targetChip = findViewById<View>(R.id.targetChip)
-    if (targetChip != null) {
-      // The IP chip opens the robot/target settings (host, port, video, presets).
-      targetChip.setOnClickListener {
-        // The chip is a button too — it vibrates like the rest of the HUD controls.
-        targetChip.haptic(Haptics.Level.HEAVY)
-        startActivity(Intent(this, RobotSettingsActivity::class.java))
-      }
+    val targetChip = requireNotNull(findViewById<View>(R.id.targetChip))
+    // The IP chip opens the robot/target settings (host, port, video, presets).
+    targetChip.setOnClickListener {
+      // The chip is a button too — it vibrates like the rest of the HUD controls.
+      targetChip.haptic(Haptics.Level.HEAVY)
+      startActivity(Intent(this, RobotSettingsActivity::class.java))
     }
 
     // Child order in activity_main.xml IS the z-order: the pads layer (controlsOverlay) is
@@ -476,13 +471,7 @@ class MainActivity :
             )
     magicButtons.populate(buttonsView, count, symbols, recenter, sizePercent)
 
-    buttonsView.post {
-      if (buttonsView.top == 0 || buttonsView.height == 0) {
-        buttonsView.post { applyButtonMargin(mainView, buttonsView) }
-      } else {
-        applyButtonMargin(mainView, buttonsView)
-      }
-    }
+    buttonsView.doOnLayout { applyButtonMargin(mainView, buttonsView) }
   }
 
   private fun applyButtonMargin(mainView: View, buttonsView: View) {

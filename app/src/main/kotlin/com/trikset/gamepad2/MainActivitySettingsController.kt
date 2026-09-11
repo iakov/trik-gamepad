@@ -7,6 +7,10 @@ import androidx.preference.PreferenceManager
 import java.net.URI
 import java.util.Locale
 
+/** Non-null-returning read of a String preference (the default is the contract). */
+internal fun SharedPreferences.readString(key: String, default: String): String =
+    getString(key, default) ?: default
+
 /**
  * Owns [MainActivity]'s preference-change handling: retargets the [sender] on host/port changes,
  * parses the video URL, animates pad opacity, clamps the wheel step and validates the keepalive
@@ -82,16 +86,16 @@ class MainActivitySettingsController(
    */
   fun onPreferenceChanged(sharedPreferences: SharedPreferences, changedKey: String? = null) {
     val addr =
-        sharedPreferences.getString(
+        sharedPreferences.readString(
             SettingsFragment.SK_HOST_ADDRESS,
             SettingsFragment.DEFAULT_HOST_ADDRESS,
-        ) ?: SettingsFragment.DEFAULT_HOST_ADDRESS
+        )
     var portNumber = DEFAULT_PORT
     val portStr =
-        sharedPreferences.getString(
+        sharedPreferences.readString(
             SettingsFragment.SK_HOST_PORT,
             SettingsFragment.DEFAULT_HOST_PORT,
-        ) ?: SettingsFragment.DEFAULT_HOST_PORT
+        )
     try {
       portNumber = portStr.toInt()
     } catch (e: NumberFormatException) {
@@ -103,8 +107,7 @@ class MainActivitySettingsController(
     // per-preset transport is deferred until the robot supports UDP). A change disconnects and the
     // next command reconnects over the new transport.
     val transportKey =
-        sharedPreferences.getString(SettingsFragment.SK_TRANSPORT, TRANSPORT_DEFAULT)
-            ?: TRANSPORT_DEFAULT
+        sharedPreferences.readString(SettingsFragment.SK_TRANSPORT, TRANSPORT_DEFAULT)
     sender.transportMode =
         if (transportKey.equals(TRANSPORT_UDP, ignoreCase = true)) {
           TransportMode.UDP
@@ -188,11 +191,11 @@ class MainActivitySettingsController(
     try {
       val timeout =
           sharedPreferences
-              .getString(
+              .readString(
                   SettingsFragment.SK_KEEPALIVE,
                   SenderService.DEFAULT_KEEPALIVE.toString(),
               )
-              ?.toInt() ?: SenderService.DEFAULT_KEEPALIVE
+              .toInt()
       if (timeout < SenderService.MINIMAL_KEEPALIVE) {
         ui.toast(
             String.format(

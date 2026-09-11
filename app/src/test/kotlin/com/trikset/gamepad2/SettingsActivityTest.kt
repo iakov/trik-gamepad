@@ -8,6 +8,7 @@ import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -54,13 +55,13 @@ class SettingsActivityTest : RobolectricTestBase() {
   }
 
   @Test
-  fun aboutSystemClickWithoutActivityShouldBeSafe() {
-    // A fragment never attached to an activity -> initializeAboutSystemField
-    // returns early via the `activity ?: return` guard.
+  fun aboutSystemClickWithoutActivityShouldThrow() {
     val fragment = SettingsFragment()
     val method = fragment.javaClass.getDeclaredMethod("initializeAboutSystemField")
     method.isAccessible = true
-    method.invoke(fragment)
+    assertThrows(java.lang.reflect.InvocationTargetException::class.java) {
+      method.invoke(fragment)
+    }
   }
 
   @Test

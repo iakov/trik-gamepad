@@ -11,6 +11,7 @@ import com.trikset.gamepad2.glyphs.GlyphTextView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -222,5 +223,15 @@ class GlyphViewsTest : RobolectricTestBase() {
       assertTrue("ink above center must pad the top side", view.paddingTop >= 1)
       assertEquals(0, view.paddingBottom)
     }
+  }
+
+  @Test
+  fun metricForEmptyGlyphShouldReturnNull() {
+    assertNull(GlyphMetrics.metricFor(""))
+  }
+
+  @Test
+  fun metricForUnknownGlyphShouldReturnNull() {
+    assertNull(GlyphMetrics.metricFor("\uD83E\uDD16"))
   }
 }
