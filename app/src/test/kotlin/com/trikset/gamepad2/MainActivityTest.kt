@@ -746,7 +746,11 @@ class MainActivityTest : RobolectricTestBase() {
     // Second call must preserve the margin (no double-growing).
     activity.setMagicButtons(5, listOf("▲", "■", "●", "✕", "◆"), 100)
     org.robolectric.shadows.ShadowLooper.idleMainLooper()
-    assertEquals("margin kept stable", lp.bottomMargin, overlay.layoutParams.let { (it as ViewGroup.MarginLayoutParams).bottomMargin })
+    assertEquals(
+        "margin kept stable",
+        lp.bottomMargin,
+        overlay.layoutParams.let { (it as ViewGroup.MarginLayoutParams).bottomMargin },
+    )
   }
 
   @Test
