@@ -1476,6 +1476,36 @@ screen; (4) settings-screen right padding for landscape nav bars; (5) coverage p
   to 0.83 (1047/1261) to keep a stable margin.
 - **Retrospective** — MEMORY.md "Campaign 36 execution run".
 
+## Campaign 37 — idiomatic nullability refactor + branch gate to 85% (2026-09-11)
+
+Scope (user-driven, auto mode, single-branch no-PR): raise the branch coverage
+gate to 85% by *reducing* the dead-null-branch tax instead of adding more tests:
+(1) `SharedPreferences.readString()` non-null-contract helper killing the
+un-coverable `?: default` after `getString(key, nonNullDefault)`;
+(2) `requireActivity()` in SettingsFragment init helpers (safe — only called
+while attached during onCreatePreferences); (3) `requireNotNull(findViewById)` for
+layout-guaranteed chrome (btnSettings, targetChip, leftPad, rightPad);
+(4) `View.doOnLayout` replacing the manual `post{post{}}` retry guard; (5) targeted
+new tests for the remaining trivially-coverable paths (`GlyphMetrics.metricFor`
+empty/unknown, `newFile` dir-exists, `setAccent` early-return).
+
+| Estimated | Actual |
+|-----------|--------|
+| — | ≈30 m (excluding the two CI-fix loops) |
+
+- **Commits** — `e337c59` (idiomatic nullability + gate 0.85), `b410724`
+  (newFile test: ShadowSystemClock doesn't wrap java.lang.System.currentTimeMillis),
+  `87077f2` (scrub device model codes from the C36 retro — caught by the
+  device-identifier gate, which re-failed every push until the scrub landed).
+- **Verification** — canonical gate fully green locally (test, lint, detekt,
+  spotbugs, jacoco + coverage gate); CI green on the pushed head. Branch coverage
+  84.06% → **85.19%**: total branches 1261 → 1215 (−46, of which 21 were
+  un-coverable dead null branches), covered 1060 → 1035, ratio up. LINE 96.4%.
+- **Decision** — DECISIONS.md "[2026-09-11] Branch gate 85% — idiomatic-nullability
+  refactor": the coverable-code ratio is the signal, not the absolute total; the
+  refactor removed dead branches the old code taxed the ratio with.
+- **Retrospective** — MEMORY.md "Campaign 37 execution run".
+
 ## Dreams / future roadmap (recorded 2026-08-19, user-suggested; no schedule)
 
 Futures the user wants tracked as candidate campaigns; each needs a design pass

@@ -4446,10 +4446,10 @@ coverage push (1041 → 1060 absolute branches). Commits listed in ROADMAP
     "apply" and "no-change" branches; the two tests duplicated a 6-line block and
     tripped the jscpd 0.0% gate — merged into one test.
 - **What the gate caught:** detekt `MagicNumber` (bare 70/150/100f literals →
-    SettingsFragment constants), detekt `MaxLineLength` (long assertEquals), CI
-    `R.string.pref_keepalive` unresolved (my new test referenced a key that does
-    not exist — corrected to `pref_keepalive_timeout`), `spotlessKotlinCheck`
-    (two formatting misses), jscpd 0.05% clone (the duplicated margin test).
+  SettingsFragment constants), detekt `MaxLineLength` (long assertEquals), CI
+  `R.string.pref_keepalive` unresolved (my new test referenced a key that does
+  not exist — corrected to `pref_keepalive_timeout`), `spotlessKotlinCheck`
+  (two formatting misses), jscpd 0.05% clone (the duplicated margin test).
 
 **Signal**
 
@@ -4514,14 +4514,67 @@ coverage push (1041 → 1060 absolute branches). Commits listed in ROADMAP
   the parenthetical 'measure absolute not just ratio' guidance folded into the
   Elapsed/`git status`-adjacent campaign habits).*
 
-### [2026-09-02] Campaign 35 execution run — global-refresh feature batch
+### [2026-09-11] Campaign 37 execution run — idiomatic nullability refactor + branch gate 85%
 
-Scope: (1) reusable smart-glyph core (`glyphs/`); (2) video-source preset chips
-(Camera 1/2/USB/No video) replacing the reset row; (3) structured report share subject +
-support-email addressing; (4) exported `image/*` share receiver packing screenshots + a
-report into one ZIP; then a settings SSOT/reuse pass, `VideoStreamLoader` deletion, a
-jscpd test-dedup fix, and the retrospective/docs pass. Commits listed in ROADMAP
-"Campaign 35"; decisions in DECISIONS.md "[2026-09-02]" entries.
+Scope: replace dynamic null-checks with type-driven contracts to remove
+un-coverable dead branches instead of adding tests, then ratchet the gate to 85%.
+Commits listed in ROADMAP "Campaign 37"; decision in DECISIONS.md "[2026-09-11]
+Branch gate 85% — idiomatic-nullability refactor".
+
+**Process**
+
+- **Biggest process win:** the idiomatic-Kotlin review came from a subagent that
+  enumerated exact line ranges, branch counts, and risk levels — made the first
+  triage of 34 candidate refactors into 3 safe mechanical wins trivial.
+- **What could have been lost:** `.opencode/opencode.json` leaked a machine-local
+  LSP path into the commit (caught on the force-push, corrected). A test used
+  `ShadowSystemClock.advanceBy()` thinking it mocked `System.currentTimeMillis()`
+  — it only wraps `android.os.SystemClock` (hit CI first, not local; the test now
+  asserts parent-dir reuse without timestamps). Device model codes from the C36
+  retro were caught by the CI device-identifier gate — scrubbed.
+- **Elapsed vs Estimated:** Estimated "—"; Actual ≈30 m for the refactor, ~2 h
+  total with the CI-fix loops (newFile test, detekt LateinitUsage, device IDs).
+
+**Learning**
+
+- **New facts worth saving:** Robolectric's `ShadowSystemClock` only mocks
+  `android.os.SystemClock.uptimeMillis()`/`elapsedRealtime()`, NOT
+  `java.lang.System.currentTimeMillis()` — so `newFile`'s timestamp-based
+  naming can't be forced to produce distinct filenames via clock advancement.
+  `check_device_identifiers.py` caught the two model codes (a Huawei + a Samsung
+  model) in the C36 retro text — the C36 docs push (897a9679) also failed this
+  gate (same codes already in MEMORY.md). The codes were introduced in the same
+  C36 retro commit, so the CI gate only ever caught them on push — no pre-commit
+  sweep exists for retro docs. Lesson: **run `check_device_identifiers.py` before
+  any commit that touches retro docs.** The gate fails the whole build when a
+  single match exists, so the C37 refactor squashes kept re-failing it until the
+  scrub commit.
+- **What the gate caught:** CI caught the `newFile` test (ShadowSystemClock gap,
+  once locally, then on a stale-assert version in CI), and the
+  device-identifier gate caught the model codes in the C36 retro — scrubbed in
+  C37 (87077f2).
+
+**Drift**
+
+- **Per-doc audit:** AGENTS.md — command hygiene rule hardened ("tee first, tail
+  for status only"; "bare pipe is HARD FAIL"). DECISIONS.md — 85% ratchet entry.
+  ROADMAP.md — Campaign 37 header. MEMORY.md — this record.
+- **Scripts review:** no new `.tmp/` ad-hoc scripts — the coverage triage used
+  the established `python3 -c "..."` pattern. Nothing to promote.
+
+**Checklist review**
+
+- **Most useless question:** "What kept each commit self-contained" — this batch
+  was a single refactor across 12 files, naturally entangled. The rephrased
+  envelope ("what entangled them") worked better.
+- **Checklist stamp:** *Last revised: 2026-09-11 (C37 retrospective: the
+  "self-contained commits" question passes again — a single-concern refactor
+  across many files is normal and produced the clean commit as amended).*
+  (Camera 1/2/USB/No video) replacing the reset row; (3) structured report share subject +
+  support-email addressing; (4) exported `image/*` share receiver packing screenshots + a
+  report into one ZIP; then a settings SSOT/reuse pass, `VideoStreamLoader` deletion, a
+  jscpd test-dedup fix, and the retrospective/docs pass. Commits listed in ROADMAP
+  "Campaign 35"; decisions in DECISIONS.md "[2026-09-02]" entries.
 
 **Process**
 
@@ -4614,6 +4667,6 @@ jscpd test-dedup fix, and the retrospective/docs pass. Commits listed in ROADMAP
   not at campaign end); the phrasing could note that for an un-estimated campaign the
   `Estimated` cell is "—" and the Actual is measured at the retrospective. No rephrase.
 - **Checklist itself:** stamp: *Last revised: 2026-09-11 (C36 retrospective: rephrased "self-contained commits"
-question to also capture what entangled the batch; added the "measure absolute
-coverage, not the ratio's last digit" guidance for gate-threshold campaigns;
-recorded the JDK-25 JaCoCo proxy-instrumentation quirk in the local-tooling lore).*
+  question to also capture what entangled the batch; added the "measure absolute
+  coverage, not the ratio's last digit" guidance for gate-threshold campaigns;
+  recorded the JDK-25 JaCoCo proxy-instrumentation quirk in the local-tooling lore).*
