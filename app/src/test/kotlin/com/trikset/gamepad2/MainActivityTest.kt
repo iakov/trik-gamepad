@@ -904,7 +904,8 @@ class MainActivityTest : RobolectricTestBase() {
     val gearStart = (btnSettings.layoutParams as ViewGroup.MarginLayoutParams).marginStart
     val chipStart = (chip.layoutParams as ViewGroup.MarginLayoutParams).marginStart
     // Dispatch insets with no display cutout: the listener must run and leave the margins intact.
-    activity.findViewById<View>(R.id.main)
+    activity
+        .findViewById<View>(R.id.main)
         .dispatchApplyWindowInsets(android.view.WindowInsets.CONSUMED)
     org.robolectric.shadows.ShadowLooper.idleMainLooper()
     val newGearStart = (btnSettings.layoutParams as ViewGroup.MarginLayoutParams).marginStart
