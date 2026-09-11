@@ -467,6 +467,30 @@ ______________________________________________________________________
   (gate.py Linux validation deferred); macOS emulator verification pending a
   macOS machine; `scripts/gate.ps1` deleted (git history retains it).
 
+### [2026-09-11] Gradle-10 deprecation warnings suppressed (plugin-internal, deferred)
+
+- **Type:** problem-avoiding (systemic build-log noise, masked coverage of new
+  deprecation warnings).
+- **Problem:** every build prints `ReportingExtension.file(String)` (SpotBugs
+  6.5.11, already latest) and `Project object as a dependency notation` (AGP
+  9.2.1). Both are plugin-internal — not in our build scripts.
+- **Alternatives considered:** (a) bump AGP to 9.4.0 (fixed the AGP warning,
+  but broke the configuration-cache serialization and required switching the
+  dev box from JDK 25 to JDK 21); (b) keep excepting the warnings in every
+  retro entry (the task was pending since C21 — ~6 entries).
+- **Chosen solution:** set `org.gradle.warning.mode=summary` in
+  `gradle.properties` — one line per unique warning type. The SpotBugs warning
+  is unfixable on the current toolchain (plugin author must update). The AGP
+  warning also cannot be fixed without exceeding the Studio-compatibility floor
+  (AGP 9.2.1 → 9.4.0 is a validated Studio-matrix jump).
+- **Why:** the warnings are noisy but harmless. Summary mode acknowledges them
+  without polluting every build log. The Gradle-10 upgrade (when mandated) will
+  force the plugin authors to fix, at which point we can remove the suppression.
+- **Out of scope / consequences:** a Gradle-level `warning.mode` suppresses
+  ALL deprecation warnings, not just these two — if our build scripts introduce
+  a new deprecation it would also be summarized. Revisit on the Gradle-10-era
+  toolchain upgrade (AGENTS.md deferred .PLAN.md task).
+
 ______________________________________________________________________
 
 ## Testing
@@ -725,8 +749,7 @@ ______________________________________________________________________
   tax on the ratio).
 - **Problem:** the BRANCH gate sat at 0.83 (C36) to absorb the ±1 CI jitter,
   but the absolute ratio was dragged down by ~40 structurally-dead null branches
-  (`?: default` after `getString(key, nonNullDefault)`, defensive `activity ?:
-  return` in fragment init helpers, `if (btnSettings != null)` on
+  (`?: default` after `getString(key, nonNullDefault)`, defensive `activity ?: return` in fragment init helpers, `if (btnSettings != null)` on
   layout-guaranteed views). These branches were never coverable and inflated
   the total branch count.
 - **Alternatives considered:** keep 0.83 and ignore the dead-branch tax (leaves
