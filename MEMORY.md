@@ -4486,7 +4486,7 @@ coverage push (1041 → 1060 absolute branches). Commits listed in ROADMAP
 
 - **Measurable profit:** magic-button size customization (new setting, live apply),
   punch-hole-safe landscape layout, symmetric pad centering verified on two
-  physical devices (Huawei ART-L29 + Samsung SM-S9210), settings right-pad; absolute
+  physical devices (a Huawei + a Samsung), settings right-pad; absolute
   branch coverage +19 (1041 → 1060, LINE 96.3%), CI green.
 - **Deferred (→ `.PLAN.md`):** Gradle-10-era deprecation bumps remain pending;
   instrumented on-device run of the new settings rows is optional (unit + device
