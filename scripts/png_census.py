@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 r"""png_census.py - pixel-census and pixel-diff for UI screenshots.
 
 Device-independent verification of on-device/emulator screenshots (AGENTS.md

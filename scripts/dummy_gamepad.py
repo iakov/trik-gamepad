@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 r"""dummy_gamepad.py - a protocol-tracking gamepad client for trik-gamepad.
 
 A tiny interactive client that speaks the DESIGN.md "Gamepad protocol" (TCP or

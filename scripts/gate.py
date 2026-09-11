@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 """gate.py - canonical local quality gate for trik-gamepad.
 
 Cross-platform replacement for the old scripts/gate.ps1.

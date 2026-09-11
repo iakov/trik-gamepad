@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 r"""ci_failures.py - which job/step failed in a GitHub Actions run?
 
 CI triage loop (AGENTS.md "After push"): `gh run list` shows the run id, this

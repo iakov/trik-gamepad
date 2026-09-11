@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 """glyph_metrics.py - compute em-relative glyph layout metrics for the bundled symbol font.
 
 Rasters every requested glyph with Pillow and reduces each to two fractions of the font's

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 r"""ui_dump_parse.py - print uiautomator dump nodes as readable attribute rows.
 
 uiautomator dumps are one giant XML line; this prints the interesting views as

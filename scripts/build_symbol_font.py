@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 """build_symbol_font.py - regenerate the bundled HUD symbol font.
 
 Downloads the pinned DejaVuSansMono Nerd Font release, subsets it to exactly the

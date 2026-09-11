@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 r"""check_xml_comments.py - reject "--" inside XML comments.
 
 aapt2 hard-fails on any "--" inside an XML comment ("The string -- is not

@@ -112,6 +112,9 @@ ______________________________________________________________________
 | Section | Applies to |
 |---------|------------|
 | Scenarios & use-cases (the contract) | [Universal] every product decision |
+| Orientation & rotation | [Universal] landscape lock, screen orientation |
+| App lifecycle & background state | [Universal] pause/resume, process death, crash recovery |
+| Hardware gamepad & keyboard | [Universal] physical button map, dead zone, swap-sticks |
 | Defaults are as useful as possible | [Universal] any new preference/field |
 | Every setting shows its current value | [Universal] preference summaries |
 | Ellipsis on dialog rows | [Universal] preference titles |
@@ -132,9 +135,84 @@ ______________________________________________________________________
 | WCAG | [Universal] contrast + touch-target standards |
 | Connection & video state UX | [Universal] status pill, reconnect badge |
 | Gamepad protocol (source of truth) | [Universal] command matrix, keepalive, wire format |
-| Connection lifecycle & keepalive semantics | [Universal] keepalive, reconnect policy |
 
 ______________________________________________________________________
+
+## [Universal] Orientation & rotation
+
+The gamepad surface requires horizontal space for two thumb zones (left = pads,
+right = magic buttons). Auto-rotation during driving disorients the user and can
+cause accidental inputs. The gamepad screen is **locked to sensor landscape** on
+mobile (both natural and reverse landscape). Desktop/web implementations may
+allow portrait if the control surface fits on a tall narrow viewport (e.g.
+vertical pad cluster), but the default layout must be landscape.
+
+Rationale: a portrait phone held landscape-style has the same physical form
+factor as landscape — the lock just prevents accidental flips during use.
+Desktop/web with a keyboard does not need the lock but should default to a
+landscape window aspect ratio.
+
+## [Universal] App lifecycle & background state
+
+The gamepad app has a specific lifecycle contract because a robot connection is
+a scarce network resource:
+
+| Event | Behavior |
+|-------|----------|
+| App goes to background (pause, home button) | Disconnect control socket, stop video playback, halt retry timers |
+| App returns to foreground (resume) | Re-arm retry timer; video recovers on the first reconnect edge (see Connection & video state UX) |
+| Configuration change (rotation, theme) | ViewModel survives; video player migrates to the new activity (no re-connect needed); state is retained |
+| Process death (system kills the app) | On next launch: crash dialog if previous exit was abnormal; settings survive via SharedPreferences; control+video start fresh |
+| Reconnecting in background | Never — a background app must not keep sockets open (Android background-connection limits, battery, privacy) |
+
+The "pause → disconnect" rule is derived from the user's intent: if they swipe
+away or cover the phone, they are done driving. An accidental home-button press
+must not keep the robot connected.
+
+## [Universal] Hardware gamepad & keyboard support
+
+Physical controls augment touch input. The mapping must be consistent across all
+platforms so a user switching between phone and desktop sees the same layout:
+
+### Physical gamepad button map
+
+| Input | Action | Notes |
+|-------|--------|-------|
+| Left analog stick X/Y | Pad 1 x/y (normalized -1 .. 1) | Continuous axis: read on every input event |
+| Right analog stick X/Y | Pad 2 x/y (normalized -1 .. 1) | Same — both thumbs active |
+| D-pad (any direction) | Pad 1 directional impulse | Maps to wheel angle or discrete pad direction (implementation chooses) |
+| A | Magic button 1 (▲) | Within configured magic-button count; out-of-range buttons are no-ops |
+| B | Magic button 2 (■) | Same |
+| X | Magic button 3 (●) | Same |
+| Y | Magic button 4 (✕) | Same |
+| L1 / R1 | Magic button 5 (◆) | Same |
+| Start / Select / Menu | Not mapped | Reserved for OS (home, back, app-switch) |
+
+Dead zone: **0.1f** (values below 0.1 are treated as 0) to filter sensor noise.
+
+Auto-repeat **ignored for button edges** — press and release are separate events
+(the controller sends `btn N down` / `btn N up`). Continuous axes (analog
+sticks) read on every input event; auto-repeat does not apply.
+
+### Swap sticks
+
+A **Swap sticks** toggle exchanges the left and right analog stick assignments
+(left → pad 2, right → pad 1). User preference, stored. Default: off.
+
+### Keyboard (desktop/web)
+
+Desktop/web implementations should additionally map:
+
+| Key | Action |
+|-----|--------|
+| W / Up | Pad 1 Y = -1 (forward) |
+| S / Down | Pad 1 Y = 1 (backward) |
+| A / Left | Pad 1 X = -1 (left) |
+| D / Right | Pad 1 X = 1 (right) |
+| 1 .. 5 | Magic buttons 1 .. 5 |
+| Arrow keys | Alternative to WASD (if W/A/S/D are used for other actions) |
+| R | Reconnect / restart video |
+| Space | Emergency stop (sends `wheel 0` or similar) |
 
 ## [Universal] Defaults are as useful as possible
 

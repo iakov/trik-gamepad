@@ -1,3 +1,6 @@
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 """Shared cross-platform Gradle wrapper resolution for trik-gamepad scripts.
 
 Picks `gradlew.bat` on Windows and `./gradlew` elsewhere so the Python tooling

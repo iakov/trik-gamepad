@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 """Measure the VISUAL ink alignment of a row of glyph buttons from a uiautomator
 dump + screenshot pair.
 

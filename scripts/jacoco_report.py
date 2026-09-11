@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 r"""jacoco_report.py - summarize the JaCoCo coverage report (XML + HTML).
 
 The coverage gate (`jacocoTestCoverageVerification`, app/build.gradle) fails

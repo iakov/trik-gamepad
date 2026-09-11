@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 """Export the README hero screenshot from the HudThemeTest render.
 
 The committed README hero must be light (docs render fast online), so this

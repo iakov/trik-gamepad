@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 """check_translations.py - translation sync guard + one-off back-translation review.
 
 TWO modes (AGENTS.md "keep translations in sync"):

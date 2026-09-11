@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 """run_bounded.py - run any command under a hard wall-clock timeout with a process-tree kill.
 
 Cross-platform bounded runner for trik-gamepad tooling (gradle, adb, npx, ...).

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 """spotless_apply.py - run Gradle's spotlessApply from the pre-commit hook.
 
 Cross-platform (Windows / Linux / macOS): picks `gradlew.bat` vs `./gradlew` by

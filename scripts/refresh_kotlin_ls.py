@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 """refresh_kotlin_ls.py - check/replace the opencode kotlin-ls JetBrains build.
 
 opencode's built-in `kotlin-ls` uses a JetBrains EAP `intellij-server` build

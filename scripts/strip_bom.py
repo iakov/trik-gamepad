@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 r"""strip_bom.py - remove a UTF-8 BOM from files.
 
 A PowerShell rewrite (`Set-Content`/`Out-File`) drops a UTF-8 BOM onto files it

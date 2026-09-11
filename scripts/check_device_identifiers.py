@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright: Iakov Kirilenko
+# SPDX-License-Identifier: Apache-2.0
+
 r"""check_device_identifiers.py - reject device identifiers in committed content.
 
 A physical device's serial, model code or IMEI can identify the exact person or
