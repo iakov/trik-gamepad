@@ -43,7 +43,7 @@ class MagicButtonPanel(
     this.container = container
     container.removeAllViews()
     val baseTouchTarget = context.resources.getDimensionPixelSize(R.dimen.touch_target_min)
-    val scale = sizePercent / 100f
+    val scale = sizePercent.toFloat() / SettingsFragment.MAGIC_BUTTON_SIZE_PERCENT_UNIT
     val touchTarget = (baseTouchTarget * scale).toInt()
     val margin = context.resources.getDimensionPixelSize(R.dimen.hud_magic_button_margin_start)
     val targetVisualHeight = touchTarget * MAGIC_GLYPH_SIZE_RATIO

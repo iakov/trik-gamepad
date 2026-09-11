@@ -73,6 +73,11 @@ class SettingsFragment : PreferenceFragmentCompat() {
     internal const val DEFAULT_RECENTER_GLYPHS = true
     /** Button size as percent of the WCAG-minimum 48dp touch target (70-150). */
     internal const val DEFAULT_MAGIC_BUTTON_SIZE = 100
+    /** Lower/upper bounds of the magic button size slider, in percent of the 48dp touch target. */
+    internal const val MIN_MAGIC_BUTTON_SIZE = 70
+    internal const val MAX_MAGIC_BUTTON_SIZE = 150
+    /** The percentage unit: 100 converts a percent value to a fraction. */
+    internal const val MAGIC_BUTTON_SIZE_PERCENT_UNIT = 100
 
     fun magicSymbolKey(buttonNumber: Int): String = "magicSymbol$buttonNumber"
 

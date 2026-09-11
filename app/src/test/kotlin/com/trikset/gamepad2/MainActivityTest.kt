@@ -904,10 +904,13 @@ class MainActivityTest : RobolectricTestBase() {
     val gearStart = (btnSettings.layoutParams as ViewGroup.MarginLayoutParams).marginStart
     val chipStart = (chip.layoutParams as ViewGroup.MarginLayoutParams).marginStart
     // Dispatch insets with no display cutout: the listener must run and leave the margins intact.
-    activity.findViewById<View>(R.id.main).dispatchApplyWindowInsets(android.view.WindowInsets.CONSUMED)
+    activity.findViewById<View>(R.id.main)
+        .dispatchApplyWindowInsets(android.view.WindowInsets.CONSUMED)
     org.robolectric.shadows.ShadowLooper.idleMainLooper()
-    assertEquals("gear margin unchanged", gearStart, (btnSettings.layoutParams as ViewGroup.MarginLayoutParams).marginStart)
-    assertEquals("chip margin unchanged", chipStart, (chip.layoutParams as ViewGroup.MarginLayoutParams).marginStart)
+    val newGearStart = (btnSettings.layoutParams as ViewGroup.MarginLayoutParams).marginStart
+    val newChipStart = (chip.layoutParams as ViewGroup.MarginLayoutParams).marginStart
+    assertEquals("gear margin unchanged", gearStart, newGearStart)
+    assertEquals("chip margin unchanged", chipStart, newChipStart)
   }
 
   @Test

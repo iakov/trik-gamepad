@@ -169,7 +169,7 @@ class MainActivitySettingsController(
     ui.setMagicButtons(
         magicCount,
         MagicSymbolsStore(sharedPreferences).readAll(),
-        magicSize.coerceIn(70, 150),
+        magicSize.coerceIn(SettingsFragment.MIN_MAGIC_BUTTON_SIZE, SettingsFragment.MAX_MAGIC_BUTTON_SIZE),
     )
 
     val hideControls = sharedPreferences.getBoolean(SettingsFragment.SK_HIDE_CONTROLS, false)
