@@ -3,8 +3,11 @@ package com.trikset.gamepad2
 import android.content.SharedPreferences
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.widget.Toast
 import androidx.core.content.edit
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
@@ -41,6 +44,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
     const val SK_ADVANCED = "advancedSettings"
     const val SK_MAGIC_BUTTON_COUNT = "magicButtonCount"
     const val SK_MAGIC_SYMBOLS = "magicSymbols"
+    const val SK_MAGIC_BUTTON_SIZE = "magicButtonSize"
     const val SK_SAVE_PRESET = "saveRobotPreset"
     const val SK_DELETE_PRESET = "deleteRobotPreset"
     const val SK_ROBOT_PRESETS = "robotPresets"
@@ -67,6 +71,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
     internal const val DEFAULT_MAGIC_BUTTON_COUNT = 3
     /** "Smart glyph alignment" ships ON: bundled glyphs center on their runtime ink box. */
     internal const val DEFAULT_RECENTER_GLYPHS = true
+    /** Button size as percent of the WCAG-minimum 48dp touch target (70-150). */
+    internal const val DEFAULT_MAGIC_BUTTON_SIZE = 100
 
     fun magicSymbolKey(buttonNumber: Int): String = "magicSymbol$buttonNumber"
 
@@ -297,6 +303,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
             SK_SHOW_PADS to (R.string.pref_show_pads_summary to DEFAULT_PADS_ALPHA),
             SK_MAGIC_BUTTON_COUNT to
                 (R.string.pref_magic_count_summary to DEFAULT_MAGIC_BUTTON_COUNT),
+            SK_MAGIC_BUTTON_SIZE to (R.string.pref_magic_size_summary to DEFAULT_MAGIC_BUTTON_SIZE),
         )
     for ((preferenceKey, pair) in seekBarFormats) {
       val preference = findPreference<Preference>(preferenceKey) ?: continue
@@ -529,6 +536,19 @@ class SettingsFragment : PreferenceFragmentCompat() {
     openApp?.onPreferenceClickListener = Preference.OnPreferenceClickListener {
       myActivity.startActivity(android.content.Intent(myActivity, SettingsActivity::class.java))
       true
+    }
+  }
+
+  override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    super.onViewCreated(view, savedInstanceState)
+    ViewCompat.setOnApplyWindowInsetsListener(listView) { v, insets ->
+      v.setPadding(
+          v.paddingLeft,
+          v.paddingTop,
+          insets.getInsets(WindowInsetsCompat.Type.systemBars()).right,
+          v.paddingBottom,
+      )
+      insets
     }
   }
 

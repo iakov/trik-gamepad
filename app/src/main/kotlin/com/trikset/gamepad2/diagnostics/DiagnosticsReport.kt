@@ -170,6 +170,22 @@ object DiagnosticsReport {
       }
     }
     out.appendLine(
+        settingLine(
+            prefs,
+            "Button size",
+            SettingsFragment.SK_MAGIC_BUTTON_SIZE,
+            SettingsFragment.DEFAULT_MAGIC_BUTTON_SIZE.toString(),
+        )
+    )
+    out.appendLine(
+        settingLine(
+            prefs,
+            "Smart glyph alignment",
+            SettingsFragment.SK_RECENTER_GLYPHS,
+            "true",
+        )
+    )
+    out.appendLine(
         settingLine(prefs, "Diagnostics verbosity", SettingsFragment.SK_DIAG_LEVEL, "info")
     )
     out.appendLine(

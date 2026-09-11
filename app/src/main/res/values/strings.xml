@@ -95,6 +95,8 @@
     <string name="pref_recenter_glyphs">Smart glyph alignment</string>
     <string name="pref_recenter_glyphs_on">Symbols are centered on their exact visual center</string>
     <string name="pref_recenter_glyphs_off">Symbols use the baseline alignment</string>
+    <string name="pref_magic_size">Button size</string>
+    <string name="pref_magic_size_summary">%d</string>
     <string name="pref_advanced">Advanced settings</string>
     <string name="pref_advanced_summary">Wheel, pads, hardware gamepad, magic buttons, diagnostics</string>
     <string name="robot_settings">Robot settings</string>

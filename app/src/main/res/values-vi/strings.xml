@@ -82,6 +82,8 @@
     <string name="pref_recenter_glyphs">Căn chỉnh biểu tượng thông minh</string>
     <string name="pref_recenter_glyphs_on">Biểu tượng được căn giữa theo đúng tâm thị giác của nút</string>
     <string name="pref_recenter_glyphs_off">Biểu tượng dùng căn chỉnh cơ bản</string>
+    <string name="pref_magic_size">Kích thước nút</string>
+    <string name="pref_magic_size_summary">%d</string>
     <string name="pref_keep_screen_on">Giữ màn hình luôn bật</string>
     <string name="pref_keep_screen_on_on">Màn hình luôn bật khi đang mở gamepad</string>
     <string name="pref_keep_screen_on_off">Màn hình có thể tắt khi đang mở gamepad</string>

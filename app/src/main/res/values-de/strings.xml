@@ -82,6 +82,8 @@
     <string name="pref_recenter_glyphs">Smarte Symbolausrichtung</string>
     <string name="pref_recenter_glyphs_on">Symbole werden exakt auf ihre visuelle Mitte zentriert</string>
     <string name="pref_recenter_glyphs_off">Symbole behalten die Basisausrichtung</string>
+    <string name="pref_magic_size">Tastengröße</string>
+    <string name="pref_magic_size_summary">%d</string>
     <string name="pref_keep_screen_on">Bildschirm an lassen</string>
     <string name="pref_keep_screen_on_on">Der Bildschirm bleibt an, solange das Gamepad geöffnet ist</string>
     <string name="pref_keep_screen_on_off">Der Bildschirm kann bei geöffnetem Gamepad in den Ruhemodus gehen</string>

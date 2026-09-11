@@ -114,6 +114,13 @@
                 android:summaryOff="@string/pref_recenter_glyphs_off"
                 android:summaryOn="@string/pref_recenter_glyphs_on"
                 android:title="@string/pref_recenter_glyphs" />
+            <SeekBarPreference
+                android:defaultValue="100"
+                android:key="magicButtonSize"
+                android:max="150"
+                app:min="70"
+                android:summary="@string/pref_magic_size_summary"
+                android:title="@string/pref_magic_size" />
         </PreferenceCategory>
 
         <PreferenceCategory android:title="@string/pref_category_about">

@@ -31,11 +31,20 @@ class MagicButtonPanel(
    * Builds the buttons into [container]. [recenter] picks the glyph centering (the "Smart glyph
    * alignment" setting; see [GlyphRendering.render]): false = the plain baseline look (default
    * centering, no ink correction); true = aim the runtime ink box at the circle center.
+   * [sizePercent] scales the button from the WCAG-minimum 48dp touch target (70-150%).
    */
-  fun populate(container: ViewGroup, count: Int, symbols: List<String>, recenter: Boolean = false) {
+  fun populate(
+      container: ViewGroup,
+      count: Int,
+      symbols: List<String>,
+      recenter: Boolean = false,
+      sizePercent: Int = SettingsFragment.DEFAULT_MAGIC_BUTTON_SIZE,
+  ) {
     this.container = container
     container.removeAllViews()
-    val touchTarget = context.resources.getDimensionPixelSize(R.dimen.touch_target_min)
+    val baseTouchTarget = context.resources.getDimensionPixelSize(R.dimen.touch_target_min)
+    val scale = sizePercent / 100f
+    val touchTarget = (baseTouchTarget * scale).toInt()
     val margin = context.resources.getDimensionPixelSize(R.dimen.hud_magic_button_margin_start)
     val targetVisualHeight = touchTarget * MAGIC_GLYPH_SIZE_RATIO
     for (num in 1..count) {

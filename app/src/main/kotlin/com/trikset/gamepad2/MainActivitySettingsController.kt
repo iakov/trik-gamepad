@@ -36,7 +36,7 @@ class MainActivitySettingsController(
 
     fun setKeepScreenOn(enabled: Boolean)
 
-    fun setMagicButtons(count: Int, symbols: List<String>)
+    fun setMagicButtons(count: Int, symbols: List<String>, sizePercent: Int)
 
     fun setControlsVisible(visible: Boolean)
 
@@ -160,7 +160,17 @@ class MainActivitySettingsController(
     // Magic buttons: count (0 hides the row; capped at the maximum) + a display glyph per button
     // (defaults ▲ ■ ● ✕ ◆); the protocol command stays numeric `btn N down`.
     val magicCount = readMagicButtonCount(sharedPreferences)
-    ui.setMagicButtons(magicCount, MagicSymbolsStore(sharedPreferences).readAll())
+    val magicSize =
+        SettingsFragment.readSeekBarValue(
+            sharedPreferences,
+            SettingsFragment.SK_MAGIC_BUTTON_SIZE,
+            SettingsFragment.DEFAULT_MAGIC_BUTTON_SIZE,
+        )
+    ui.setMagicButtons(
+        magicCount,
+        MagicSymbolsStore(sharedPreferences).readAll(),
+        magicSize.coerceIn(70, 150),
+    )
 
     val hideControls = sharedPreferences.getBoolean(SettingsFragment.SK_HIDE_CONTROLS, false)
     // Empty host = video-only device: no pads/buttons to tap regardless of the toggle.

@@ -84,6 +84,8 @@
     <string name="pref_recenter_glyphs">Умное выравнивание символов</string>
     <string name="pref_recenter_glyphs_on">Символы центрируются по своему точному визуальному центру</string>
     <string name="pref_recenter_glyphs_off">Символы используют базовое выравнивание</string>
+    <string name="pref_magic_size">Размер кнопок</string>
+    <string name="pref_magic_size_summary">%d</string>
     <string name="pref_keep_screen_on">Не выключать экран</string>
     <string name="pref_keep_screen_on_on">Экран остаётся включённым, пока открыт геймпад</string>
     <string name="pref_keep_screen_on_off">Экран может засыпать, пока открыт геймпад</string>

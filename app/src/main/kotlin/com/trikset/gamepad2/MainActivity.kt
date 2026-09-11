@@ -186,11 +186,35 @@ class MainActivity :
     if (btnSettings != null) {
       btnSettings.isHapticFeedbackEnabled = true
       btnSettings.setOnClickListener {
-        // Every button vibrates (user report: the gear was the one that did not); one strong
-        // pulse per tap, matching the magic buttons.
         btnSettings.haptic(Haptics.Level.HEAVY)
-        // The gear is the settings affordance (was: toggle the action bar).
         startActivity(Intent(this, SettingsActivity::class.java))
+      }
+      // Offset the gear button and target chip past the display cutout (punch-hole camera on the
+      // left edge in landscape). safeInsetLeft is the pixel width of the camera notch.
+      // Only increases the left margin — never reduces it below the XML layout default.
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        val mainView = findViewById<View>(R.id.main)
+        mainView.setOnApplyWindowInsetsListener { _, insets ->
+          val cutoutPx = insets.displayCutout?.safeInsetLeft ?: 0
+          val halfGlyph = resources.getDimensionPixelSize(R.dimen.hud_half_glyph)
+          val requiredMargin = cutoutPx + halfGlyph
+          val gearLp = btnSettings.layoutParams as ViewGroup.MarginLayoutParams
+          val newGearMargin = maxOf(gearLp.marginStart, requiredMargin)
+          if (gearLp.marginStart != newGearMargin) {
+            gearLp.marginStart = newGearMargin
+            btnSettings.layoutParams = gearLp
+          }
+          findViewById<View>(R.id.targetChip)?.let { chip ->
+            val chipLp = chip.layoutParams as ViewGroup.MarginLayoutParams
+            val newChipMargin = maxOf(chipLp.marginStart, requiredMargin)
+            if (chipLp.marginStart != newChipMargin) {
+              chipLp.marginStart = newChipMargin
+              chip.layoutParams = chipLp
+            }
+          }
+          insets
+        }
+        mainView.requestApplyInsets()
       }
     }
 
@@ -441,18 +465,42 @@ class MainActivity :
     findViewById<View>(R.id.main)?.keepScreenOn = enabled
   }
 
-  override fun setMagicButtons(count: Int, symbols: List<String>) {
+  override fun setMagicButtons(count: Int, symbols: List<String>, sizePercent: Int) {
+    val mainView = findViewById<View>(R.id.main)
     val buttonsView = findViewById<ViewGroup>(R.id.buttons) ?: return
-    // The controller re-pushes the magic buttons on every preference change, so reading the
-    // "Smart glyph alignment" toggle here applies a flip immediately (no extra SettingsUi
-    // callback).
     val recenter =
         PreferenceManager.getDefaultSharedPreferences(this)
             .getBoolean(
                 SettingsFragment.SK_RECENTER_GLYPHS,
                 SettingsFragment.DEFAULT_RECENTER_GLYPHS,
             )
-    magicButtons.populate(buttonsView, count, symbols, recenter)
+    magicButtons.populate(buttonsView, count, symbols, recenter, sizePercent)
+
+    buttonsView.post {
+      if (buttonsView.top == 0 || buttonsView.height == 0) {
+        buttonsView.post { applyButtonMargin(mainView, buttonsView) }
+      } else {
+        applyButtonMargin(mainView, buttonsView)
+      }
+    }
+  }
+
+  private fun applyButtonMargin(mainView: View, buttonsView: View) {
+    val controlsOverlay = findViewById<View>(R.id.controlsOverlay) ?: return
+    val chip = findViewById<View>(R.id.targetChip) ?: return
+    val buttonTop = buttonsView.top
+    val chipBottom = chip.bottom
+    // Center pads vertically between the chip bottom and button top, producing
+    // equal gap on both sides. Works on any screen size.
+    val controlsOverlayH = chipBottom + buttonTop
+    val bottomInset = mainView.height - controlsOverlayH
+    if (bottomInset > 0) {
+      val lp = controlsOverlay.layoutParams as ViewGroup.MarginLayoutParams
+      if (lp.bottomMargin != bottomInset) {
+        lp.bottomMargin = bottomInset
+        controlsOverlay.layoutParams = lp
+      }
+    }
   }
 
   override fun setControlsVisible(visible: Boolean) {
