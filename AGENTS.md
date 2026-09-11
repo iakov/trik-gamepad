@@ -122,6 +122,9 @@ configurations, update this section and the referenced config files.
   `DESIGN.md` section index, `TESTING.md`, `app/build.gradle`, and
   `.github/workflows/ci.yml`; pull MEMORY/DECISIONS/DESIGN sections on demand.
 - Don't talk to the user before session warm-up is complete.
+- Run `uv run python scripts/refresh_kotlin_ls.py` — exit 0 means the
+  JetBrains EAP intellij-server build is fresh. If it warns, re-download with
+  `uv run python scripts/refresh_kotlin_ls.py --refresh`.
 
 ### Before commit
 
@@ -295,6 +298,11 @@ configurations, update this section and the referenced config files.
 - **Docs-drift audit is per-doc scope**: when fixing drift, check **each** doc (including `AGENTS.md`) against its own scope — it must contain everything it must, and nothing it mustn't (no detail that belongs elsewhere, no stale claims).
 - **Missed knowledge → suggest next time**: if a doc is missing something, record the gap and propose the fix at the next review; if a repeated suggestion doesn't stick, explore a better home/solution for the knowledge rather than letting it rot.
 - **`.PLAN.md` holds only unfinished tasks**: completed/published work leaves it after push — no COMPLETE/kept-as-history campaign entries (that record belongs in ROADMAP/MEMORY). Why: DECISIONS.md "Why .PLAN.md exists".
+- **kotlin-ls expiry guard**: the JetBrains EAP `intellij-server` build expires ~6 weeks after release
+  ("This build of intellij-server has expired", hit 2026-09-11). On session init,
+  run `uv run python scripts/refresh_kotlin_ls.py` (exit 0 = OK). If it warns,
+  re-download: `uv run python scripts/refresh_kotlin_ls.py --refresh`.
+  Override install dir with `--dist` or `KOTLIN_LS_DIR` env var.
 - **Session context is ephemeral**: persist decisions to `AGENTS.md`/`DECISIONS.md`/`MEMORY.md` BEFORE creating any PR or wrapping up — never rely on chat history to preserve decisions.
 - **Docs/code sync**: config/dependency/public-interface/workflow changes update `README.md`, `AGENTS.md`, and/or `MEMORY.md`/`DECISIONS.md`; if `.github/workflows/` changed, grep docs for stale claims. `README.md` is end-user-facing only.
 - **Docs store experience, not state**: keep only what saves future time and cannot be rediscovered faster than a doc can drift — counts, versions, thresholds, and hashes must be OUT of docs (glob/wrapper/`libs.versions.toml`/build scripts reveal them in seconds). Dated records stay as history; never restate live state. Docs help, not burden: a line that would not save a future step is cut.

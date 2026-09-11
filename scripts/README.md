@@ -50,6 +50,7 @@ the same command works on Windows and POSIX, and CI invokes them the same way.
 | `ui_dump_parse.py` | Print a uiautomator dump as readable rows (id/class/desc/text/bounds) with a `--filter` | reading the view tree + deriving tap bounds-centre |
 | `dummy_gamepad.py` | Interactive/batch protocol-tracking gamepad client (TCP/UDP): logs every outbound command + inbound line, `wait <ms>`, `--batch "c1;c2"` for scripting | probing DummyRobotServer / a robot's control port |
 | `strip_bom.py` | Remove a UTF-8 BOM from files (PS rewrites drop BOMs — hit C24) | after a PowerShell `Set-Content`/`Out-File` rewrite touched sources |
+| `refresh_kotlin_ls.py` | Check the opencode kotlin-ls JetBrains EAP build age (`majorVersionReleaseDate` in `product-info.json`) and exit 1 when it's nearing expiry; `--refresh` downloads + installs the latest from the VS Code Marketplace | session init (AGENTS.md kotlin-ls expiry guard); when the LSP silently fails |
 
 ## New-script workflow
 
