@@ -44,7 +44,7 @@ class SettingsTests {
     editPreference(R.string.pref_host_address, "localhost")
     editPreference(R.string.pref_host_port, "12345")
     editPreference(R.string.pref_video_uri, "http://localhost:8080/?action=stream")
-    editPreference(R.string.pref_keepalive, "3000")
+    editPreference(R.string.pref_keepalive_timeout, "3000")
 
     // Out of the robot settings back to the gamepad (single-level screen since C17's settings
     // split — the old Advanced sub-screen needed a second back).
@@ -65,7 +65,7 @@ class SettingsTests {
     val initialKeepaliveTimeout = mActivityTestRule.activity.senderService.keepaliveTimeout
 
     openRobotSettings()
-    editPreference(R.string.pref_keepalive, "500") // keepalive below MINIMAL_KEEPALIVE
+    editPreference(R.string.pref_keepalive_timeout, "500") // keepalive below MINIMAL_KEEPALIVE
 
     Espresso.pressBack()
 
