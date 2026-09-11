@@ -79,6 +79,28 @@ class SettingsActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun onPreferenceStartScreenWithAppXmlArgShouldPreservePreferenceXml() {
+    // When the caller fragment has ARG_PREFERENCE_XML set, the nested screen carries it forward.
+    val manager = PreferenceManager(activity)
+    val screen = manager.createPreferenceScreen(activity)
+    screen.key = SettingsFragment.SK_ADVANCED
+    val caller = SettingsFragment()
+    caller.arguments =
+        Bundle().apply {
+          putInt(SettingsFragment.ARG_PREFERENCE_XML, R.xml.pref_app)
+        }
+    activity.supportFragmentManager.beginTransaction().add(caller, "caller").commitNow()
+    assertTrue(activity.onPreferenceStartScreen(caller, screen))
+    activity.supportFragmentManager.executePendingTransactions()
+    val top = activity.supportFragmentManager.fragments.last()
+    assertEquals(
+        "preference XML must be preserved",
+        R.xml.pref_app,
+        top.arguments?.getInt(SettingsFragment.ARG_PREFERENCE_XML, 0),
+    )
+  }
+
+  @Test
   fun nestedFragmentWithAdvancedRootShouldLoadAdvancedPrefs() {
     // The sub-screen fragment runs onCreatePreferences with rootKey="advancedSettings", so its
     // tree is the Advanced subtree and the init helpers resolve within it.
@@ -143,14 +165,26 @@ class SettingsActivityTest : RobolectricTestBase() {
   }
 
   @Test
+  fun magicSizeSeekBarShouldShowValue() {
+    val size = fragment.findPreference<Preference>(SettingsFragment.SK_MAGIC_BUTTON_SIZE)
+    assertNotNull(size)
+    assertEquals("100", size!!.summary)
+    size.onPreferenceChangeListener!!.onPreferenceChange(size, 130)
+    assertEquals("130", size.summary)
+  }
+
+  @Test
   fun seekBarSummariesShowDefaultsWhenUnset() {
-    // Fresh install: no stored values -> the XML defaults (7/100/3) must show, not a fabricated 0.
+    // Fresh install: no stored values -> the XML defaults (7/100/3/100) must show, not a fabricated
+    // 0.
     val wheel = fragment.findPreference<Preference>(SettingsFragment.SK_WHEEL_STEP)
     assertEquals("7 · Smaller = more sensitive; 5..10 is typical", wheel!!.summary)
     val pads = fragment.findPreference<Preference>(SettingsFragment.SK_SHOW_PADS)
     assertEquals("100 · 0 for fully transparent, 255 is opaque", pads!!.summary)
     val count = fragment.findPreference<Preference>(SettingsFragment.SK_MAGIC_BUTTON_COUNT)
     assertEquals("3 · 0 hides the row; 1..5 buttons", count!!.summary)
+    val size = fragment.findPreference<Preference>(SettingsFragment.SK_MAGIC_BUTTON_SIZE)
+    assertEquals("100", size!!.summary)
   }
 
   @Test
@@ -169,6 +203,25 @@ class SettingsActivityTest : RobolectricTestBase() {
         "unparseable String falls back to the default",
         7,
         SettingsFragment.readSeekBarValue(prefs, SettingsFragment.SK_WHEEL_STEP + ".nope", 7),
+    )
+  }
+
+  @Test
+  fun magicSizeReadSeekBarHonorsIntAndString() {
+    val prefs = PreferenceManager.getDefaultSharedPreferences(activity)
+    assertEquals(
+        100,
+        SettingsFragment.readSeekBarValue(prefs, SettingsFragment.SK_MAGIC_BUTTON_SIZE, 100),
+    )
+    prefs.edit().putInt(SettingsFragment.SK_MAGIC_BUTTON_SIZE, 120).commit()
+    assertEquals(
+        120,
+        SettingsFragment.readSeekBarValue(prefs, SettingsFragment.SK_MAGIC_BUTTON_SIZE, 100),
+    )
+    prefs.edit().putString(SettingsFragment.SK_MAGIC_BUTTON_SIZE, "80").commit()
+    assertEquals(
+        80,
+        SettingsFragment.readSeekBarValue(prefs, SettingsFragment.SK_MAGIC_BUTTON_SIZE, 100),
     )
   }
 

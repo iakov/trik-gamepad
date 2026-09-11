@@ -1,6 +1,8 @@
 package com.trikset.gamepad2
 
 import android.view.View
+import android.view.ViewGroup
+import android.widget.Button
 import androidx.preference.PreferenceManager
 import com.trikset.gamepad2.mjpeg.MjpegView
 import com.trikset.gamepad2.mjpeg.ScaleMode
@@ -728,10 +730,52 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun setMagicButtonsShouldPopulateTheRow() {
-    activity.setMagicButtons(3, listOf("▲", "■", "●"))
+    activity.setMagicButtons(3, listOf("▲", "■", "●"), 100)
     val row = activity.findViewById<android.view.ViewGroup>(R.id.buttons)!!
     assertEquals(3, row.childCount)
     assertEquals("▲", (row.getChildAt(0) as android.widget.Button).text.toString())
+  }
+
+  @Test
+  fun setMagicButtonsShouldApplyBottomMargin() {
+    activity.setMagicButtons(3, listOf("▲", "■", "●"), 100)
+    org.robolectric.shadows.ShadowLooper.idleMainLooper()
+    val overlay = activity.findViewById<View>(R.id.controlsOverlay)
+    val lp = overlay?.layoutParams as ViewGroup.MarginLayoutParams?
+    assertNotNull("controlsOverlay must be found", overlay)
+    assertTrue("bottom margin must be > 0 to clear buttons", lp!!.bottomMargin > 0)
+  }
+
+  @Test
+  fun setMagicButtonsTwiceShouldKeepMargin() {
+    activity.setMagicButtons(3, listOf("▲", "■", "●"), 100)
+    org.robolectric.shadows.ShadowLooper.idleMainLooper()
+    val overlay = activity.findViewById<View>(R.id.controlsOverlay)
+    val lp = overlay?.layoutParams as ViewGroup.MarginLayoutParams?
+    val margin1 = lp!!.bottomMargin
+    // Second call with margin already correct -> no-change path.
+    activity.setMagicButtons(3, listOf("▲", "■", "●"), 100)
+    org.robolectric.shadows.ShadowLooper.idleMainLooper()
+    assertEquals("margin should stay the same", margin1, lp.bottomMargin)
+  }
+
+  @Test
+  fun setMagicButtonsWithFullCountShouldPopulateFive() {
+    activity.setMagicButtons(5, listOf("▲", "■", "●", "✕", "◆"), 100)
+    val row = activity.findViewById<android.view.ViewGroup>(R.id.buttons)!!
+    assertEquals(5, row.childCount)
+  }
+
+  @Test
+  fun setMagicButtonsBeforeLayoutShouldRetryGuard() {
+    val controller = org.robolectric.Robolectric.buildActivity(MainActivity::class.java)
+    controller.create()
+    val earlyActivity = controller.get()
+    earlyActivity.setMagicButtons(3, listOf("▲", "■", "●"), 100)
+    controller.resume().visible()
+    org.robolectric.shadows.ShadowLooper.idleMainLooper()
+    val overlay = earlyActivity.findViewById<View>(R.id.controlsOverlay)
+    assertTrue("margin must be set after retry", overlay.bottom > 0)
   }
 
   @Test
@@ -853,6 +897,28 @@ class MainActivityTest : RobolectricTestBase() {
     sender.disconnect("test done")
   }
 
+  @Test
+  fun dispatchEmptyWindowInsetsShouldNotChangeMargins() {
+    val btnSettings = activity.findViewById<Button>(R.id.btnSettings)
+    val chip = activity.findViewById<View>(R.id.targetChip)
+    val gearStart = (btnSettings.layoutParams as ViewGroup.MarginLayoutParams).marginStart
+    val chipStart = (chip.layoutParams as ViewGroup.MarginLayoutParams).marginStart
+    // Dispatch insets with no display cutout: the listener must run and leave the margins intact.
+    activity.findViewById<View>(R.id.main).dispatchApplyWindowInsets(android.view.WindowInsets.CONSUMED)
+    org.robolectric.shadows.ShadowLooper.idleMainLooper()
+    assertEquals("gear margin unchanged", gearStart, (btnSettings.layoutParams as ViewGroup.MarginLayoutParams).marginStart)
+    assertEquals("chip margin unchanged", chipStart, (chip.layoutParams as ViewGroup.MarginLayoutParams).marginStart)
+  }
+
+  @Test
+  fun streamErrorDuringResumeShouldReportUnavailable() {
+    val player = StubVideoPlayer()
+    setField(activity, "video", player)
+    method(activity, "onResume").invoke(activity)
+    player.triggerStreamError()
+    org.robolectric.shadows.ShadowLooper.idleMainLooper()
+  }
+
   /** Builds a SensorEvent of [type] via the modern SensorEventBuilder API. */
   private fun sensorEvent(type: Int): android.hardware.SensorEvent =
       org.robolectric.shadows.SensorEventBuilder.newBuilder()
@@ -869,14 +935,21 @@ private class StubVideoPlayer : VideoPlayer {
   override var showFps: Boolean = false
   override var scaleMode: ScaleMode = ScaleMode.FIT
   override var onPlayResult: ((Boolean) -> Unit)? = null
+  var streamErrorListener: (() -> Unit)? = null
 
   override fun play(url: String?) {}
 
   override fun stop() {}
 
-  override fun setOnStreamErrorListener(listener: (() -> Unit)?) {}
+  override fun setOnStreamErrorListener(listener: (() -> Unit)?) {
+    streamErrorListener = listener
+  }
 
   override fun setOnFirstFrameListener(listener: (() -> Unit)?) {}
 
   override fun release() {}
+
+  fun triggerStreamError() {
+    streamErrorListener?.invoke()
+  }
 }

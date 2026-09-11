@@ -55,12 +55,18 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
 
     var magicCount = -1
     var magicSymbols = listOf<String>()
+    var magicSizePercent = 100
     var controlsVisibleState = true
     var showFpsState = false
 
-    override fun setMagicButtons(count: Int, symbols: List<String>) {
+    override fun setMagicButtons(
+        count: Int,
+        symbols: List<String>,
+        sizePercent: Int,
+    ) {
       magicCount = count
       magicSymbols = symbols
+      magicSizePercent = sizePercent
     }
 
     override fun setControlsVisible(visible: Boolean) {
@@ -221,6 +227,14 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
   }
 
   @Test
+  fun effectiveVideoUriWithHostOverrideShouldUseOverride() {
+    assertEquals(
+        "http://override.host:8080/?action=stream",
+        SettingsFragment.effectiveVideoUri(prefs, "override.host"),
+    )
+  }
+
+  @Test
   fun registerShouldApplyDefaultPreferences() {
     controller.register()
     try {
@@ -265,6 +279,25 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
     controller.onPreferenceChanged(prefs)
     assertEquals(3, ui.magicCount)
     assertEquals(listOf("▲", "■", "●", "✕", "◆"), ui.magicSymbols)
+    assertEquals(100, ui.magicSizePercent)
+  }
+
+  @Test
+  fun onPreferenceChangedWithMagicButtonSizeShouldClamp() {
+    controller.onPreferenceChanged(prefs)
+    assertEquals("default", 100, ui.magicSizePercent)
+
+    prefs.edit().putString(SettingsFragment.SK_MAGIC_BUTTON_SIZE, "50").commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals("clamped to min", 70, ui.magicSizePercent)
+
+    prefs.edit().putString(SettingsFragment.SK_MAGIC_BUTTON_SIZE, "200").commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals("clamped to max", 150, ui.magicSizePercent)
+
+    prefs.edit().putInt(SettingsFragment.SK_MAGIC_BUTTON_SIZE, 130).commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals("in-range int", 130, ui.magicSizePercent)
   }
 
   @Test
@@ -337,6 +370,22 @@ class MainActivitySettingsControllerTest : RobolectricTestBase() {
         3,
         MainActivitySettingsController.readMagicButtonCount(prefs),
     )
+  }
+
+  @Test
+  fun onPreferenceChangedWithVideoCropShouldToggle() {
+    controller.onPreferenceChanged(prefs)
+    assertTrue(!ui.cropToFillState)
+    prefs.edit().putBoolean(SettingsFragment.SK_VIDEO_CROP, true).commit()
+    controller.onPreferenceChanged(prefs)
+    assertTrue(ui.cropToFillState)
+  }
+
+  @Test
+  fun onPreferenceChangedWithIntShowPadsShouldClampAlpha() {
+    prefs.edit().putInt(SettingsFragment.SK_SHOW_PADS, 50).commit()
+    controller.onPreferenceChanged(prefs)
+    assertEquals(50f / 255f, ui.lastAlpha, 0.001f)
   }
 
   @Test

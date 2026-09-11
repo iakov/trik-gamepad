@@ -80,6 +80,8 @@ class DiagnosticsReportTest {
     val report = DiagnosticsReport.build(context, prefs, null, emptyList(), null)
     assertTrue(report.contains("Robot IP address: 192.168.77.1 (default)"))
     assertTrue(report.contains("Robot TCP port: 4444 (default)"))
+    assertTrue(report.contains("Button size: 100 (default)"))
+    assertTrue(report.contains("Smart glyph alignment: true (default)"))
     assertTrue(report.contains("Diagnostics verbosity: info (default)"))
   }
 

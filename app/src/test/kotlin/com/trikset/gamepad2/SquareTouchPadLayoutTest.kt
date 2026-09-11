@@ -38,8 +38,8 @@ class SquareTouchPadLayoutTest : RobolectricTestBase() {
   @Before
   fun setUp() {
     sender = SenderService(mExecutor)
-    sender.keepaliveTimeout = 10000000 // disable keepalive noise
-    sender.setTarget("localhost", 12345) // connect attempt is queued, not awaited
+    sender.keepaliveTimeout = 10000000
+    sender.setTarget("localhost", 12345)
 
     val context = org.robolectric.RuntimeEnvironment.getApplication()
     val parent = android.widget.FrameLayout(context)
@@ -101,6 +101,18 @@ class SquareTouchPadLayoutTest : RobolectricTestBase() {
     )
     assertEquals(260, pad.measuredWidth)
     assertEquals(260, pad.measuredHeight)
+  }
+
+  @Test
+  fun measureShouldCacheAdaptiveSize() {
+    // First measure primes the cache; second measure skips recomputation.
+    measureAndLayout(300, 150)
+    assertEquals(260, pad.measuredWidth)
+    val cached = field(pad, "adaptivePadPx") as Int
+    assertEquals("cached value is the measured size", 260, cached)
+    // A second measure with different specs reads the same cached value.
+    measureAndLayout(100, 100)
+    assertEquals(260, pad.measuredWidth)
   }
 
   @Test
