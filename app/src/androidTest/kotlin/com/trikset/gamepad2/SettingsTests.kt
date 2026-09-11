@@ -41,10 +41,10 @@ class SettingsTests {
   @Test
   fun settingsShouldWorkCorrectly() {
     openRobotSettings()
-    editPreference("Robot IP address…", "localhost")
-    editPreference("Robot TCP port…", "12345")
-    editPreference("URI for video stream to play…", "http://localhost:8080/?action=stream")
-    editPreference("Keep-alive timeout, ms…", "3000")
+    editPreference(R.string.pref_host_address, "localhost")
+    editPreference(R.string.pref_host_port, "12345")
+    editPreference(R.string.pref_video_uri, "http://localhost:8080/?action=stream")
+    editPreference(R.string.pref_keepalive, "3000")
 
     // Out of the robot settings back to the gamepad (single-level screen since C17's settings
     // split — the old Advanced sub-screen needed a second back).
@@ -65,7 +65,7 @@ class SettingsTests {
     val initialKeepaliveTimeout = mActivityTestRule.activity.senderService.keepaliveTimeout
 
     openRobotSettings()
-    editPreference("Keep-alive timeout, ms…", "500") // keepalive below MINIMAL_KEEPALIVE
+    editPreference(R.string.pref_keepalive, "500") // keepalive below MINIMAL_KEEPALIVE
 
     Espresso.pressBack()
 
@@ -80,23 +80,25 @@ class SettingsTests {
     onView(allOf(withId(R.id.targetChip), isDisplayed())).perform(click())
   }
 
-  /** Scrolls to and clicks the preference row titled [title]. */
-  private fun clickPreference(title: String) {
+  /** Scrolls to and clicks the preference row by its string resource ID. */
+  private fun clickPreference(titleResId: Int) {
     onView(withId(androidx.preference.R.id.recycler_view))
         .perform(
-            RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(hasDescendant(withText(title)))
+            RecyclerViewActions.scrollTo<RecyclerView.ViewHolder>(
+                hasDescendant(withText(titleResId))
+            )
         )
-    onView(allOf(withText(title), isDisplayed())).perform(click())
+    onView(allOf(withText(titleResId), isDisplayed())).perform(click())
   }
 
-  /** Opens the preference titled [title], sets its edit text to [value] and confirms. */
-  private fun editPreference(title: String, value: String) {
-    clickPreference(title)
+  /** Opens the preference titled [titleResId], sets its edit text to [value] and confirms. */
+  private fun editPreference(titleResId: Int, value: String) {
+    clickPreference(titleResId)
 
     onView(allOf(withId(android.R.id.edit), isDisplayed()))
         .perform(replaceText(value), closeSoftKeyboard())
 
-    onView(allOf(withId(android.R.id.button1), withText("OK"), isDisplayed()))
+    onView(allOf(withId(android.R.id.button1), withText(android.R.string.ok), isDisplayed()))
         .perform(scrollTo(), click())
   }
 }

@@ -236,6 +236,8 @@ class MainWindowTests {
           }
         }
 
+    private val defaultGlyphs = listOf("▲", "■", "●", "✕", "◆")
+
     @Before
     fun initNetworkSettings() {
       initNetworkSettings(mActivityTestRule.activity)
@@ -246,12 +248,9 @@ class MainWindowTests {
     fun magicButtonsShouldSendCorrectCommands() {
       val server = DummyServer()
       for (i in 1..5) {
-        // Direct performClick (no touch injection): the Espresso touch-based click() raced the
-        // connect->video-reload work and silently dropped the second tap in the sequence
-        // (hit 2026-08-11, whichever button was second). The wiring under test is the button
-        // listener -> command; pad touch handling is covered by SquareButtonTest.
-        // The description is "Button N · <glyph>" (a11y), so match the "Button N" prefix.
-        onView(withContentDescription(org.hamcrest.Matchers.startsWith("Button $i")))
+        // The description is locale-dependent word + "· <glyph>" (e.g. "Кнопка 1 · ▲").
+        // Match by the glyph suffix, which is the same in every locale.
+        onView(withContentDescription(org.hamcrest.Matchers.endsWith("· ${defaultGlyphs[i - 1]}")))
             .perform(performClickAction())
         // The listener fires an async send (connect + write on a real executor); bounded-await
         // each command so the socket write lands (TESTING.md: never a bare assert on
