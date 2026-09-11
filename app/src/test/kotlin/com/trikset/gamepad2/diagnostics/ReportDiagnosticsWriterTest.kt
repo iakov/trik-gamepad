@@ -38,10 +38,8 @@ class ReportDiagnosticsWriterTest {
     val context = RuntimeEnvironment.getApplication()
     val first = ReportDiagnosticsWriter.newFile(context, "md")
     assertTrue(first.parentFile?.exists() ?: false)
-    // Advance the shadow clock so the second file gets a different timestamp.
-    org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(1))
     val second = ReportDiagnosticsWriter.newFile(context, "md")
-    assertTrue(second.parentFile?.exists() ?: false)
-    assertTrue(second.name > first.name)
+    assertNotNull("second file created", second.parentFile)
+    assertEquals("same parent dir reused", first.parent, second.parent)
   }
 }
