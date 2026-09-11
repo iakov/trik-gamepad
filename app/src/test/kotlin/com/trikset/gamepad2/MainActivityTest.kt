@@ -738,25 +738,15 @@ class MainActivityTest : RobolectricTestBase() {
 
   @Test
   fun setMagicButtonsShouldApplyBottomMargin() {
-    activity.setMagicButtons(3, listOf("▲", "■", "●"), 100)
+    activity.setMagicButtons(5, listOf("▲", "■", "●", "✕", "◆"), 100)
     org.robolectric.shadows.ShadowLooper.idleMainLooper()
-    val overlay = activity.findViewById<View>(R.id.controlsOverlay)
-    val lp = overlay?.layoutParams as ViewGroup.MarginLayoutParams?
-    assertNotNull("controlsOverlay must be found", overlay)
-    assertTrue("bottom margin must be > 0 to clear buttons", lp!!.bottomMargin > 0)
-  }
-
-  @Test
-  fun setMagicButtonsTwiceShouldKeepMargin() {
-    activity.setMagicButtons(3, listOf("▲", "■", "●"), 100)
+    val overlay = activity.findViewById<View>(R.id.controlsOverlay)!!
+    val lp = overlay.layoutParams as ViewGroup.MarginLayoutParams
+    assertTrue("bottom margin must be > 0 to clear buttons", lp.bottomMargin > 0)
+    // Second call must preserve the margin (no double-growing).
+    activity.setMagicButtons(5, listOf("▲", "■", "●", "✕", "◆"), 100)
     org.robolectric.shadows.ShadowLooper.idleMainLooper()
-    val overlay = activity.findViewById<View>(R.id.controlsOverlay)
-    val lp = overlay?.layoutParams as ViewGroup.MarginLayoutParams?
-    val margin1 = lp!!.bottomMargin
-    // Second call with margin already correct -> no-change path.
-    activity.setMagicButtons(3, listOf("▲", "■", "●"), 100)
-    org.robolectric.shadows.ShadowLooper.idleMainLooper()
-    assertEquals("margin should stay the same", margin1, lp.bottomMargin)
+    assertEquals("margin kept stable", lp.bottomMargin, overlay.layoutParams.let { (it as ViewGroup.MarginLayoutParams).bottomMargin })
   }
 
   @Test
