@@ -1,15 +1,22 @@
-# DESIGN.md — trik-gamepad UX & accessibility conventions
+# DESIGN.md — prescriptive design for any TRIK gamepad app
 
 <!-- encoding: utf-8 -->
 
-Scope: the *why* behind user-facing UI/UX decisions, so future changes stay
-consistent and are not re-litigated. This is a contract: conventions here are
-enforced in reviews and (where possible) by tests/lint. AGENTS.md keeps only
-short trigger lines pointing at the named sections below — read a section when
-you touch that surface, never restate its rationale in AGENTS.md.
+Scope: the *why* behind user-facing UI/UX decisions, written for any
+platform that implements a gamepad app for a TRIK robot (Android, iOS,
+Web, Tizen, desktop — with or without haptics/sensors/hardware gamepad).
+This is a contract: conventions here must be followed by future
+implementations. No code — only requirements (*what*) and rationale (*why*).
+
+Each section is tagged with its applicable platform:
+
+- **[Universal]** — applies to every TRIK gamepad app regardless of platform.
+- **[Mobile]** — applies to touch-based interfaces (phone, tablet).
+- **[Android]** — Android-specific implementation notes (reference only, not
+  prescriptive for other platforms).
 
 Rationale for the decisions themselves (problem → alternatives → why) lives in
-`DECISIONS.md` "Campaign 15" and its execution record in `MEMORY.md`.
+`DECISIONS.md`; execution records live in `MEMORY.md`.
 
 ## Scenarios & use-cases (the contract)
 
@@ -104,29 +111,32 @@ ______________________________________________________________________
 
 | Section | Applies to |
 |---------|------------|
-| Scenarios & use-cases | every product decision (the contract) |
-| Defaults are as useful as possible | any new preference/field |
-| Every setting shows its current value | preference summaries |
-| Ellipsis on dialog rows | preference titles |
-| Option descriptions | every toggle/list/field |
-| Color is never the only signal | connection status, HUD state |
-| Touch targets | interactive controls on the gamepad screen |
-| Magic button symbols (advanced) | Advanced > Magic buttons |
-| About system vs Copy report | About category |
-| System theme | day/night, gamepad vs Settings |
-| HUD themes (Type 1) | the gamepad chrome: pads, buttons, gear, pill, chip |
-| Smart glyph alignment | every centered bundled-font glyph (magic buttons, pill, gear, video preset chips) |
-| Robot-target chip | top-left chip + connection-tone semantics |
-| Localization | strings, locales, translations |
-| WCAG | contrast + touch-target regression tests |
-| Connection & video state UX | status pill, reconnect badge |
-| Haptics | pads, magic buttons, settings gear |
-| Video player abstraction | VideoPlayer interface, MJPEG and RTSP implementations, factory |
-| Gamepad protocol (source of truth) | every protocol change, TCP and UDP |
+| Scenarios & use-cases (the contract) | [Universal] every product decision |
+| Defaults are as useful as possible | [Universal] any new preference/field |
+| Every setting shows its current value | [Universal] preference summaries |
+| Ellipsis on dialog rows | [Universal] preference titles |
+| Option descriptions | [Universal] every toggle/list/field |
+| Color is never the only signal | [Universal] connection status, HUD state |
+| Empty-value semantics | [Universal] empty = disabled contract |
+| Touch targets | [Mobile] interactive controls |
+| Magic button symbols (advanced) | [Universal/Mobile] symbol table + fallback |
+| Smart glyph alignment | [Universal/Mobile] ink-box centering |
+| Robot-target chip | [Mobile] target chip + connection-tone semantics |
+| HUD themes (Type 1) | [Mobile] gamepad chrome: pads, buttons, gear, pill, chip |
+| Two-layer HUD layout & error pill | [Mobile] layout geometry, error stacking |
+| Haptics | [Mobile] pads, magic buttons, settings gear |
+| About system vs Copy report | [Android] About category |
+| System theme | [Android] day/night, gamepad vs Settings |
+| Video player abstraction | [Android] VideoPlayer MJPEG/RTSP/Media3 |
+| Localization | [Universal] strings, locales, translations |
+| WCAG | [Universal] contrast + touch-target standards |
+| Connection & video state UX | [Universal] status pill, reconnect badge |
+| Gamepad protocol (source of truth) | [Universal] command matrix, keepalive, wire format |
+| Connection lifecycle & keepalive semantics | [Universal] keepalive, reconnect policy |
 
 ______________________________________________________________________
 
-## Defaults are as useful as possible
+## [Universal] Defaults are as useful as possible
 
 Every field's default is the **most useful choice for a typical user**, and the
 UI **pre-fills defaults rather than showing a blank**. A blank input where a
@@ -134,7 +144,7 @@ sensible default exists is a bug. Examples: the magic-button glyphs pre-fill
 with ▲ ■ ● ✕ ◆ when unset; the video-URI summary shows "No stream URI set"
 instead of an empty row.
 
-## Every setting shows its current value
+## [Universal] Every setting shows its current value
 
 A value-bearing setting always shows its current value in its summary:
 verbosity → `Info · …`, seekbars → `12 · Smaller = more sensitive…`, the video
@@ -155,21 +165,21 @@ or an explicitly-empty URI). The row and the runtime share one helper
 (`SettingsFragment.effectiveVideoUri`) so they can never disagree; a host edit
 refreshes the row too (the derived value follows the host).
 
-## Ellipsis on dialog rows
+## [Universal] Ellipsis on dialog rows
 
 A row that opens an input dialog ends with "…" (U+2026): `Robot IP address…`,
 `Wheel sensitivity…`, `Delete a preset…`. Switches, immediate-action rows and
 sub-screen rows stay plain. Enforcement: the strings themselves carry the
 ellipsis; lint `TypographyEllipsis` guards the character.
 
-## Option descriptions
+## [Universal] Option descriptions
 
 Every option carries a description, and descriptions are **state-aware**
 (`summaryOn`/`summaryOff`): flipping "Share logs without editing" changes the
 explanation to match the new state. A setting with no explanation is a bug —
 users must understand what flipping a switch or picking a value does.
 
-## Color is never the only signal
+## [Universal] Color is never the only signal
 
 State conveyed by a color change is also conveyed by text/announcement:
 
@@ -180,14 +190,14 @@ State conveyed by a color change is also conveyed by text/announcement:
 
 Rationale: the connection state was color-only (invisible to screen readers).
 
-## Touch targets
+## [Mobile] Touch targets
 
 Interactive controls on the gamepad screen are ≥ 48dp: the tap-to-connect pill
 (`minHeight 48dp`), the magic buttons (`minWidth`/`minHeight 48dp`), the gear
 (`touch_target_min` 48dp). Non-interactive indicators (spinner, FPS) may be smaller. Enforced by
 `TouchTargetSizeTest` + `MagicButtonPanelTest`.
 
-## Magic button symbols (advanced)
+## [Universal/Mobile] Magic button symbols (advanced)
 
 The five per-button glyphs are edited in one "Button symbols…" dialog
 (Advanced > Magic buttons, below "Number of buttons"). The dialog pre-fills the
@@ -197,14 +207,14 @@ symbols", and saves the whole array. Storage stays under the legacy
 gates how many buttons are shown; editing symbols never touches it). Glyphs are
 display-only — the protocol stays numeric `btn N down`.
 
-## About system vs Copy report
+## [Android] About system vs Copy report
 
 "About system" shows a short device spec and **copies exactly that short spec**
 on tap. "Copy report" is the row that copies the **full diagnostic report**
 (see Campaign 14). The two rows never copy the same payload, and the summary
 preview matches what "About system" copies ("Tap to copy — <spec>").
 
-## System theme
+## [Android] System theme
 
 The app follows the system light/dark mode (`Theme.AppCompat.DayNight`). The
 **gamepad HUD stays dark in both modes** — it sits over full-screen robot video
@@ -214,7 +224,7 @@ stay visible over bright frames — via an explicit black window background and
 system chrome. Verified by pixel-sampled screenshots in light (250,250,250)
 and dark (48,48,48) mode.
 
-## HUD themes (Type 1)
+## [Mobile] HUD themes (Type 1)
 
 The gamepad chrome ships as **"Type 1"** — a glass/arcade look (accent-colored
 border outlines, brand-green stroke, borderless bare-circle magic buttons,
@@ -281,7 +291,7 @@ one tintable pad-chrome vector). Two principles:
   `setMeasuredDimension`), or the chrome collapses to 0×0 and the pad renders
   as an empty glass panel (see DECISIONS.md "[2026-08-12] Pad render + layout").
 
-## Robot-target chip
+## [Mobile] Robot-target chip
 
 The top-left glass chip shows the robot target and reflects **robot control
 status** (not the app's UI state):
@@ -304,7 +314,7 @@ status** (not the app's UI state):
   interaction surface is the settings screen it opens, and a full 48dp target
   made the chip dominate the top-left of the video.
 
-## Smart glyph alignment
+## [Universal/Mobile] Smart glyph alignment
 
 Every centered bundled-font glyph in the HUD — the magic buttons, the status
 pill, the gear, and the video-source preset chips — renders through ONE shared
@@ -342,7 +352,7 @@ Suggested on-device check: `scripts/measure_glyph_row.py --dump … --shot …`
 by construction from the em-relative metrics, which are size/density/font-scale
 invariant (Android and Pillow rasterize the same bundled TTF via FreeType).
 
-## Localization
+## [Universal] Localization
 
 - The app ships `en` + `ru` + `fr` + `de` + `vi` (`resourceConfigurations` +
   `values-*/strings.xml` + `res/xml/locales_config.xml` for the Android 13+
@@ -359,7 +369,7 @@ invariant (Android and Pillow rasterize the same bundled TTF via FreeType).
 - Russian is the first additional language and gets a **human (native-speaker)
   review**; fr/de/vi are machine-drafted + machine back-translation verified.
 
-## WCAG
+## [Universal] WCAG
 
 WCAG 2.x AA is enforced by regression tests, not by hand:
 
@@ -370,7 +380,7 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
 - `TouchTargetSizeTest` asserts the 48dp minimum for interactive controls.
   A color change that drops below threshold fails the suite.
 
-## Connection & video state UX
+## [Universal] Connection & video state UX
 
 - The status pill is **symbol-only** in the Type 1 HUD: a rotating arrow (`↺`)
   while connecting and a power glyph (`⏻`) when disconnected, tinted to the
@@ -392,7 +402,7 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
   signal") was deliberately **not** added: a robot with video disabled
   legitimately keeps the spinner cycling (see DECISIONS.md).
 
-## Two-layer HUD layout & the error pill
+## [Mobile] Two-layer HUD layout & the error pill
 
 - **Two layers in `activity_main.xml`** (child order = z-order, no
   `bringToFront()`): the pads layer (`controlsOverlay`, full-screen, two
@@ -431,7 +441,7 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
   (a cmap-verified DejaVuSansMono Nerd Font subset) so they render identically
   on every device; anything else a user types falls back to the system font.
 
-## Haptics
+## [Mobile] Haptics
 
 - **Haptic feedback is deliberate and sparse** (user-corrected in C24: the old
   pad fired per-move feedback that kept coming after the finger lifted — "very
@@ -467,7 +477,7 @@ WCAG 2.x AA is enforced by regression tests, not by hand:
   `Haptics.constant(level)` (the semantic level, not a raw constant — the unit
   suite runs under SDK 23 where the older fallback would otherwise fire).
 
-## Video player abstraction
+## [Android] Video player abstraction
 
 The video pipeline uses a `VideoPlayer` interface so the retry/self-heal
 controller (`VideoRetryController`) drives whichever sink is active, and future
@@ -517,7 +527,7 @@ new class under the `VideoPlayer` interface — no `MainActivity` or
 `VideoRetryController` changes. Media3 is **not** added to the dependencies
 until proven necessary.
 
-## Gamepad protocol (source of truth)
+## [Universal] Gamepad protocol (source of truth)
 
 The control protocol is the **single truth for every byte sent to and received
 from the robot**. This section, not code, is the contract: `docs/architecture.md`
