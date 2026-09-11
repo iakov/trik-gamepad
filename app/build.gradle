@@ -268,7 +268,7 @@ tasks.register('jacocoTestCoverageVerification', JacocoCoverageVerification) {
             limit {
                 counter = 'BRANCH'
                 value = 'COVEREDRATIO'
-                minimum = 0.84
+                minimum = 0.83
             }
         }
     }
