@@ -923,6 +923,16 @@ class MainActivityTest : RobolectricTestBase() {
     org.robolectric.shadows.ShadowLooper.idleMainLooper()
   }
 
+  @Test
+  fun streamErrorWithNullRetryControllerShouldBeSafe() {
+    setField(activity, "videoRetryController", null)
+    val player = StubVideoPlayer()
+    setField(activity, "video", player)
+    method(activity, "onResume").invoke(activity)
+    player.triggerStreamError()
+    org.robolectric.shadows.ShadowLooper.idleMainLooper()
+  }
+
   /** Builds a SensorEvent of [type] via the modern SensorEventBuilder API. */
   private fun sensorEvent(type: Int): android.hardware.SensorEvent =
       org.robolectric.shadows.SensorEventBuilder.newBuilder()
