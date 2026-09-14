@@ -24,18 +24,11 @@ system's aspect-ratio settings, or lock your device's rotation to landscape.
 
 New session or contributor? Start here:
 
-- `AGENTS.md` — rules, guardrails, and commands for AI agents and contributors.
-- `DESIGN.md` — UX/accessibility conventions (named sections; the AGENTS memory
-  index points into them).
-- `MEMORY.md` — project facts, architecture details, CI quirks, and
-  retrospectives (pull on demand; `AGENTS.md` points to its sections).
-- `DECISIONS.md` — the decision log (problem → alternatives → why → out-of-scope
-  for every decision in the repo).
-- `TESTING.md` — test strategy and how to run the test suites.
-- `docs/architecture.md` — module map, TCP command protocol, MJPEG video
-  pipeline, and test layering, plus the Android/Kotlin/CI best-practice
-  reference.
-- `docs/ROADMAP.md` — the committed improvement plan (next phases and
-  sequencing).
+- `scripts/README.md` — reusable tooling (gate, translator, device-identifier
+  scrub, APK analyzer, pixel-census, etc.).
+- `.github/workflows/ci.yml` — CI configuration (build, unit tests, quality
+  gates, instrumented tests on emulator).
+- `app/config/` — static-analysis rule sets (detekt, checkstyle, pmd).
+- `app/lint.xml` — Android Lint configuration and baseline.
 - The maintained app lives in the canonical `app/` module at the repo root
   (`settings.gradle` + `app/`); all gradle commands run from the repo root.

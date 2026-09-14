@@ -79,6 +79,10 @@ versions risk collisions with the `minSdk*10000 + ...` formula).
   `sdkmanager "platforms;android-36"` (or the newer `android sdk install ...`
   CLI). System images installed include `android-36;default;x86_64` and
   `android-36;aosp_atd;x86_64` (the local instrumented-test AVD `Atd_API36`).
+- **apkanalyzer CLI path (Windows):** `cmdline-tools/latest/bin/apkanalyzer.bat`,
+  NOT `tools/bin/apkanalyzer` (which is a unix shell script, not executable on
+  Windows). Use `local.properties` `sdk.dir` or ANDROID_SDK_ROOT to resolve the
+  SDK path. Confirmed 2026-09-14 (C38).
 
 ### Version/SDK data snapshot
 
@@ -4514,7 +4518,108 @@ coverage push (1041 → 1060 absolute branches). Commits listed in ROADMAP
   the parenthetical 'measure absolute not just ratio' guidance folded into the
   Elapsed/`git status`-adjacent campaign habits).*
 
-### [2026-09-11] Campaign 37 execution run — idiomatic nullability refactor + branch gate 85%
+### [2026-09-14] Campaign 38 execution run — glyph chips alignment fix + app logo + pre-PR gate
+
+Scope: (1) fix video-source preset chips row (baseline alignment staggered
+rings + divider clipping), (2) replace app icon from 4096×4096 source to all 5
+mipmap densities as lossless WebP, (3) scripts/pr_gate.py with apkanalyzer
+APK-level checks. Commits: glyph fix at 9da0a70 + docs commit at 7f7e05e.
+
+**Process**
+
+- **Biggest process win:** the device-on-smoke step (run on physical S10e then
+  verify pixel-measurements) caught that the first "fixed" build had NOT been
+  installed — the device ran the old APK. Without the pixel-measurement
+  discipline and fresh install, the glyph fix would have been "verified" on
+  stale bytes. The reinstall + re-capture revealed the true alignment.
+- **What kept each commit self-contained:** the glyph fix was one entangled
+  commit (12 files, code + docs); the icon + pr_gate was a clean second. The
+  entangled glyph commit was unavoidable — code + test + docs + DESIGN/DECISIONS
+  needed to ship together to be compilable.
+- **What could have been lost:** the 4096×4096 11.8 MB source PNG was in
+  mipmap-xxxhdpi and would have been bundled into the APK during a rebuild
+  (caught by user instruction: "move to .tmp/"). The pr_gate.py's large-blob
+  check would catch such a file in the APK going forward.
+- **Elapsed vs Estimated:** Estimated "—" (no estimate set); Actual ≈4.5 h
+  total across two sub-sessions (glyph fix + icons/scripts).
+
+**Learning**
+
+- **New facts worth saving:**
+  - `apkanalyzer` CLI requires `cmdline-tools/latest/bin/apkanalyzer.bat` on
+    Windows, not `tools/bin/apkanalyzer` (which is a unix shell script).
+    ANDROID_SDK_ROOT or local.properties resolves the SDK path.
+  - The `apkanalyzer dex references` output is multi-line: one line per dex
+    file with `\t`-separated name/count. Must sum across all lines.
+  - `apkanalyzer files list` paths start with `/res/mipmap-xxxhdpi-v4/`.
+  - `aapt dump badging` confirms icon density presence via
+    `application-icon-160/240/320/480/640:` lines.
+- **What the gate caught:** the old device-identifier gate caught nothing new.
+  The pr_gate caught the releaseDebug APK still having the old icon (hadn't
+  been rebuilt after icon changes) — rebuilt and passed.
+
+**Signal**
+
+- **Frequency-scan:** "Deprecated Gradle features" still in every build (known
+  `.PLAN.md` Gradle-10-era bump). No new systemic message.
+- **Rule deviations / missing rules:** when re-adding CI-run verification: the
+  `check_emoji` step was not in the normal gate, so a missing CI-run report is
+  deferred until the push finishes — no rule change needed.
+- **User corrections:** (1) "OFF = plain centered text" was a product
+  clarification that superseded an earlier "make OFF look like ON" assumption —
+  user had to correct the agent's design default. This is now a DESIGN.md
+  scenario fact. (2) Emulator launch for remaining device verification when
+  the real device is gone — already covered by AGENTS.md "use Swiftshader_API36
+  for screenshots" but not stated as a general "real device absent → boot
+  emulator" rule. Captured in Drift.
+
+**Drift**
+
+- **Per-doc audit:**
+  - AGENTS.md — needs slim to pointer style (deferred from C37); no stale
+    rules found, but many inline rationales should move to MEMORY/DECISIONS.
+  - DECISIONS.md — needs 2026-09-05 entry for glyph centering semantics + new
+    2026-09-14 entries for icon format (WebP lossless, Lanczos) and pr_gate.
+  - DESIGN.md — glyph centering semantics already added in the glyph fix
+    commit; icon design no DESIGN.md change needed (standard mipmap).
+  - MEMORY.md — this record; also add `apkanalyzer` path trivia.
+  - TESTING.md — no new test strategy changes; Robolectric tests unchanged.
+  - scripts/README.md — needs pr_gate entry.
+  - README.md — needs update for upstream PR (deferred to PR-branch finalization).
+- **Best-scoped doc:** pr_gate.py is code (scripts/); the apkanalyzer
+  availability quirk goes to MEMORY.md; the icon decision goes to DECISIONS.md.
+- **Scripts review:** `scripts/pr_gate.py` promoted from planned script (no
+  `.tmp/` needed — written directly). `scripts/run_bounded.py` was reused to
+  wrap emulator launch but the `.ps1` → `powershell -File` bridge was needed
+  (run_bounded can't exec `.ps1` directly). Consider adding `.ps1` support to
+  run_bounded or documenting the bridge in scripts/README.md.
+
+**Value**
+
+- **Measurable profit:** glyph chips row now forms a true aligned row (0px
+  top/bottom spread in both ON and OFF modes) with correct 12dp divider gap;
+  app icon updated to all 5 densities as lossless WebP (total 44 KB across all
+  densities); pr_gate adds 7 APK-level checks that catch density gaps, method
+  bloat, oversized blobs, and permission drift before upstream PR.
+- **Deferred (→ `.PLAN.md`):** adaptive icon transition (next major release);
+  on-robot verification of chip port table; upstream PR creation.
+- **Next automation candidates:** pr_gate.py is now the tool; upstream CI could
+  add `apkanalyzer` checks and APK upload verification. A `scripts/` entry for
+  the `.ps1`→`powershell -File` bridge pattern.
+- **What I should have asked earlier:** the OFF/ON semantics question should
+  have been asked before writing the centering code, not after — cost one
+  iteration of redesign. Already captured in DESIGN.md.
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added:** none.
+- **Most useless question this campaign:** "Scripts review — any reusable
+  `.tmp/` ad-hoc script used twice?" — no `.tmp/` scripts were created this
+  campaign (pr_gate was written directly, resize used one-liner). The question
+  still produced the correct answer (nothing to promote).
+- **Checklist stamp:** *Last revised: 2026-09-14 (C38 retrospective: confirmed
+  no new questions; the "reusable .tmp script" question correctly reported
+  nothing this round).*
 
 Scope: replace dynamic null-checks with type-driven contracts to remove
 un-coverable dead branches instead of adding tests, then ratchet the gate to 85%.

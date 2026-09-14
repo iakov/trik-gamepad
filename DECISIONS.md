@@ -42,9 +42,10 @@ touch one.
 | Architecture | MJPEG reconnect, NSC scoping, raw-socket client, ViewModel, bounded retry, video-only mode, diagnostics & crash reporting, GPU-backed MJPEG render, UDP transport, TCP keepalive read path, VideoPlayer abstraction, RTSP via MediaPlayer, Media3 deferral, ScaleMode FIT/CROP, color rename, FPS integer+hysteresis, thread-safety audit, video-source preset chips, share-in images ZIP, VideoStreamLoader deletion | [2026-09-05] Wi-Fi network tracker is a single app-scoped instance (TooManyRequests crash) |
 | Workflows | fork-only, releases | [2026-08-22] Release via signed tags + GH releases |
 | Process | docs culture, auto-mode contract, operational rules, plan-file design | [2026-08-15] Docs-discipline rules (scoped storage, per-doc drift audit, plan-trim-after-push) |
-| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics | [2026-09-05] Chips circles in a row + OFF = plain baseline centering |
+| UX & accessibility & i18n | design conventions, a11y, WCAG, localization, theme, HUD error pill, inset-aware HUD, magic-button glyph centering, haptics, app icon | [2026-09-14] App icon: lossless WebP at all 5 mipmap densities |
 | Repo hygiene | device identifiers never enter repo content, fork-only | [2026-08-20] Device-identifier pre-commit hook + gate step |
 | Tooling & process | timeout-bound commands, process-tree kill, host adb shim, dependency drops, chip extraction, emulator launch | [2026-08-27] run_bounded hang-proof redesign |
+| Tooling & quality | pre-PR APK gate (pr_gate.py), apkanalyzer checks | [2026-09-14] scripts/pr_gate.py — pre-upstream-PR APK quality gate |
 | Build & versioning | package naming, minSdk, versionCode formula, release signing | [2026-08-22] Package rename to com.trikset.gamepad2 |
 
 ______________________________________________________________________
@@ -2359,6 +2360,31 @@ ______________________________________________________________________
   verified by pixel-census (chrome/knob/ring present in sepia idle; gear + chip
   render) and hash-matched against fresh captures.
 
+### [2026-09-14] App icon: lossless WebP at all 5 mipmap densities (Lanczos downscale)
+
+- **Type:** design-clarifying (the launcher icon is the app's primary visual
+  identity on the home screen).
+- **Problem:** the old icon was a 192×192 WebP in xxxhdpi-only (no other density
+  variants); Android scaled it down for lower-density screens, wasting memory.
+  The user provided a 4096×4096 PNG source.
+- **Alternatives considered:** (a) keep xxxhdpi-only and let Android scale
+  (rejected — memory waste, slightly blurry on mdpi/hdpi); (b) generate PNG
+  at all densities (rejected — WebP is 4–10× smaller with identical pixels);
+  (c) generate lossless WebP at all 5 densities with Lanczos (chosen);
+  (d) add adaptive icon foreground/background layers (rejected — deferred to
+  next major release).
+- **Chosen solution:** resize the 4096 source to 48/72/96/144/192 px (mdpi
+  through xxxhdpi) using `PIL.Image.LANCZOS`, save as lossless WebP. Manifest
+  updated to `@mipmap/trik_gamepad_logo`. Source PNG moved to `.tmp/`.
+- **Why:** Lanczos (8×8 kernel) preserves edge sharpness at extreme downscales
+  (85×) better than bilinear or bicubic; lossless WebP is the standard Android
+  icon format (supported since API 18, our minSdk 21). All 5 densities consume
+  ~44 KB total — negligible vs the 11.8 MB source.
+- **Out of scope / consequences:** adaptive icon layers (foreground/background)
+  are deferred; the `ic_launcher.xml` pattern for adaptive icons will be added
+  at the next major version bump. The old `trik_gamepad_logo_512x512.webp` is
+  deleted.
+
 ### [2026-08-27] run_bounded hang-proof redesign
 
 - **Type:** problem-avoiding (command hygiene: a bounded runner must never leave
@@ -3177,3 +3203,16 @@ ______________________________________________________________________
   timeout (abort after 10 min). No APK is stored in the repository (the
   release entry is the delivery channel). Historical APKs in `_apk/` are not
   removed — the convention changes going forward.
+
+______________________________________________________________________
+
+## Tooling & quality
+
+### [2026-09-14] scripts/pr_gate.py — pre-upstream-PR APK quality gate
+
+- **Type:** problem-avoiding (catches APK-level defects before the upstream PR: density gaps, oversized blobs, method-count creep, permission drift).
+- **Problem:** the normal gate (`scripts/gate.py`) validates code, tests, and resources at the source level, but does not inspect the assembled APK. A missing icon density, an oversized resource in the build, or a new dangerous permission slips through.
+- **Alternatives considered:** (a) add all checks to the existing `gate.py` (rejected — these checks require `assemble`, which gate.py does not run; adding them would slow the commit gate); (b) a separate `pr_gate.py` script run before upstream PR creation (chosen); (c) CI-only checks (rejected — the local developer should catch these before pushing).
+- **Chosen solution:** `scripts/pr_gate.py` runs 7 checks via `apkanalyzer`: APK summary, file size, download size, permission audit, dex reference count (threshold 60K), icon density completeness (all 5 mipmap densities), and large-blob scan (>500 KB non-standard files). Defaults to the releaseDebug APK; accepts `--apk` for custom paths. Uses `run_bounded` for timeouts.
+- **Why:** `apkanalyzer` is part of the Android SDK (`cmdline-tools/latest/bin/`) — zero additional dependencies. Each check targets a real past defect or near-miss: the 11 MB icon source caught by the large-blob scan; missing icon densities by the density check. The `dex references` parser sums multi-dex output correctly (7 dex files, 58437 total refs in the current build).
+- **Out of scope / consequences:** the script does not build the APK (caller runs `assembleReleaseDebug` first). It does not run the normal gate (`gate.py` separately). The 500 KB threshold for large blobs is generous — tighten as the app grows.
