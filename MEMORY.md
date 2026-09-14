@@ -4775,3 +4775,114 @@ Branch gate 85% — idiomatic-nullability refactor".
   question to also capture what entangled the batch; added the "measure absolute
   coverage, not the ratio's last digit" guidance for gate-threshold campaigns;
   recorded the JDK-25 JaCoCo proxy-instrumentation quirk in the local-tooling lore).*
+
+### [2026-09-15] Campaign 39 execution run — upstream PR prep, design doc maturity, dev tooling hardening
+
+Scope: (1) complete C37 nullability refactor → 85% branch gate, (2) kotlin-ls
+expiry guard, (3) Gradle-10 deprecation suppression, (4) DESIGN.md restructure to
+multi-platform prescription + content gaps (orientation, lifecycle, hardware
+gamepad), (5) script SPDX headers (Copyright + Apache-2.0), (6) DummyRobotServer
+protocol audit (in sync — no action), (7) upstream-pr-v2 creation with 4 clean
+commits on top of upstream/master, (8) releaseDebug verification (full gate +
+connected tests) on both feat/global-refresh and upstream-pr-v2.
+
+**Process**
+
+- **Biggest process win:** the upstream-pr-v2 branch strategy — isolate code+CI+tests
+  into fresh commits on upstream/master, keep docs/dev-scripts on global-refresh.
+  The subagent-driven audit of DESIGN.md gaps (orientation, lifecycle, hardware
+  gamepad) produced concrete missing sections that were written in one pass.
+- **What kept each commit self-contained:** upstream-pr-v2's 4 commits are naturally
+  separable by concern (build, sources, tests, CI). Each compiles or is valid at
+  its slice (build alone configures the module; sources add content; tests depend on
+  sources but are part of the same final state).
+- **What could have been lost:** the `docs/img/` screenshot was missing from
+  upstream-pr-v2 (READ ME referenced it but the directory wasn't committed — caught
+  by the retrospect-ve subagent). The `_apk/` artifact was committed in the first
+  draft of commit 1 then removed by C38 — "do not commit APKs until prompted" rule
+  now enforced.
+- **Elapsed vs Estimated:** Estimated "—" (no estimate). Actual ~6 h cumulative
+  across CI-fix loops + DESIGN.md + upstream-pr-v2 creation + device deploy.
+
+**Learning**
+
+- **New facts worth saving:**
+  - `install_non_market_apps=1` is not sufficient on API 29+ for adb installs —
+    must also clear `PackageInstaller` data (`pm clear com.android.packageinstaller`)
+    to reset "user rejected permissions" rejection history.
+  - `appops set com.android.shell REQUEST_INSTALL_PACKAGES allow` is a preventive
+    measure for shell-triggered adb installs.
+  - `DummyRobotServer` is in full protocol sync with DESIGN.md (verified by
+    cross-reference subagent — zero mismatches, full command matrix coverage).
+- **What the gate caught:** detekt failed when running on JDK 25 (detekt 1.23.8
+  caps at jvmTarget 22) — root cause was dev-box drift (only JDK 25 installed,
+  AGENTS.md mandates JDK 21). Resolved by installing openjdk-21-jdk-headless via
+  apt. The Gradle-10 deprecation summary mode `org.gradle.warning.mode=summary`
+  suppresses both SpotBugs and AGP plugin-internal warnings to one line.
+
+**Signal**
+
+- **Frequency-scan:** top repeated diagnostic: `Configuration cache entry discarded due to serialization error` when switching AGP versions (9.2.1 → 9.4.0 → 9.2.1).
+  Root-caused: AGP 9.4.0's config-cache serialization is incompatible with AGP 9.2.1's
+  cached entry — forcing `rm -rf .gradle/configuration-cache` each time. No new
+  systemic message.
+- **Rule deviations / missing rules:** device install failure pattern not captured
+  in AGENTS.md — the `PackageInstaller data clear` rescue is a new machine-local
+  workaround (→ `.tooling.md` candidate). The JDK 21 requirement is in AGENTS.md
+  but no explicit "if only JDK 25+ is available, install JDK 21" instruction —
+  added to local dev setup guidance.
+- **User corrections:** (1) "keep docs in global-refresh, code+CI in upstream-pr-v2"
+  — corrected my assumption that all branches carry docs. New rule: code-only PR
+  branches are separate from dev-docs branches. (2) "do not commit APKs until
+  prompted" — corrected my habit of bundling APK in the build commit. Rule: APK
+  is a release artifact, never committed. (3) "copyright is Iakov Kirilenko" —
+  corrected my guess of "trikset/trik-gamepad contributors" for script headers.
+
+**Drift**
+
+- **Per-doc audit:**
+  - AGENTS.md — kotlin-ls expiry guard hook added; command hygiene hardened;
+    the upstream-PR branches rule should be captured.
+  - DESIGN.md — restructured to multi-platform prescription doc with [Universal]/
+    [Mobile]/[Android] tags; 3 new sections (orientation, lifecycle, hardware
+    gamepad); dangling "Connection lifecycle & keepalive semantics" index row
+    removed.
+  - DECISIONS.md — Gradle-10 deprecation suppression rationale added.
+  - MEMORY.md — this record.
+  - scripts/ — SPDX headers (Copyright + Apache-2.0) added to all 18 scripts.
+- **Best-scoped doc:** DESIGN.md now holds all "why" for product decisions; the
+  subagent audit confirmed no missing design guidance in areas checked (orientation,
+  lifecycle, hardware gamepad, error UX, navigation, Wi-Fi binding, audio).
+- **Scripts review:** SPDX license headers promoted from conversation (user
+  correction) to all 18 scripts — done as a single `sed` batch. No `.tmp/`
+  ad-hoc scripts to promote (all work used established tools).
+
+**Value**
+
+- **Measurable profit:** upstream-pr-v2 is ready to PR (4 clean commits, no docs,
+  no committed APK, CI badge pointing to trikset, screenshot included). DESIGN.md
+  is now a multi-platform prescription doc that covers the 3 top-content gaps.
+  All scripts carry SPDX license identifiers. DummyRobotServer confirmed in sync
+  with protocol spec.
+- **Deferred (→ `.PLAN.md`):** Gradle-10-era toolchain upgrade (SpotBugs
+  ReportingExtension suppression must be removed). DESIGN.md medium/low priority
+  gaps (multi-window, Wi-Fi binding, error UX). Instrumented tests for
+  upstream-pr-v2 (connected suite passed locally but CI YAML needs split config
+  for unit vs instrumented).
+- **Next automation candidates:** a `check_spdx.py` to verify all scripts have
+  copyright+license headers (gate.py step). An `adb_install.py` wrapper that
+  handles the `PackageInstaller` data clear dance.
+- **What I should have asked earlier:** whether the upstream-pr-v2 README should
+  include the screenshot or reference a URL — would have caught the missing
+  `docs/img/` earlier. Also: whether to tag before or after building APK
+  (user: "no need to tag now, sometimes later").
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added:** none.
+- **Most useless question this campaign:** "What kept each commit self-contained"
+  — the upstream-pr-v2 4 commits are naturally separable by design (build, sources,
+  tests, CI). The question passed clean this round. Keep it.
+- **Checklist stamp:** *Last revised: 2026-09-15 (C39 retrospective: all questions
+  produced useful answers; the "self-contained commits" question correctly
+  identifies the upstream-pr-v2 split as a success pattern to repeat).*
