@@ -1,4 +1,7 @@
-# TRIK Gamepad (Android)
+<p align="center">
+  <img src="docs/img/trik_gamepad_logo.png" width="72" height="72" alt="TRIK Gamepad logo">
+</p>
+<h1 align="center">TRIK Gamepad (Android)</h1>
 
 [![CI](https://github.com/iakov/trik-gamepad/actions/workflows/ci.yml/badge.svg)](https://github.com/iakov/trik-gamepad/actions/workflows/ci.yml)
 
