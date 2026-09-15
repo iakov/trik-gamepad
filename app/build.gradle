@@ -158,7 +158,7 @@ detekt {
 // find-sec-bugs as the security SAST detector on the SpotBugs classpath. The
 // SpotBugs engine itself is pulled in via toolVersion above.
 dependencies {
-    spotbugsPlugins "com.h3xstream.findsecbugs:findsecbugs-plugin:${libs.versions.findsecbugs.get()}"
+    spotbugsPlugins "com.h3xstream.findsecbugs:findsecbugs-plugin:1.14.0"
 }
 
 tasks.withType(com.github.spotbugs.snom.SpotBugsTask).configureEach {

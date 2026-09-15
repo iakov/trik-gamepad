@@ -49,6 +49,7 @@ Scripts: `scripts/README.md`.
   `DESIGN.md` index, `TESTING.md`, `app/build.gradle`, `.github/workflows/ci.yml`;
   pull sections on demand.
 - Run `uv run python scripts/refresh_kotlin_ls.py` (--refresh if it warns).
+- Snapshot project health: `scripts/ci_failures.py` from the latest CI run.
 
 ### Before commit
 
@@ -61,6 +62,8 @@ Scripts: `scripts/README.md`.
 ### Before push — publishing gate
 
 - Fork-only workflow: work lives in personal fork (origin). Never PR upstream.
+- **Rebase onto the real upstream tip** before push: `git fetch origin && git rebase origin/feat/global-refresh`. Confirm the base first (`git merge-base HEAD origin/feat/global-refresh`) — rebasing onto an ancestor replays merged commits.
+- **Review pending commits**: `git log --oneline --max-count=5` — verify each commit is self-contained and the message is Conventional Commits format.
 - Branch: `feat/`/`fix/`/`docs/`/`style/`/`refactor/`/`chore/`. No direct master push.
 - Squash-fix mistakes before push (`git reset --soft HEAD~1 && git commit`).
 - **Commit cheaply** (pre-commit only). Batch validation once: `uv run python scripts/gate.py` + full 3-variant test twice. `git status --short` must be clean.
@@ -148,6 +151,15 @@ Scripts: `scripts/README.md`.
 - Push tag first (signed) before `gh release create`. User reviews + publishes.
 - After publish: refresh README hero screenshot if HUD changed.
 
+## Priority tasks / status snapshot (when asked)
+
+- **CI status**: `gh run list --repo iakov/trik-gamepad --branch feat/global-refresh --limit 3`
+- **Coverage**: `./gradlew jacocoTestReport` then read the summary table from `app/build/reports/jacoco/test/html/index.html`
+- **Detekt violations**: `./gradlew detekt`
+- **Open PRs**: `gh pr list --state open --repo iakov/trik-gamepad`
+- **Security alerts**: `gh api repos/iakov/trik-gamepad/dependabot/alerts --jq '.[] | "\(.state) \(.security_advisory.severity) \(.dependency.package.name)"'`
+- **APK analysis**: `uv run python scripts/pr_gate.py`
+
 ## Guardrails
 
 - **Design sits above decisions** — DESIGN.md scenarios (S1–S14) are the product
@@ -158,6 +170,12 @@ Scripts: `scripts/README.md`.
   before acting; research best solution; implement only proved decisions.
 - **PR discipline**: Conventional Commits, imperative mood, \<50 chars, one idea,
   diff \<400 lines. Description: root cause / profit / trade-offs / verification.
+- **PR signing (upstream)**: at minimum the last commit in a PR branch must be
+  GPG-signed. Before opening an upstream PR, re-sign branch commits:
+  `git rebase --exec 'git commit --amend --no-edit -S' origin/<base>` then verify
+  `git log --format=%G? origin/<base>..HEAD` shows all `G`. For our fork PRs,
+  `--no-gpg-sign` remains acceptable (local gpgsign=true, no interactive agent).
+  Details: lobe-server MEMORY.md "Signing discipline".
 - **Repo hygiene**: `.tmp/` for temp files; never touch `git config`; feature
   branches only.
 - **Never push device identifiers** — serial, model, IMEI. Session-only via
@@ -166,7 +184,7 @@ Scripts: `scripts/README.md`.
 - **Suppressions**: every `@Suppress`/`//noinspection`/lint.xml relaxation
   carries a rationale comment or MEMORY.md entry.
 - **Tooling assumptions**: verify with `--help`/docs/`--read-only` probe; route
-  complex args through `.tmp/` file.
+  complex args through `.tmp/` file. Verify commands work BEFORE documenting them.
 - **Re-read .md diffs after mdformat** — line-start `+`/`-`/`*` create lists;
   keep inline-code spans on a single line.
 - **Documenting decisions**: AGENTS.md = rules/triggers only (never rationale).
@@ -192,6 +210,10 @@ Scripts: `scripts/README.md`.
   code changes. No stale/misleading comments; delete rather than leave wrong.
 - **Machine-local workarounds never enter repo docs** — host in `.tooling.md`.
 - **Verify toolchain names against executable sources** before writing docs.
+- **detekt bump auto-enables rules** — a previously-green tree failing after a
+  detekt version bump is likely a new rule, not a code regression. Evaluate the
+  rule on merit before "fixing" code (same applies to any linter with
+  auto-enable semantics).
 - **Tests are code**: reuse shared test support (TestTcpServer, RobolectricTestBase,
   helpers). Dedup drives token count, not table-ization.
 - **Tests must be able to fail**: no tautologies, no unreachable assertions.
@@ -225,6 +247,10 @@ Scripts: `scripts/README.md`.
 - **Nested quoting through cmd/PowerShell mangles `$`, quotes, `^`** → route
   through `.tmp/` file. `uv run pip list` showing a package ≠ usable — use
   `uv run --with <pkg>`.
+- **Complex commit messages via file** — PowerShell interprets `-1`, backticks,
+  and quotes in `git commit -m` as command syntax. Use `git commit --file .tmp/msg.txt`
+  for non-trivial messages. Write the file with byte-preserving Python, not
+  PowerShell `Set-Content`/`Out-File` (see BOM trap above).
 
 ## Commands
 

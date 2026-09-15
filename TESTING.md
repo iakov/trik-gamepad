@@ -389,13 +389,17 @@ main looper to run `onPostExecute`. Do not rely on real threads for the
 
 Every batch of changes touching `SenderService` or the tests should consider:
 
-- Empty commands (`send("")` must still connect).
-- Keepalive boundaries: `MINIMAL_KEEPALIVE` (1000) vs default (5000) vs large
-  values (keepalive effectively disabled in tests via `10000000`).
+- Empty/null inputs (`send("")` must still connect).
+- Boundary values (keepalive: `MINIMAL_KEEPALIVE` (1000) vs default (5000) vs large).
 - Target change while connected → disconnect, then reconnect on next send.
 - Port/reuse failure modes (bind conflicts, closed listener in `close()`).
+- Corrupt or malformed data (malformed command lines, truncated MJPEG frames).
+- Failure modes (file missing, permission denied, network unavailable).
 - Instrumented: orientation (landscape-only activity), fullscreen/immersive UI,
   settings-driven host/port/video-URI changes.
+
+Where edge cases emerge during testing, update this list — don't let lessons
+live only in the test that caught them.
 
 ## Test quality discipline
 
