@@ -4886,3 +4886,31 @@ connected tests) on both feat/global-refresh and upstream-pr-v2.
 - **Checklist stamp:** *Last revised: 2026-09-15 (C39 retrospective: all questions
   produced useful answers; the "self-contained commits" question correctly
   identifies the upstream-pr-v2 split as a success pattern to repeat).*
+
+### [2026-09-17] Process notes: upstream PR merge, issue triage, dev branch lifecycle
+
+**PR merge pattern (adopted for upstream):**
+- **Feature PRs** (our own code changes) → **squash-merge** (single commit, clean
+  history). PR #35 was squash-merged as `e2fa5e4`.
+- **Dependabot/automation PRs** → **rebase-merge** (preserves the single commit
+  Dependabot generates). PR #36 was rebase-merged as `52e1651` — merge commit is
+  the Dependabot's own commit, which Dependabot recognizes and won't re-create.
+
+**Issue closure workflow:**
+- Open issues that were resolved by the Kotlin rewrite (old Java bugs/enhancements)
+  were closed with per-issue comments referencing the merge commit (`e2fa5e4`).
+  Each comment cites the implementing classes and their responsibilities so the
+  closure is auditable without opening the code.
+- 6 issues closed: #31 (version), #30 (video), #29 (tests), #25 (TODO), #23
+  (feedback protocol), #1 (press/release events).
+
+**`dev` branch lifecycle:**
+- `dev` is the permanent development branch, based on `upstream/master` with all
+  docs/scripts/dev-tooling on top. It replaces `feat/global-refresh` as the active
+  dev fork branch.
+- `git diff upstream/master..dev` shows only docs/scripts/configs — zero code
+  changes. Bugfix branches are created from `upstream/master` (clean code base)
+  and PR'd to upstream; the fix can also be cherry-picked to `dev` for testing.
+- `feat/global-refresh` is**historical** — kept for reference, no new work on it.
+- **Before a bugfix PR:** create branch from `upstream/master`, implement, gate,
+  PR with rebase-merge to upstream. Cherry-pick the fix commit to `dev`.
