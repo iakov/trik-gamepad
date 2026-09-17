@@ -17,7 +17,7 @@ triggers, the user can verify the claim at the linked URL before acting.
 | Samsung Galaxy Store | https://developer.samsung.com/galaxy-store/requirements |
 | F-Droid | https://f-droid.org/docs/Inclusion_Policy/ |
 | Amazon Appstore | https://developer.amazon.com/docs/app-submission/app-submission-checklist.html |
-| RuStore | https://help.rustore.ru/rustore/for_developers (JS-rendered, verify manually) |
+| RuStore | https://www.rustore.ru/help/developers/ |
 
 ## Universal checks (every store)
 
@@ -106,18 +106,32 @@ Run before any store-specific review:
 
 | # | Requirement | Mandatory? | Check | Source |
 |---|-------------|-----------|-------|--------|
-| R1 | **Privacy policy in Russian** | Yes | U3 + U4 must pass; policy must have a Russian-language version | [Developer docs](https://help.rustore.ru/rustore/for_developers) |
-| R2 | **minSdk ≥ 21** | Yes | Already met | [Developer docs](https://help.rustore.ru/rustore/for_developers) |
-| R3 | **Content rating** (0+, 6+, 12+, 16+, 18+) | Yes | Self-rate in RuStore Console | [Rating](https://help.rustore.ru/rustore/for_developers) |
-| R4 | **Screenshots 2–5** | Yes | Manual: same screenshots as Google Play | [Publication](https://help.rustore.ru/rustore/for_developers) |
-| R5 | **App description in Russian** | Yes | Write Russian description (already exists in `values-ru/strings.xml`) | [Publication](https://help.rustore.ru/rustore/for_developers) |
-| R6 | **Developer identity verification** | Yes | Confirm via Gosuslugi (Russian government portal) | [Registration](https://help.rustore.ru/rustore/for_developers) |
-| R7 | **152-ФЗ compliance** (personal data law) | Yes | App does not collect personal data → automatically compliant | [152-ФЗ](https://help.rustore.ru/rustore/for_developers) |
-| R8 | **No VPN/tor/anonymizer functionality** | Yes | Verify: app only connects to local robots | [Moderation policy](https://help.rustore.ru/rustore/for_developers) |
-| R9 | **APK signing** | Yes | Standard Android signing | [Publication](https://help.rustore.ru/rustore/for_developers) |
-| R10 | **No Google Play Services dependency** | Recommended | `grep -ri 'google.*services\|gms' app/build.gradle` — should be clean (GMS not available on RuStore devices) | [Compatibility](https://help.rustore.ru/rustore/for_developers) |
+| R1 | **App functional and stable** (no crashes/errors) | Yes | `test` gate passes, no known crashes | [Requirements §1](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#1) |
+| R2 | **Self-contained app** (not just WebView wrapper) | Yes | Verify: native gamepad UI, not a website wrapper | [Requirements §1](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#1) |
+| R3 | **App name ≤30 chars**, identical on store and device | Yes | `grep app_name app/src/main/res/values/strings.xml` | [Publication §info](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication#) |
+| R4 | **Category selected** (e.g. Tools) | Yes | Manual: choose in RuStore Console | [Publication §category](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication/new-version-app/category) |
+| R5 | **Age restriction** (0+, 6+, 12+, 16+, 18+) | Yes | Manual: select in RuStore Console | [Publication §age](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication/new-version-app/age-restrictions) |
+| R6 | **Content/policy compliance**: no hate speech, porn, violence, illegal goods, IP infringement | Yes | Manual: review app content against requirements | [Requirements §2](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#app-contains) |
+| R7 | **minSdk ≥ 21** (pulled from manifest) | Yes | Already met | [Publication §info](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication#) |
+| R8 | **Privacy policy** (if handling personal data) | Conditional | App does NOT collect personal data → recommended but optional | [Requirements §3](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#3) |
+| R9 | **152-ФЗ compliance** (consent for data collection) | Conditional | No personal data collected → automatically compliant | [Requirements §3](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#3) |
+| R10 | **Data security declaration** in console | Yes | Declare INTERNET + ACCESS_NETWORK_STATE only | [Publication §security](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication#) |
+| R11 | **No prohibited permissions** | Yes | `grep 'protectionLevel.*signature\|privileged' app/src/main/AndroidManifest.xml` → zero | [Requirements §4](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#4) |
+| R12 | **Sensitive permissions declared** | Yes | No sensitive perms → declare "none" in console | [Requirements §4](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#4) |
+| R13 | **App supports Russian or English** | Yes | Already met (en + ru locales) | [Requirements §2](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#app-contains) |
+| R14 | **Developer contacts** (email required, VK/Website/MAX optional) | Yes | Provide `support@trikset.com` | [Publication §contacts](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication#) |
+| R15 | **Developer identity via Gosuslugi** | Yes | Complete in RuStore Console before publishing | [Registration](https://www.rustore.ru/help/developers/developer-account) |
+| R16 | **Short description ≤80 chars**, no emoji/special chars | Yes | Manual: write RU short description | [Requirements §6](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#6) |
+| R17 | **Full description ≤4000 chars in Russian**, accurate | Yes | Manual: write RU full description | [Requirements §6.3](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#63) |
+| R18 | **Icon 512×512** px, 1:1, PNG/JPG, ≤1 MB, full bg fill | Yes | Already exists; upload to console | [Requirements §6.4](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#64) |
+| R19 | **Screenshots ≥3** per device type, 16:9 recommended, max 2160×3840, ≤3 MB, actual UI | Yes | Manual: capture 3+ at 1080x1920 or 1920x1080 | [Requirements §6.5](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#65) |
+| R20 | **"What's new"** for version updates | Yes | Manual: write RU changelog per version | [Publication §whatsnew](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication#) |
+| R21 | **APK signed**, size ≤5 GB, version increasing | Yes | Standard signing already configured | [Publication §upload](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication#upload-app-file) |
+| R22 | **Version ≥ other stores** | Yes | RuStore version must not lag behind Google Play | [Requirements §1](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#1) |
+| R23 | **No GMS dependency** | Recommended | `grep -ri 'google.*services\|gms' app/build.gradle` → zero matches | [Compatibility](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps) |
+| R24 | **Test account** if app requires auth | Conditional | App has no auth → N/A | [Requirements §1](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#1) |
 
-**Note:** RuStore documentation is a client-side rendered SPA. The source URL above is the developer docs hub. Specific requirement pages should be verified manually by opening in a browser. RuStore moderation may also request additional documentation under Russian Federation laws.
+**Source docs:** Full RuStore developer docs at `https://www.rustore.ru/help/developers/`. Requirements: `rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps`. Publication guide: `rustore.ru/help/developers/publishing-and-verifying-apps/app-publication`. These are static server-rendered pages — links are stable.
 
 The following scripts should be wired into CI for automatic store-readiness
 gating. Each maps to one or more checks above:
