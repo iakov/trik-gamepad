@@ -69,6 +69,9 @@ Scripts: `scripts/README.md`.
 - **Commit cheaply** (pre-commit only). Batch validation once: `uv run python scripts/gate.py` + full 3-variant test twice. `git status --short` must be clean.
 - **Scan the push for device identifiers** (`git diff origin/<branch>..HEAD`).
 - Docs-only pushes (`.md`): never wait for green CI.
+- **`uv.lock` freshness**: if `pyproject.toml` changed, verify `uv.lock` is up to
+  date (`git diff --name-only HEAD -- uv.lock` must be non-empty). Run `uv lock`
+  otherwise and commit the lock file update.
 - If AGENTS.md changed: verify every line against the boundary test (below).
 
 ### After push (retrospective)
