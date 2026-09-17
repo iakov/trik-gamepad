@@ -17,6 +17,7 @@ triggers, the user can verify the claim at the linked URL before acting.
 | Samsung Galaxy Store | https://developer.samsung.com/galaxy-store/requirements |
 | F-Droid | https://f-droid.org/docs/Inclusion_Policy/ |
 | Amazon Appstore | https://developer.amazon.com/docs/app-submission/app-submission-checklist.html |
+| RuStore | https://help.rustore.ru/rustore/for_developers (JS-rendered, verify manually) |
 
 ## Universal checks (every store)
 
@@ -101,7 +102,22 @@ Run before any store-specific review:
 | A6 | **Fire OS compatibility** | Yes | Test on Fire tablet (Amazon offers Remote Test Lab) | [Testing](https://developer.amazon.com/docs/app-testing/remote-test-lab.html) |
 | A7 | **DRM for video** | No | MJPEG/RTSP streams are DRM-free — no issue | [Policy](https://developer.amazon.com/docs/app-submission/app-submission-checklist.html) |
 
-## CI / scripts for formal gates
+### RuStore
+
+| # | Requirement | Mandatory? | Check | Source |
+|---|-------------|-----------|-------|--------|
+| R1 | **Privacy policy in Russian** | Yes | U3 + U4 must pass; policy must have a Russian-language version | [Developer docs](https://help.rustore.ru/rustore/for_developers) |
+| R2 | **minSdk ≥ 21** | Yes | Already met | [Developer docs](https://help.rustore.ru/rustore/for_developers) |
+| R3 | **Content rating** (0+, 6+, 12+, 16+, 18+) | Yes | Self-rate in RuStore Console | [Rating](https://help.rustore.ru/rustore/for_developers) |
+| R4 | **Screenshots 2–5** | Yes | Manual: same screenshots as Google Play | [Publication](https://help.rustore.ru/rustore/for_developers) |
+| R5 | **App description in Russian** | Yes | Write Russian description (already exists in `values-ru/strings.xml`) | [Publication](https://help.rustore.ru/rustore/for_developers) |
+| R6 | **Developer identity verification** | Yes | Confirm via Gosuslugi (Russian government portal) | [Registration](https://help.rustore.ru/rustore/for_developers) |
+| R7 | **152-ФЗ compliance** (personal data law) | Yes | App does not collect personal data → automatically compliant | [152-ФЗ](https://help.rustore.ru/rustore/for_developers) |
+| R8 | **No VPN/tor/anonymizer functionality** | Yes | Verify: app only connects to local robots | [Moderation policy](https://help.rustore.ru/rustore/for_developers) |
+| R9 | **APK signing** | Yes | Standard Android signing | [Publication](https://help.rustore.ru/rustore/for_developers) |
+| R10 | **No Google Play Services dependency** | Recommended | `grep -ri 'google.*services\|gms' app/build.gradle` — should be clean (GMS not available on RuStore devices) | [Compatibility](https://help.rustore.ru/rustore/for_developers) |
+
+**Note:** RuStore documentation is a client-side rendered SPA. The source URL above is the developer docs hub. Specific requirement pages should be verified manually by opening in a browser. RuStore moderation may also request additional documentation under Russian Federation laws.
 
 The following scripts should be wired into CI for automatic store-readiness
 gating. Each maps to one or more checks above:
@@ -146,6 +162,7 @@ review for: huawei
 review for: samsung
 review for: f-droid
 review for: amazon
+review for: rustore
 ```
 
 ### CI compliance only
