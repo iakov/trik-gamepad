@@ -4887,6 +4887,92 @@ connected tests) on both feat/global-refresh and upstream-pr-v2.
   produced useful answers; the "self-contained commits" question correctly
   identifies the upstream-pr-v2 split as a success pattern to repeat).*
 
+### [2026-09-17] Campaign 40 execution run — Pillow CVE fix, privacy policy, store-review skill, upstream PR prep
+
+Scope: (1) dev branch created from upstream/master + pushed; upstream pr-v2
+merged, (2) Pillow 11.3.0 → 12.3.0 bump — 20 Dependabot CVEs resolved;
+requires-python ≥3.9 → ≥3.10; pyproject.toml + uv.lock committed, (3) PRIVACY.md
+created (EN+RU, support@trikset.com, only INTERNET + ACCESS_NETWORK_STATE),
+(4) PR #37 created (fix/pillow-cves branch) for upstream Pillow CVE PR,
+(5) store-readiness reviewer skill created at
+`.opencode/skills/store-review/SKILL.md` covering 6 stores (Google Play, Huawei,
+Samsung, F-Droid, Amazon, RuStore) with 12 universal checks + per-store
+checklists, each citing a source URL, (6) RuStore section updated: 10 placeholder
+checks → 24 verified checks with actual docs URLs (lightpanda-rendered),
+(7) full store-compliance audit: 71 checks executed against the codebase,
+(8) U4 fix: in-app privacy policy link added (SettingsFragment.kt + 5 locale
+strings + pref_app.xml), (9) U12 fix: pr_gate.py Linux bugs fixed (C: path
+prepending on Linux, missing extensionless apkanalyzer candidate), (10) full
+gate passed (47 tasks, BUILD SUCCESSFUL, lint clean), (11) AGENTS.md uv.lock
+freshness check added to publishing gate, (12) post-implementation 5-agent
+review: PASSED across all lanes (goal, QA, code quality, security, context).
+
+**Process**
+
+- **Biggest process win:** the delegated explore agent for store research
+  discovered actual RuStore docs by rendering JS SPA; the lightpanda browser
+  fetch resolved www.rustore.ru pages that webfetch couldn't reach.
+- **What kept each commit self-contained:** the store-skill commits were cleanly
+  separable by concern (skill creation, RuStore update, compliance fixes).
+- **What could have been lost:** the pr_gate.py Linux bug found during the
+  store-compliance audit — would never have been caught without running the full
+  check suite on a dev machine.
+- **Elapsed vs Estimated:** the store-review skill as a universal, re-purposable
+  reviewer invoked via ask/review-for patterns means the next store audit is a
+  one-command operation.
+
+**Learning**
+
+- **New facts worth saving:**
+  - RuStore docs are a JS-rendered SPA at help.rustore.ru but render properly
+    via lightpanda at www.rustore.ru.
+  - Samsung Galaxy Store requires minSdk ≥ 23 (app is 21 — policy decision for
+    later).
+  - Google Play requires minSdk ≥ 34 for NEW apps from Aug 2025 (app already
+    published, different rules).
+  - In-app privacy policy link can be a simple preference row opening the repo's
+    PRIVACY.md URL in a browser via `Intent.ACTION_VIEW` and `toUri()` Ktx
+    extension.
+  - SettingsFragment uses `androidx.core.net.toUri` for clean URI parsing.
+- **What the gate caught:** full gate passed (47 tasks, BUILD SUCCESSFUL, lint
+  clean) after the U4/U12 fixes.
+
+**Signal**
+
+- **Frequency-scan:** top repeated diagnostic — Kotlin LSP not installed on dev
+  machine; compiled successfully via gradle instead.
+- **Rule deviations / missing rules:** commit discipline was good; no new
+  violations.
+
+**Drift**
+
+- **Per-doc audit:**
+  - MEMORY.md — this record.
+  - SKILL.md — new store-review skill.
+  - AGENTS.md — uv.lock gate added.
+  - PRIVACY.md — new file.
+
+**Value**
+
+- **Measurable profit:** 20 Dependabot CVEs resolved. Store-compliance audit
+  completed: app now has in-app privacy policy link, pr_gate works on Linux.
+  Upstream PR #37 ready with Pillow CVE fix. Store-review skill enables
+  one-command store audits for all future releases.
+- **Deferred (→ `.PLAN.md`):** Samsung Galaxy Store minSdk ≥ 23 policy decision.
+- **Next automation candidates:** none new — the store-review skill already
+  automates the store audit.
+- **What I should have asked earlier:** nothing outstanding — the 5-agent review
+  covered goal, QA, code quality, security, and context lanes.
+
+**Checklist review (final step — do NOT skip)**
+
+- **New question added:** none.
+- **Most useful question this campaign:** "What keeps each commit self-contained?"
+  — the store-skill commits were cleanly separable (skill creation, RuStore
+  update, compliance fixes).
+- **Checklist stamp:** *Last revised: 2026-09-17 (C40 retrospective: all
+  questions produced useful answers)*
+
 ### [2026-09-17] Process notes: upstream PR merge, issue triage, dev branch lifecycle
 
 **PR merge pattern (adopted for upstream):**

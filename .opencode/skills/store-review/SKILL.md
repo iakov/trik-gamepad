@@ -108,7 +108,7 @@ Run before any store-specific review:
 |---|-------------|-----------|-------|--------|
 | R1 | **App functional and stable** (no crashes/errors) | Yes | `test` gate passes, no known crashes | [Requirements §1](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#1) |
 | R2 | **Self-contained app** (not just WebView wrapper) | Yes | Verify: native gamepad UI, not a website wrapper | [Requirements §1](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#1) |
-| R3 | **App name ≤30 chars**, identical on store and device | Yes | `grep app_name app/src/main/res/values/strings.xml` | [Publication §info](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication#) |
+| R3 | **App name ≤30 chars**, identical on store and device | Yes | `grep appLabel app/src/main/res/values/strings.xml` | [Publication §info](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication#) |
 | R4 | **Category selected** (e.g. Tools) | Yes | Manual: choose in RuStore Console | [Publication §category](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication/new-version-app/category) |
 | R5 | **Age restriction** (0+, 6+, 12+, 16+, 18+) | Yes | Manual: select in RuStore Console | [Publication §age](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/app-publication/new-version-app/age-restrictions) |
 | R6 | **Content/policy compliance**: no hate speech, porn, violence, illegal goods, IP infringement | Yes | Manual: review app content against requirements | [Requirements §2](https://www.rustore.ru/help/developers/publishing-and-verifying-apps/requirement-apps#app-contains) |
