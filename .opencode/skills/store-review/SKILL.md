@@ -27,6 +27,8 @@ Run before any store-specific review:
 |---|-------|---------------|-----------|
 | U1 | **minSdk ≥ store minimum** | `grep minSdk app/src/main/AndroidManifest.xml` | Check per store table below |
 | U2 | **No sensitive permissions** | `grep uses-permission app/src/main/AndroidManifest.xml` | Only INTERNET + ACCESS_NETWORK_STATE |
+| U2a | **Wi-Fi feature declared** | `grep 'uses-feature.*wifi' app/src/main/AndroidManifest.xml` | `android.hardware.wifi` should be `required="true"` (app needs Wi-Fi) |
+| U2b | **Location feature opt-out** | `grep 'uses-feature.*location' app/src/main/AndroidManifest.xml` | `android.hardware.location` should be `required="false"` (app does not use location) |
 | U3 | **Privacy policy exists** | `test -f PRIVACY.md` | Must exist |
 | U4 | **Privacy policy linked in-app** | `grep -r privacy\|PRIVACY app/src/main/kotlin/` | Link to PRIVACY.md or external URL |
 | U5 | **Open-source license** | `test -f LICENSE.txt` | Apache 2.0 |
@@ -44,12 +46,14 @@ Run before any store-specific review:
 
 | # | Requirement | Mandatory? | Check | Source |
 |---|-------------|-----------|-------|--------|
-| G1 | **minSdk ≥ 34** (from Aug 2025) | Yes | `grep minSdk app/src/main/AndroidManifest.xml` → must be ≥ 34 | Play Console |
+| G1 | **targetSdk ≥ 34** (from Aug 2025 for new apps) | Yes | `grep targetSdk app/build.gradle` → must be ≥ 34 (currently 36) | [Play Console policy](https://support.google.com/googleplay/android-developer/answer/17134731) |
 | G2 | **Privacy policy in store listing + in-app** | Yes | U3 + U4 must pass | [User Data Policy](https://support.google.com/googleplay/android-developer/answer/1078869) |
 | G3 | **Content rating (IARC)** | Yes | Submit Play Console questionnaire | [IARC](https://www.globalratings.com/) |
 | G4 | **Screenshots 2–8** (min 320 px) | Yes | Manual: prepare 2–8 screenshots at 1080×1920 or 1920×1080 | [Store listing](https://support.google.com/googleplay/android-developer/answer/9857753) |
 | G5 | **Feature graphic 1024×500** | Yes | Manual: prepare landscape banner | [Store listing](https://support.google.com/googleplay/android-developer/answer/9857753) |
 | G6 | **Data Safety section** | Yes | Fill Play Console form: no data collected → simplest declaration | [Data Safety](https://support.google.com/googleplay/android-developer/answer/10787469) |
+| G7 | **Android App Bundle (AAB)** | Recommended | `ls -la app/build/outputs/bundle/` — AAB is required for new apps since Aug 2021 | [Play Console](https://developer.android.com/google/play/requirements-tiers-new-apps) |
+| G8 | **Developer verification (2026)** | Yes | Complete Android Developer Verification in Play Console | [Play Console](https://support.google.com/googleplay/android-developer/answer/17134731) |
 | G7 | **14-day closed test** (new accounts) | Yes | 12+ testers, 14 days minimum engagement | [Testing](https://support.google.com/googleplay/android-developer/answer/140504) |
 | G8 | **Play App Signing** | Yes | Enabled in Play Console | [Signing](https://support.google.com/googleplay/android-developer/answer/9842756) |
 | G9 | **App description** (short ≤ 80, full ≤ 4000) | Yes | Write EN + RU (match PRIVACY.md languages) | [Store listing](https://support.google.com/googleplay/android-developer/answer/9857753) |
@@ -83,24 +87,36 @@ Run before any store-specific review:
 
 | # | Requirement | Mandatory? | Check | Source |
 |---|-------------|-----------|-------|--------|
-| F1 | **No proprietary dependencies** | Yes | `grep -ri 'google.*services\|firebase\|crashlytics' app/build.gradle` → zero | [Inclusion Policy](https://f-droid.org/docs/Inclusion_Policy/) |
-| F2 | **No tracking/analytics** | Yes | U6 must pass | [Inclusion Policy](https://f-droid.org/docs/Inclusion_Policy/) |
-| F3 | **Active maintenance** | Yes | CI green, recent commits | [Inclusion Policy](https://f-droid.org/docs/Inclusion_Policy/) |
-| F4 | **Useful to end users** | Yes | Manual: app is functional gamepad | [Inclusion Policy](https://f-droid.org/docs/Inclusion_Policy/) |
-| F5 | **Source reproducibility** | Recommended | `./gradlew clean assembleRelease` → compare APK hash | [Reproducibility](https://f-droid.org/docs/Reproducible_Builds/) |
-| F6 | **Anti-feature labels** | Yes | Declare: NonFreeNet (connects to network), maybe NoSourceSince | [Anti-Features](https://f-droid.org/docs/Anti-Features/) |
+| F1 | **FOSS license** (Apache 2.0, GPL, etc.) | Yes | `test -f LICENSE.txt` → Apache 2.0 | [Inclusion Policy §Free Software](https://f-droid.org/docs/Inclusion_Policy/#free-software-requirement) |
+| F2 | **No proprietary dependencies** (no GMS/Firebase) | Yes | `grep -ri 'google.*services\|firebase\|crashlytics' app/build.gradle` → zero | [Inclusion Policy §Free Software](https://f-droid.org/docs/Inclusion_Policy/#free-software-requirement) |
+| F3 | **No tracking/analytics** | Yes | U6 must pass (zero tracking libraries) | [Inclusion Policy §Free Software](https://f-droid.org/docs/Inclusion_Policy/#free-software-requirement) |
+| F4 | **Active maintenance** | Yes | CI green, recent commits, version tags | [Inclusion Policy §Quality](https://f-droid.org/docs/Inclusion_Policy/#quality-control) |
+| F5 | **Public source repo** | Yes | GitHub `trikset/trik-gamepad` | [Quick Start Guide §Prepare](https://f-droid.org/docs/Submitting_to_F-Droid_Quick_Start_Guide/#prepare-and-compliance-check) |
+| F6 | **Version tags** (e.g. `v2.44` for each release) | Yes | `git tag --sort=-creatordate \| head -5` | [Quick Start Guide §Upstream metadata](https://f-droid.org/docs/Submitting_to_F-Droid_Quick_Start_Guide/#upstream-metadata) |
+| F7 | **short_description.txt** (≤80 chars, no trailing dot) | Yes — only truly mandatory metadata file | Must exist at `fastlane/metadata/android/*/short_description.txt` | [All About Descriptions §Fastlane](https://f-droid.org/docs/All_About_Descriptions_Graphics_and_Screenshots/#fastlane-structure) |
+| F8 | **full_description.txt** (≤4000 chars) | Yes — same as F7 | Must exist at `fastlane/metadata/android/*/full_description.txt` | [All About Descriptions §Fastlane](https://f-droid.org/docs/All_About_Descriptions_Graphics_and_Screenshots/#fastlane-structure) |
+| F9 | **Anti-feature labels** (if applicable) | Yes | Declare in fdroiddata `.yml` metadata: no anti-features needed (tracking-free, no NonFreeNet — robot runs FOSS, no ads, no NonFreeDeps) | [Anti-Features](https://f-droid.org/docs/Anti-Features/) |
+| F10 | **Icon** (512×512 PNG) | For Latest tab | Must exist at `fastlane/metadata/android/*/images/icon.png` | [Latest tab criteria](https://f-droid.org/docs/All_About_Descriptions_Graphics_and_Screenshots/#latest-tab-criteria) |
+| F11 | **Screenshot or featureGraphic** | For Latest tab | At least one: `phoneScreenshots/1.png` or `featureGraphic.png` | [Latest tab criteria](https://f-droid.org/docs/All_About_Descriptions_Graphics_and_Screenshots/#latest-tab-criteria) |
+| F12 | **What's New changelog** (≤500 chars, name = versionCode) | For Latest tab | `fastlane/metadata/android/*/changelogs/<versionCode>.txt` | [Latest tab criteria](https://f-droid.org/docs/All_About_Descriptions_Graphics_and_Screenshots/#latest-tab-criteria) |
+| F13 | **At least one field translated** | For Latest tab | ru locale has short/full descriptions translated | [Latest tab criteria](https://f-droid.org/docs/All_About_Descriptions_Graphics_and_Screenshots/#latest-tab-criteria) |
+| F14 | **Source reproducibility** | Recommended | `./gradlew clean assembleRelease` → compare APK hash | [Reproducibility](https://f-droid.org/docs/Reproducible_Builds/) |
+
+**Note:** The fdroiddata build metadata `.yml` file (RepoType, Repo, Builds blocks, License, AutoUpdateMode) lives in the F-Droid GitLab repository (`fdroiddata`), not in this repo. The fastlane metadata above is what we maintain in our source repository. Three equivalent structures are accepted by F-Droid: (a) Fastlane at `fastlane/metadata/android/<locale>/`, (b) Triple-T at `<module>/src/main/play/`, (c) directly in the fdroiddata `.yml` metadata file. Fastlane is the simplest for single-module apps.
 
 ### Amazon Appstore
 
+**⚠️ Amazon Appstore for Android was discontinued on August 20, 2025.** You can no longer submit or update apps for Android mobile devices. Only Fire TV, Fire Tablets, and Fire TV built-in (Vega OS) are supported. This checklist is for Fire OS device publishing only — skip unless targeting Fire hardware.
+
 | # | Requirement | Mandatory? | Check | Source |
 |---|-------------|-----------|-------|--------|
-| A1 | **minSdk ≥ 21** | Yes | Already met | [Developer docs](https://developer.amazon.com/docs/app-submission/app-submission-checklist.html) |
-| A2 | **Privacy policy** | Yes | U3 + U4 must pass | [Agreement](https://developer.amazon.com/docs/app-submission/app-submission-checklist.html) |
-| A3 | **Content rating** | Yes | Self-rate (G, PG, PG-13, R, M) | [Developer Console](https://developer.amazon.com/) |
-| A4 | **Screenshots 1–10** (1280×800 or 800×1280) | Yes | Manual | [Submission](https://developer.amazon.com/docs/app-submission/app-submission-checklist.html) |
-| A5 | **Icon 114×114** | Yes | Extra density needed (not in mipmap) | [Submission](https://developer.amazon.com/docs/app-submission/app-submission-checklist.html) |
-| A6 | **Fire OS compatibility** | Yes | Test on Fire tablet (Amazon offers Remote Test Lab) | [Testing](https://developer.amazon.com/docs/app-testing/remote-test-lab.html) |
-| A7 | **DRM for video** | No | MJPEG/RTSP streams are DRM-free — no issue | [Policy](https://developer.amazon.com/docs/app-submission/app-submission-checklist.html) |
+| A1 | **Fire OS target** (not Android mobile) | Yes | App targets Fire TV/Tablet, not general Android | [Release Notes](https://developer.amazon.com/docs/app-submission/release-notes.html) |
+| A2 | **TV-compatible lifecycle** | Yes | Media streams and socket interfaces must release audio focus on navigate-away | [Amazon Docs](https://developer.amazon.com/) |
+| A3 | **Privacy policy** | Yes | U3 + U4 must pass | [Appstore Agreement](https://developer.amazon.com/docs/app-submission/presubmission-checklist.html) |
+| A4 | **Content rating** | Yes | Self-rate (G, PG, PG-13, R, M) | [Developer Console](https://developer.amazon.com/) |
+| A5 | **Screenshots** (Fire device, not Android phone) | Yes | Capture on Fire TV/Tablet, not phone | [Taking Screenshots](https://developer.amazon.com/docs/app-submission/taking-screenshots.html) |
+| A6 | **App Bundles (AAB)** supported | Yes | Amazon accepts AAB format (since May 2022) | [App Bundles](https://developer.amazon.com/docs/app-submission/app-bundles.html) |
+| A7 | **Fire OS compatibility** | Yes | Test on actual Fire device (Amazon offers Remote Test Lab) | [Testing](https://developer.amazon.com/docs/app-testing/remote-test-lab.html) |
 
 ### RuStore
 
