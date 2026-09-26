@@ -57,8 +57,4 @@ app/.gradle
 
 # Scratch (repo-local temp files; see AGENTS.md)
 .tmp/
-# OpenCode session artifacts (internal, not for version control)
-.omo/
-
-# Release tag text files (generated locally, not part of source)
-release-v*.md
+.opencode/opencode.json

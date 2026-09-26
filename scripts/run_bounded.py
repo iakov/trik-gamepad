@@ -19,7 +19,8 @@ This combination guarantees the caller always returns: the pipe EOF is decided
 by the reader thread, and proc.wait() is bounded by the timeout.
 
 Usage:
-  uv run python scripts/run_bounded.py --timeout 600 --label assembleDebug --log .tmp/x.log -- gradlew.bat --no-daemon assembleDebug
+  uv run python scripts/run_bounded.py --timeout 600 --label assembleDebug --log .tmp/x.log \
+    -- gradlew.bat --no-daemon assembleDebug
   uv run python scripts/run_bounded.py --timeout 120 -- adb -s emulator-5556 install -r app.apk
 
 Exit code: the wrapped command's exit code, or 124 on timeout. On timeout the
@@ -101,7 +102,9 @@ def run(timeout: float, label: str, cmd: list[str], log: str | None) -> int:
         close_sink = f.close
     else:
         sink = sys.stdout
-        close_sink = lambda: None  # noqa: E731
+
+        def close_sink() -> None:
+            pass
 
     # Always PIPE: if the child tree inherits the caller's own stdout/stderr,
     # the pipe EOF (and therefore the bash tool's return) waits on every

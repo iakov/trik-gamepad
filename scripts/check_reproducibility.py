@@ -84,6 +84,7 @@ def main() -> int:
         return 2
 
     try:
+        moved = False  # referenced in finally; set True only after successful rename
         print("== F-Droid reproducible build check ==")
 
         env = dict(os.environ)
@@ -91,14 +92,14 @@ def main() -> int:
         # upstream). Move the symlink aside (inside project .tmp/), build, then
         # restore it exactly. The keystore contents are never read.
         backup = ROOT / ".tmp" / "android-keystorage.p12.reprod-bak"
-        moved = KEYSTORE.exists()
-        if moved:
+        if KEYSTORE.exists():
             os.rename(KEYSTORE, backup)
+            moved = True
             print(f"[1/3] keystore moved aside: {KEYSTORE.name} (absent during build)")
         else:
             print("[1/3] keystore already absent — good (F-Droid environment)")
 
-# Keep the keystore absent for BOTH builds (F-Droid environment has no
+        # Keep the keystore absent for BOTH builds (F-Droid environment has no
         # keystore); restore at the very end.
         if args.skip_build_1:
             print("[2/3] skipping build #1 (--skip-build-1)")

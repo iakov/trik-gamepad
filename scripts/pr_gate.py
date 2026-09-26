@@ -20,8 +20,6 @@ import shutil
 import subprocess
 import sys
 
-from run_bounded import run
-
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_DIR = os.path.join(ROOT, ".tmp")
 LOG = os.path.join(LOG_DIR, "pr_gate.log")
@@ -71,7 +69,10 @@ def apkanalyzer() -> str:
     for c in candidates:
         if c and os.path.isfile(c):
             return c
-    sys.exit(f"apkanalyzer not found. Install cmdline-tools or set ANDROID_SDK_ROOT.\n  Tried: sdk={sdk}, candidates={candidates}")
+    sys.exit(
+        "apkanalyzer not found. Install cmdline-tools or set ANDROID_SDK_ROOT.\n"
+        f"  Tried: sdk={sdk}, candidates={candidates}"
+    )
 
 
 def check_apk_summary(apk: str) -> int:
@@ -127,7 +128,7 @@ def check_permissions(apk: str, baseline: set[str] | None = None) -> int:
     tool = apkanalyzer()
     out = _cmd_output([tool, "manifest", "permissions", apk])
     append_log(out)
-    perms = set(p.strip() for p in out.strip().split("\n") if p.strip())
+    perms = {p.strip() for p in out.strip().split("\n") if p.strip()}
     for p in sorted(perms):
         print(f"    {p}")
     if baseline is not None:
@@ -144,16 +145,18 @@ def check_dex_refs(apk: str, max_refs: int = 60000) -> int:
     out = _cmd_output([tool, "dex", "references", apk])
     append_log(out)
     total = 0
+    dex_count = 0
     for line in out.splitlines():
         line = line.strip()
         if not line or "\t" not in line:
             continue
+        dex_count += 1
         try:
             n = int(line.split("\t")[1])
             total += n
         except (ValueError, IndexError):
             pass
-    print(f"    {total} total references across {len([l for l in out.splitlines() if l.strip()])} dex files")
+    print(f"    {total} total references across {dex_count} dex files")
     if total > max_refs:
         print(f"FAILED: {total} references exceeds threshold of {max_refs}")
         return 1
@@ -183,6 +186,7 @@ def check_icon_densities(apk: str, icon_name: str = "trik_gamepad_logo") -> int:
 def check_large_blobs(apk: str) -> int:
     print("==> Unexpected large files (>500 KB non-dex)")
     import zipfile
+
     large: list[str] = []
     try:
         with zipfile.ZipFile(apk, "r") as zf:
@@ -191,7 +195,7 @@ def check_large_blobs(apk: str) -> int:
                     continue
                 # Standard APK paths we don't flag
                 fname = info.filename.replace("\\", "/")
-                if fname.startswith("res/") or fname.startswith("META-INF/"):
+                if fname.startswith(("res/", "META-INF/")):
                     continue
                 if fname.startswith("classes") and fname.endswith(".dex"):
                     continue
@@ -204,8 +208,8 @@ def check_large_blobs(apk: str) -> int:
         print(f"FAILED: {e}")
         return 1
     if large:
-        for l in large:
-            print(l)
+        for entry in large:
+            print(entry)
         print(f"Found {len(large)} large non-standard file(s)")
     else:
         print("    no non-standard large files found")

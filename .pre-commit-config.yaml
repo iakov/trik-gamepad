@@ -10,6 +10,17 @@ repos:
     rev: 0.7.21
     hooks:
       - id: mdformat
+  # Python discipline (scripts/, AGENTS.md semantics: correctness over style).
+  # Select E,F,W,N is pinned in pyproject.toml [tool.ruff]; BLE/S/DTZ/PLW stay
+  # out by design (run_bounded.py intentional blind-exception teardown).
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.5
+    hooks:
+      - id: ruff
+        args: [check, --fix]
+        files: ^scripts/.*\.py$
+      - id: ruff-format
+        files: ^scripts/.*\.py$
   # Format Kotlin at commit time so spotlessCheck never fails the gate on
   # formatting (AGENTS.md "Format before you gate"). Cross-platform:
   # `python scripts/spotless_apply.py` (language: system) picks gradlew.bat vs
