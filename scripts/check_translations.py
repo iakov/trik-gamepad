@@ -70,8 +70,7 @@ def sync_check() -> int:
     locales = sorted(
         d
         for d in os.listdir(RES_DIR)
-        if os.path.isdir(os.path.join(RES_DIR, d))
-        and re.fullmatch(r"values-[a-z]{2}", d)
+        if os.path.isdir(os.path.join(RES_DIR, d)) and re.fullmatch(r"values-[a-z]{2}", d)
     )
     if not locales:
         print("FAILED: no values-* locale directories found")
@@ -122,9 +121,7 @@ def save_cache(cache: dict) -> None:
 def translate(text: str, src: str) -> str | None:
     """Back-translate <src> -> en via MyMemory's free API; returns None on failure."""
     url = "https://api.mymemory.translated.net/get?{}".format(
-        urllib.parse.urlencode(
-            {"q": text, "langpair": f"{src}|en", "de": "me@trik-gamepad.invalid"}
-        )
+        urllib.parse.urlencode({"q": text, "langpair": f"{src}|en", "de": "me@trik-gamepad.invalid"})
     )
     try:
         with urllib.request.urlopen(url, timeout=20) as resp:
@@ -181,9 +178,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="trik-gamepad translation checks")
     parser.add_argument("--sync", action="store_true", help="deterministic key/specifier parity check")
     parser.add_argument("--back-translate", action="store_true", help="online back-translation review")
-    parser.add_argument(
-        "--locales", nargs="+", default=["ru", "fr", "de", "vi"], help="locales to back-translate"
-    )
+    parser.add_argument("--locales", nargs="+", default=["ru", "fr", "de", "vi"], help="locales to back-translate")
     parser.add_argument("--min-ratio", type=float, default=0.5, help="similarity threshold (0..1)")
     parser.add_argument("--strict", action="store_true", help="fail when rows fall below the threshold")
     args = parser.parse_args()

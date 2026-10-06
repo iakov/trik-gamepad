@@ -1,3 +1,0 @@
--F-Droid scanner compliance: removed encrypted dependency metadata block.
--Pre-release validation gates prevent metadata drift.
--F-Droid submission template for consistent metadata generation.

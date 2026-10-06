@@ -1,3 +1,6 @@
+# Copyright 2013 Iakov Kirilenko. Licensed under Apache-2.0.
+# See LICENSE.txt for full terms.
+#
 # F-Droid submission metadata template for TRIK Gamepad
 #
 # Before submitting to fdroiddata, generate the actual file with:
@@ -12,6 +15,9 @@
 Categories:
   - Connectivity
 License: Apache-2.0
+AuthorName: Iakov Kirilenko
+AuthorEmail: jake.kirilenko@gmail.com
+AuthorWebSite: https://github.com/iakov
 SourceCode: https://github.com/trikset/trik-gamepad
 IssueTracker: https://github.com/trikset/trik-gamepad/issues
 Changelog: https://github.com/trikset/trik-gamepad/releases

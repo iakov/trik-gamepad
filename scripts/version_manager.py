@@ -198,6 +198,11 @@ def check_fdroiddata(version: Version) -> list[str]:
         issues.append(f"missing changelog: {changelog.relative_to(ROOT)} "
                       "(create it before release)")
 
+    # 8. Author fields present (F-Droid maintainer requirement)
+    for field in ("AuthorName:", "AuthorEmail:", "AuthorWebSite:"):
+        if not re.search(rf"^{field}\s+\S+", text, re.MULTILINE):
+            issues.append(f"fdroiddata: missing {field}")
+
     return issues
 
 

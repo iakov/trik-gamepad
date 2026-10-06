@@ -122,6 +122,11 @@ object DummyRobotServer {
     private val serverSocket = ServerSocket(port)
     private var running = true
     val clients = AtomicInteger(0)
+    /** Tracks pad positions (pad1 x/y, pad2 x/y) for semantic validation. */
+    private val pad1X = AtomicInteger(0)
+    private val pad1Y = AtomicInteger(0)
+    private val pad2X = AtomicInteger(0)
+    private val pad2Y = AtomicInteger(0)
 
     fun start() {
       Thread {
@@ -162,6 +167,7 @@ object DummyRobotServer {
             // Any incoming message proves the client is alive (re-charges the watchdog clock).
             lastMessageMs.set(System.currentTimeMillis())
             announceKeepaliveIfPresent(line, announcedKeepaliveMs)
+            trackPadState(line)
             val marker = if (line.startsWith(CUSTOM_PREFIX)) "TCP< custom" else "TCP<"
             System.out.println(
                 "${LocalTime.now().format(TIME_FORMAT)} $marker ${client.inetAddress.hostAddress}: $line"
@@ -185,6 +191,37 @@ object DummyRobotServer {
       if (line.startsWith(KEEPALIVE_PREFIX)) {
         line.substring(KEEPALIVE_PREFIX.length).trim().toIntOrNull()?.let {
           announcedKeepaliveMs.set(it)
+        }
+      }
+    }
+
+    /**
+     * Parses `pad N x y` and `pad N up` commands and tracks the pad state. Prints a state-change
+     * marker when a pad position changes or is released. This is the reference-sanity check:
+     * connected clients that send `pad N up` MUST reset the tracked position to (0,0).
+     */
+    private fun trackPadState(line: String) {
+      val parts = line.trim().split("\\s+")
+      if (parts.size < 2) return
+      if (parts[0] == "pad" && parts.size >= 4) {
+        val id = parts[1].toIntOrNull() ?: return
+        val x = parts[2].toIntOrNull() ?: return
+        val y = parts[3].toIntOrNull() ?: return
+        if (id == 1) {
+          pad1X.set(x)
+          pad1Y.set(y)
+        } else if (id == 2) {
+          pad2X.set(x)
+          pad2Y.set(y)
+        }
+      } else if (parts[0] == "pad" && parts[1] == "up" && parts.size >= 2) {
+        val id = parts[1].toIntOrNull() ?: return
+        if (id == 1) {
+          pad1X.set(0)
+          pad1Y.set(0)
+        } else if (id == 2) {
+          pad2X.set(0)
+          pad2Y.set(0)
         }
       }
     }
