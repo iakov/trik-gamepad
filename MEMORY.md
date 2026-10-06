@@ -5282,4 +5282,31 @@ Branch: `feat/pad-send-interval`. Estimated: 4 h. Elapsed: ~6 h (3 h feature +
 
 5. **`-X theirs` on cherry-pick is a gamble on dev-only files.** Use it for .kt files (where upstream is autoritative). Do NOT use it for .md files (where dev has unique content). Resolve .md conflicts manually.
 
-6. **Squash before editing, not after.** If the end state is 1 commit, create it FIRST, then make changes. Squashing after content edits multiplies the risk of losing uncommitted work. (Fully attributable to this session — the squash went clean mostly by luck.)
+6. **Squash before editing, not after.** If the end state is 1 commit, create it FIRST, then make changes. Squashing after content edits multiplies the risk of losing uncommitted work.
+
+### [2026-10-06] Screenshot & emulator waste — v2.48 release prep
+
+**Key learning: verify tool capabilities BEFORE spending effort.**
+
+Three things were wasted:
+
+| Waste | Root cause | Save next time |
+|-------|------------|----------------|
+| **30 min fighting Russian locale** | Tried `LANG=ru`, `setprop`, `adb shell env`, locale packs — none work. The Android AVD system image has one locale (English) and it cannot be changed without rebuilding the image. | Check `adb shell locale -a` and `locales` availability FIRST (3 seconds). If Russian isn't there, skip — accept English screenshots or note "locale not available on AVD." |
+| **20 min fighting TCP/video "connected" state** | Tried to set up TCP server + MJPEG stream + IP routing between emulator and host. Emulator is on a virtual 10.0.2.x network; adding routes requires root (not available). `adb shell input text` appends, never replaces, making target IP reconfiguration via UI unreliable. | The "connected with video" screenshot is not achievable on a standard AVD without a real robot on the same network. Accept this upfront — the disconnected HUD screenshot is sufficient for documentation. |
+| **10 min fighting text input** | `adb shell input text` ALWAYS appends, never replaces existing content. Tried key events (backspace, delete) — no reliable method to clear a field before entering text. | Use `adb shell input text` only for empty fields. For pre-filled fields, either modify the app's preference database directly (`/data/data/...`) or accept the default value. |
+
+**Other learnings:**
+
+1. **`.kotlin/` and `.omo/run-continuation/` must be in `.gitignore`** — These LSP/build artifact files keep sneaking into commits via `git add -A`. Add to `.gitignore` as soon as they appear. The root cause was not having `.gitignore` entries for `.kotlin/` and `.omo/run-continuation/`.
+
+2. **`version_manager.py check` should run before ANY release PR** — It catches missing fdroiddata metadata, stale version properties, AND now also checks for the tag description file. This prevents the "forgot tag description" failure mode.
+
+3. **Tag description must exist BEFORE tagging** — The `.tmp/v<version>.tag` file is the gate. If it doesn't exist when `version_manager.py check` runs, the check fails. This was the guardrail added after this campaign.
+
+4. **Emulator AVD limitations summary (for future reference):**
+   - No locale switching — English only
+   - No root access — can't add routes, modify system files
+   - `adb shell input text` appends — can't reliably edit pre-filled fields
+   - Network isolation — 10.0.2.x virtual network, no host connectivity without route config
+   - Screenshots are for DISCONNECTED state and settings only — connected state requires a real robot

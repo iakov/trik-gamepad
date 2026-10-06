@@ -62,3 +62,7 @@ app/.gradle
 
 # Release tag text files (generated locally, not part of source)
 release-v*.md
+
+# LSP build artifacts
+.kotlin/
+
