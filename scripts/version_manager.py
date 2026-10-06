@@ -241,7 +241,16 @@ def cmd_check(_args) -> int:
         capture_output=True,
         text=True,
     ).stdout.strip()
-    print(f"  git tag v{version.name}: {'exists' if tags else 'NOT TAGGED yet (normal during development)'}")
+    tagged = bool(tags)
+    print(f"  git tag v{version.name}: {'exists' if tagged else 'NOT TAGGED yet (normal during development)'}")
+
+    # Tag description file (.tmp/v<version>.tag) must exist when about to tag.
+    tag_file = ROOT / ".tmp" / f"v{version.name}.tag"
+    if not tagged and not tag_file.exists():
+        issues.append(f"missing tag description: create {tag_file.relative_to(ROOT)} before signing "
+                      "(run `.tmp/create-tag-desc.sh` or write manually)")
+    elif not tagged:
+        print(f"  tag description: {tag_file.relative_to(ROOT)} ready")
 
     # F-Droid metadata validation
     print()
@@ -290,8 +299,9 @@ def cmd_bump(args) -> int:
               "(gitignored — copy to fdroiddata repo when submitting)")
     else:
         print(f"  3. uv run python scripts/check_reproducibility.py  (F-Droid gate)")
-    print(f"  5. git tag -s v{new.name} upstream/master")
-    print(f"  6. git push upstream v{new.name}")
+    print(f"  5. create tag description: bash .tmp/create-tag-desc.sh")
+    print(f"  6. git tag -s v{new.name} upstream/master -F .tmp/v{new.name}.tag")
+    print(f"  7. git push upstream v{new.name}")
     return 0
 
 
